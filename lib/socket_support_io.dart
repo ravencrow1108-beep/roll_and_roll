@@ -21,6 +21,7 @@ class IoRoomServerHandle implements RoomServerHandle {
   IoRoomServerHandle(this._serverSocket) : _sc = StreamController<String>();
 
   final ServerSocket _serverSocket;
+  StreamSubscription<Socket>? _serverSub;
   final StreamController<String> _sc;
   final List<_ClientInfo> _clients = [];
 
@@ -57,9 +58,11 @@ class IoRoomServerHandle implements RoomServerHandle {
 
   @override
   Future<void> close() async {
+    await _serverSub?.cancel();
+    _serverSub = null;
     for (final c in [..._clients]) {
       try {
-        await c.socket.close();
+        c.socket.destroy();
       } catch (_) {}
     }
     _clients.clear();
@@ -76,7 +79,7 @@ Future<RoomServerHandle> startServer(
   final serverSocket = await ServerSocket.bind(InternetAddress.anyIPv4, port);
   final handle = IoRoomServerHandle(serverSocket);
 
-  serverSocket.listen((socket) {
+  handle._serverSub = serverSocket.listen((socket) {
     final remote = socket.remoteAddress.address;
     bool joined = false;
 
@@ -112,7 +115,7 @@ Future<RoomServerHandle> startServer(
           }
         } catch (_) {
           try {
-            socket.close();
+            socket.destroy();
           } catch (_) {}
         }
       },

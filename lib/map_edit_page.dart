@@ -39,7 +39,9 @@ class _MapEditPageState extends State<MapEditPage> {
   @override
   void initState() {
     super.initState();
-    _saveFilePath = widget.saveFilePath;
+    _saveFilePath = (widget.saveFilePath?.isEmpty ?? true)
+        ? null
+        : widget.saveFilePath;
     if (_saveFilePath != null) {
       _saveFileName = _saveFilePath!.split('/').last.split('\\').last;
       _loadSaveData();

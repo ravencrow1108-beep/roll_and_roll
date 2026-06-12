@@ -36,6 +36,7 @@ class _JoinedRoomPageState extends State<JoinedRoomPage> {
   void initState() {
     super.initState();
     RoomSession.instance.membersNotifier.addListener(_handleMembersChanged);
+    RoomSession.instance.memberRolesNotifier.addListener(_handleMembersChanged);
 
     _msgSub = widget.clientHandle.messages.listen((msg) {
       _handleMessage(msg);
@@ -55,16 +56,22 @@ class _JoinedRoomPageState extends State<JoinedRoomPage> {
 
         case 'start_adventure':
           if (!mounted) return;
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => CharacterSelectPage(
-                playerName: widget.playerName,
-                role: widget.role,
-                saveFilePath: data['saveFilePath'] as String? ?? '',
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => CharacterSelectPage(
+                  playerName: widget.playerName,
+                  role: widget.role,
+                  saveFilePath:
+                      (data['saveFilePath'] as String?)?.isEmpty == true
+                      ? null
+                      : data['saveFilePath'] as String?,
+                ),
               ),
-            ),
-          );
+            );
+          });
           break;
 
         case 'member_joined':
@@ -88,6 +95,10 @@ class _JoinedRoomPageState extends State<JoinedRoomPage> {
   void dispose() {
     _msgSub?.cancel();
     RoomSession.instance.membersNotifier.removeListener(_handleMembersChanged);
+    RoomSession.instance.memberRolesNotifier.removeListener(
+      _handleMembersChanged,
+    );
+    widget.clientHandle.close();
     super.dispose();
   }
 

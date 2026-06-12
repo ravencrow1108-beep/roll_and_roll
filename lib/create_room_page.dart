@@ -34,6 +34,7 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
       roomAddress: _roomAddress,
     );
     RoomSession.instance.membersNotifier.addListener(_onMembersChanged);
+    RoomSession.instance.memberRolesNotifier.addListener(_onMembersChanged);
   }
 
   void _onMembersChanged() {
@@ -125,32 +126,33 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
   }
 
   Future<void> _stopHosting() async {
-    await _server?.close();
-    if (!mounted) {
-      return;
+    final server = _server;
+    _server = null;
+    if (server != null) {
+      await server.close().timeout(const Duration(seconds: 2));
     }
+    if (!mounted) return;
+    RoomSession.instance.reset();
     setState(() {
-      _server = null;
       _isHosting = false;
       _status = '已关闭端口';
       _roomAddress = '等待开放端口';
     });
-    RoomSession.instance.initializeHost(
-      widget.playerName,
-      roomAddress: _roomAddress,
-    );
   }
 
   void _startAdventure(BuildContext context) {
     if (!mounted || !context.mounted) return;
 
     // Broadcast the start_adventure event to all players
-    RoomSession.instance.broadcast({
+    final msg = <String, dynamic>{
       'type': 'start_adventure',
       'from': widget.playerName,
       'role': _role,
-      'saveFilePath': _saveFilePath ?? '',
-    });
+    };
+    if (_saveFilePath != null && _saveFilePath!.isNotEmpty) {
+      msg['saveFilePath'] = _saveFilePath;
+    }
+    RoomSession.instance.broadcast(msg);
 
     Navigator.push(
       context,
@@ -167,6 +169,7 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
   @override
   void dispose() {
     RoomSession.instance.membersNotifier.removeListener(_onMembersChanged);
+    RoomSession.instance.memberRolesNotifier.removeListener(_onMembersChanged);
     _server?.close();
     _portController.dispose();
     super.dispose();
@@ -175,7 +178,21 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('新建房间')),
+      appBar: AppBar(
+        title: const Text('新建房间'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () async {
+            final navigator = Navigator.of(context);
+            if (_isHosting) {
+              await _stopHosting();
+            }
+            if (mounted) {
+              navigator.pop();
+            }
+          },
+        ),
+      ),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(20),

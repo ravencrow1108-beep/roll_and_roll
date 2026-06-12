@@ -53,8 +53,17 @@ class _AdventurePageState extends State<AdventurePage> {
       _loadSaveData();
     }
 
-    // Listen for messages
     final session = RoomSession.instance;
+
+    // If the map was already set before this page was created
+    // (e.g. MapEditPage set it before pushing AdventurePage),
+    // pick it up immediately — the listener won't fire for past values.
+    if (session.mapNotifier.value != null) {
+      _adventureStarted = true;
+      _displayedMap = session.mapNotifier.value;
+    }
+
+    // Listen for messages
     final stream = _isGM
         ? session.serverHandle?.messages
         : session.clientHandle?.messages;

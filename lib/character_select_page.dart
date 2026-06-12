@@ -39,7 +39,9 @@ class _CharacterSelectPageState extends State<CharacterSelectPage> {
   @override
   void initState() {
     super.initState();
-    _saveFilePath = widget.saveFilePath;
+    _saveFilePath = (widget.saveFilePath?.isEmpty ?? true)
+        ? null
+        : widget.saveFilePath;
     if (_saveFilePath != null) {
       _saveFileName = _saveFilePath!.split('/').last.split('\\').last;
       _loadSaveData();
@@ -59,6 +61,12 @@ class _CharacterSelectPageState extends State<CharacterSelectPage> {
 
       if (type == 'adventure_started') {
         if (!mounted) return;
+        // Set the map immediately so AdventurePage can pick it up on init
+        if (data['map'] != null) {
+          RoomSession.instance.mapNotifier.value = MapData.fromJson(
+            data['map'] as Map<String, dynamic>,
+          );
+        }
         Navigator.push(
           context,
           MaterialPageRoute(
