@@ -1,5 +1,7 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
+import 'adventure_page.dart';
 import 'room_state.dart';
 import 'socket_support.dart';
 
@@ -181,6 +183,8 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
   bool _isHosting = false;
   String _status = '尚未开放端口';
   String _roomAddress = '等待开放端口';
+  String? _saveFilePath;
+  String _saveFileName = '未选择';
 
   @override
   void initState() {
@@ -193,6 +197,19 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
   void _handleMembersChanged() {
     if (mounted) {
       setState(() {});
+    }
+  }
+
+  Future<void> _selectSaveFile() async {
+    final result = await FilePicker.platform.pickFiles(
+      dialogTitle: '选择存档文件',
+      type: FileType.any,
+    );
+    if (result != null && result.files.single.path != null) {
+      setState(() {
+        _saveFilePath = result.files.single.path!;
+        _saveFileName = result.files.single.name;
+      });
     }
   }
 
@@ -289,7 +306,6 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
   }
 
   @override
-  @override
   void dispose() {
     RoomSession.instance.membersNotifier.removeListener(_handleMembersChanged);
     _server?.close();
@@ -346,6 +362,56 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
                       Text('房间地址: $_roomAddress'),
                     ],
                   ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                '选择存档',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: Card(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.save_outlined),
+                            const SizedBox(width: 12),
+                            Expanded(child: Text(_saveFileName)),
+                            IconButton(
+                              icon: const Icon(Icons.folder_open),
+                              tooltip: '选择存档文件',
+                              onPressed: _selectSaveFile,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => AdventurePage(
+                          playerName: widget.playerName,
+                          saveFilePath: _saveFilePath,
+                        ),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.rocket_launch_outlined),
+                  label: const Text('开始冒险'),
                 ),
               ),
               const SizedBox(height: 24),
