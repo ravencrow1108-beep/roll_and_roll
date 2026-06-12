@@ -1,5 +1,5 @@
+import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -7,7 +7,6 @@ import 'package:flutter/material.dart';
 import 'adventure_page.dart';
 import 'create_save_page.dart';
 import 'room_state.dart';
-import 'save_data.dart';
 import 'socket_support.dart';
 
 void main() {
@@ -54,18 +53,13 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _openPage(BuildContext context, Widget page) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => page),
-    );
+    Navigator.push(context, MaterialPageRoute(builder: (_) => page));
   }
 
   void _handleRoomAction(BuildContext context, Widget page) {
     if (_webUnsupported) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('当前 Web 端无法使用房间创建与加入功能，请在桌面端运行。'),
-        ),
+        const SnackBar(content: Text('当前 Web 端无法使用房间创建与加入功能，请在桌面端运行。')),
       );
       return;
     }
@@ -104,9 +98,9 @@ class _HomePageState extends State<HomePage> {
                   const SizedBox(height: 12),
                   Text(
                     '选择你想要开始的方式',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: Colors.grey[700],
-                    ),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.titleMedium?.copyWith(color: Colors.grey[700]),
                   ),
                   const SizedBox(height: 24),
                   if (_webUnsupported)
@@ -116,7 +110,10 @@ class _HomePageState extends State<HomePage> {
                         padding: const EdgeInsets.all(12),
                         child: Row(
                           children: [
-                            const Icon(Icons.warning_amber_rounded, color: Colors.orange),
+                            const Icon(
+                              Icons.warning_amber_rounded,
+                              color: Colors.orange,
+                            ),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
@@ -188,8 +185,9 @@ class CreateRoomPage extends StatefulWidget {
 }
 
 class _CreateRoomPageState extends State<CreateRoomPage> {
-  final TextEditingController _portController = TextEditingController(text: '33333');
-  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _portController = TextEditingController(
+    text: '33333',
+  );
   RoomServerHandle? _server;
   bool _isHosting = false;
   String _status = '尚未开放端口';
@@ -201,15 +199,10 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
   @override
   void initState() {
     super.initState();
-    RoomSession.instance.initializeHost(widget.playerName, roomAddress: _roomAddress);
-    _nameController.text = widget.playerName;
-    RoomSession.instance.membersNotifier.addListener(_handleMembersChanged);
-  }
-
-  void _handleMembersChanged() {
-    if (mounted) {
-      setState(() {});
-    }
+    RoomSession.instance.initializeHost(
+      widget.playerName,
+      roomAddress: _roomAddress,
+    );
   }
 
   Future<void> _selectSaveFile() async {
@@ -257,15 +250,20 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
 
       final server = await PlatformSocketSupport.startServer(
         port,
-        onClient: (remoteAddress) {
-          final playerName = '玩家 $remoteAddress';
+        onClient: (remoteAddress, name) {
           if (!mounted) {
             return;
           }
-          RoomSession.instance.addMember(playerName);
+          RoomSession.instance.addMember(name);
+          // Tell all other clients about the new member
+          RoomSession.instance.broadcast({
+            'type': 'member_joined',
+            'name': name,
+          });
         },
       );
       _server = server;
+      RoomSession.instance.setServerHandle(server);
 
       if (!mounted) {
         return;
@@ -305,76 +303,33 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
     );
   }
 
-  void _addPlayer() {
-    final name = _nameController.text.trim();
-    if (name.isEmpty) {
-      return;
-    }
-    RoomSession.instance.addMember(name);
-    _nameController.clear();
-    if (mounted) {
-      setState(() {});
-    }
-  }
-
-  Future<void> _startAdventure(BuildContext context) async {
-    String? characterName;
-    if (_role == '玩家' && _saveFilePath != null) {
-      final chars = _loadCharacters(_saveFilePath!);
-      if (chars.isEmpty) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-                content: Text('存档中没有角色'), backgroundColor: Colors.orange),
-          );
-        }
-        return;
-      }
-      characterName = await showDialog<String>(
-        context: context,
-        builder: (ctx) => SimpleDialog(
-          title: const Text('选择角色'),
-          children: chars
-              .map((c) => SimpleDialogOption(
-                    onPressed: () => Navigator.pop(ctx, c.name),
-                    child: ListTile(
-                      leading: const Icon(Icons.person),
-                      title: Text(c.name),
-                      subtitle: Text('${c.className} · ${c.race} · Lv${c.level}'),
-                    ),
-                  ))
-              .toList(),
-        ),
-      );
-      if (characterName == null) return;
-    }
+  void _startAdventure(BuildContext context) {
     if (!mounted || !context.mounted) return;
+
+    // Broadcast the start_adventure event to all players
+    RoomSession.instance.broadcast({
+      'type': 'start_adventure',
+      'from': widget.playerName,
+      'role': _role,
+      'saveFilePath': _saveFilePath ?? '',
+    });
+
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => AdventurePage(
-          playerName: characterName ?? widget.playerName,
+          playerName: _role == '主持' ? '主持' : widget.playerName,
+          role: _role,
           saveFilePath: _saveFilePath,
         ),
       ),
     );
   }
 
-  List<CharacterData> _loadCharacters(String path) {
-    try {
-      final json = jsonDecode(File(path).readAsStringSync());
-      return SaveData.fromJson(json as Map<String, dynamic>).characters;
-    } catch (_) {
-      return [];
-    }
-  }
-
   @override
   void dispose() {
-    RoomSession.instance.membersNotifier.removeListener(_handleMembersChanged);
     _server?.close();
     _portController.dispose();
-    _nameController.dispose();
     super.dispose();
   }
 
@@ -389,9 +344,9 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
             children: [
               Text(
                 '开放本机端口',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
               TextField(
@@ -408,8 +363,15 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
                   Expanded(
                     child: ElevatedButton.icon(
                       onPressed: _isHosting ? _stopHosting : _startHosting,
-                      icon: Icon(_isHosting ? Icons.stop_circle_outlined : Icons.wifi_tethering),
-                      label: Text(_isHosting ? '关闭端口' : '开放端口', style: const TextStyle(fontSize: 16)),
+                      icon: Icon(
+                        _isHosting
+                            ? Icons.stop_circle_outlined
+                            : Icons.wifi_tethering,
+                      ),
+                      label: Text(
+                        _isHosting ? '关闭端口' : '开放端口',
+                        style: const TextStyle(fontSize: 16),
+                      ),
                     ),
                   ),
                 ],
@@ -431,15 +393,23 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
               const SizedBox(height: 24),
               Text(
                 '选择身份',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
               SegmentedButton<String>(
                 segments: const [
-                  ButtonSegment(value: '玩家', label: Text('玩家'), icon: Icon(Icons.person)),
-                  ButtonSegment(value: '主持', label: Text('主持'), icon: Icon(Icons.mic)),
+                  ButtonSegment(
+                    value: '玩家',
+                    label: Text('玩家'),
+                    icon: Icon(Icons.person),
+                  ),
+                  ButtonSegment(
+                    value: '主持',
+                    label: Text('主持'),
+                    icon: Icon(Icons.mic),
+                  ),
                 ],
                 selected: {_role},
                 onSelectionChanged: (v) => setState(() => _role = v.first),
@@ -447,9 +417,9 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
               const SizedBox(height: 24),
               Text(
                 '选择存档',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
               Row(
@@ -457,7 +427,10 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
                   Expanded(
                     child: Card(
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 14,
+                        ),
                         child: Row(
                           children: [
                             const Icon(Icons.save_outlined),
@@ -479,61 +452,9 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: () async {
-                    final result = await Navigator.push<String>(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const CreateSavePage(),
-                      ),
-                    );
-                    if (result != null && mounted) {
-                      setState(() {
-                        _saveFilePath = result;
-                        _saveFileName = result.split('/').last.split('\\').last;
-                      });
-                    }
-                  },
-                  icon: const Icon(Icons.edit_note_rounded),
-                  label: const Text('创建存档', style: TextStyle(fontSize: 16)),
-                ),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
                   onPressed: () => _startAdventure(context),
                   icon: const Icon(Icons.rocket_launch_outlined),
                   label: const Text('开始冒险', style: TextStyle(fontSize: 16)),
-                ),
-              ),
-              const SizedBox(height: 24),
-              Text(
-                '房间内玩家名称',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _nameController,
-                decoration: const InputDecoration(
-                  labelText: '输入玩家名称',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 8),
-              ElevatedButton.icon(
-                onPressed: _addPlayer,
-                icon: const Icon(Icons.person_add_alt_1),
-                label: const Text('添加玩家', style: TextStyle(fontSize: 16)),
-              ),
-              const SizedBox(height: 12),
-              ...RoomSession.instance.membersNotifier.value.map(
-                (name) => Card(
-                  child: ListTile(
-                    leading: const Icon(Icons.account_circle),
-                    title: Text(name),
-                  ),
                 ),
               ),
             ],
@@ -554,26 +475,14 @@ class JoinRoomPage extends StatefulWidget {
 }
 
 class _JoinRoomPageState extends State<JoinRoomPage> {
-  final TextEditingController _ipController = TextEditingController(text: '127.0.0.1');
-  final TextEditingController _portController = TextEditingController(text: '33333');
+  final TextEditingController _ipController = TextEditingController(
+    text: '127.0.0.1',
+  );
+  final TextEditingController _portController = TextEditingController(
+    text: '33333',
+  );
   bool _isJoining = false;
   String _status = '请输入房间地址';
-  String? _saveFilePath;
-  String _saveFileName = '未选择';
-  String _role = '玩家';
-
-  Future<void> _selectSaveFile() async {
-    final result = await FilePicker.platform.pickFiles(
-      dialogTitle: '选择存档文件',
-      type: FileType.any,
-    );
-    if (result != null && result.files.single.path != null) {
-      setState(() {
-        _saveFilePath = result.files.single.path!;
-        _saveFileName = result.files.single.name;
-      });
-    }
-  }
 
   Future<void> _joinRoom(BuildContext context) async {
     final ip = _ipController.text.trim();
@@ -601,7 +510,11 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
     });
 
     try {
-      await PlatformSocketSupport.connectToRoom(ip, port);
+      final clientHandle = await PlatformSocketSupport.connectToRoom(
+        ip,
+        port,
+        playerName: widget.playerName,
+      );
 
       if (!mounted || !context.mounted) {
         return;
@@ -611,6 +524,7 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
         widget.playerName,
         roomAddress: '$ip:$port',
       );
+      RoomSession.instance.setClientHandle(clientHandle);
 
       if (!mounted || !context.mounted) {
         return;
@@ -629,6 +543,7 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
             port: port,
             playerName: widget.playerName,
             members: [widget.playerName, '房主'],
+            clientHandle: clientHandle,
           ),
         ),
       );
@@ -640,58 +555,6 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
         _isJoining = false;
         _status = '加入失败: $e';
       });
-    }
-  }
-
-  Future<void> _startAdventure(BuildContext context) async {
-    String? characterName;
-    if (_role == '玩家' && _saveFilePath != null) {
-      final chars = _loadCharacters(_saveFilePath!);
-      if (chars.isEmpty) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-                content: Text('存档中没有角色'), backgroundColor: Colors.orange),
-          );
-        }
-        return;
-      }
-      characterName = await showDialog<String>(
-        context: context,
-        builder: (ctx) => SimpleDialog(
-          title: const Text('选择角色'),
-          children: chars
-              .map((c) => SimpleDialogOption(
-                    onPressed: () => Navigator.pop(ctx, c.name),
-                    child: ListTile(
-                      leading: const Icon(Icons.person),
-                      title: Text(c.name),
-                      subtitle: Text('${c.className} · ${c.race} · Lv${c.level}'),
-                    ),
-                  ))
-              .toList(),
-        ),
-      );
-      if (characterName == null) return;
-    }
-    if (!mounted || !context.mounted) return;
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => AdventurePage(
-          playerName: characterName ?? widget.playerName,
-          saveFilePath: _saveFilePath,
-        ),
-      ),
-    );
-  }
-
-  List<CharacterData> _loadCharacters(String path) {
-    try {
-      final json = jsonDecode(File(path).readAsStringSync());
-      return SaveData.fromJson(json as Map<String, dynamic>).characters;
-    } catch (_) {
-      return [];
     }
   }
 
@@ -713,9 +576,9 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
             children: [
               Text(
                 '通过 IP 和端口加入房间',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 12),
               TextField(
@@ -740,7 +603,10 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
                 child: ElevatedButton.icon(
                   onPressed: _isJoining ? null : () => _joinRoom(context),
                   icon: const Icon(Icons.login_rounded),
-                  label: Text(_isJoining ? '连接中...' : '加入房间', style: const TextStyle(fontSize: 16)),
+                  label: Text(
+                    _isJoining ? '连接中...' : '加入房间',
+                    style: const TextStyle(fontSize: 16),
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
@@ -748,84 +614,6 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
                 child: Padding(
                   padding: const EdgeInsets.all(12),
                   child: Text(_status),
-                ),
-              ),
-              const SizedBox(height: 24),
-              Text(
-                '选择身份',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              SegmentedButton<String>(
-                segments: const [
-                  ButtonSegment(value: '玩家', label: Text('玩家'), icon: Icon(Icons.person)),
-                  ButtonSegment(value: '主持', label: Text('主持'), icon: Icon(Icons.mic)),
-                ],
-                selected: {_role},
-                onSelectionChanged: (v) => setState(() => _role = v.first),
-              ),
-              const SizedBox(height: 24),
-              Text(
-                '选择存档',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: Card(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.save_outlined),
-                            const SizedBox(width: 12),
-                            Expanded(child: Text(_saveFileName)),
-                            IconButton(
-                              icon: const Icon(Icons.folder_open),
-                              tooltip: '选择存档文件',
-                              onPressed: _selectSaveFile,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () async {
-                    final result = await Navigator.push<String>(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const CreateSavePage(),
-                      ),
-                    );
-                    if (result != null && mounted) {
-                      setState(() {
-                        _saveFilePath = result;
-                        _saveFileName = result.split('/').last.split('\\').last;
-                      });
-                    }
-                  },
-                  icon: const Icon(Icons.edit_note_rounded),
-                  label: const Text('创建存档', style: TextStyle(fontSize: 16)),
-                ),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () => _startAdventure(context),
-                  icon: const Icon(Icons.rocket_launch_outlined),
-                  label: const Text('开始冒险', style: TextStyle(fontSize: 16)),
                 ),
               ),
             ],
@@ -842,6 +630,7 @@ class JoinedRoomPage extends StatefulWidget {
     required this.port,
     required this.playerName,
     required this.members,
+    required this.clientHandle,
     super.key,
   });
 
@@ -849,16 +638,58 @@ class JoinedRoomPage extends StatefulWidget {
   final int port;
   final String playerName;
   final List<String> members;
+  final RoomClientHandle clientHandle;
 
   @override
   State<JoinedRoomPage> createState() => _JoinedRoomPageState();
 }
 
 class _JoinedRoomPageState extends State<JoinedRoomPage> {
+  StreamSubscription<String>? _msgSub;
+
   @override
   void initState() {
     super.initState();
     RoomSession.instance.membersNotifier.addListener(_handleMembersChanged);
+
+    _msgSub = widget.clientHandle.messages.listen((msg) {
+      _handleMessage(msg);
+    });
+  }
+
+  void _handleMessage(String message) {
+    try {
+      final data = jsonDecode(message) as Map<String, dynamic>;
+      final type = data['type'] as String? ?? '';
+
+      switch (type) {
+        case 'player_ready':
+          final name = data['name'] as String? ?? '';
+          RoomSession.instance.setStateReady(name);
+          break;
+
+        case 'start_adventure':
+          if (!mounted) return;
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => AdventurePage(
+                playerName: widget.playerName,
+                role: '玩家',
+                saveFilePath: data['saveFilePath'] as String? ?? '',
+              ),
+            ),
+          );
+          break;
+
+        case 'member_joined':
+          final name = data['name'] as String? ?? '';
+          RoomSession.instance.addMember(name);
+          break;
+      }
+    } catch (_) {
+      // Ignore malformed messages
+    }
   }
 
   void _handleMembersChanged() {
@@ -869,6 +700,7 @@ class _JoinedRoomPageState extends State<JoinedRoomPage> {
 
   @override
   void dispose() {
+    _msgSub?.cancel();
     RoomSession.instance.membersNotifier.removeListener(_handleMembersChanged);
     super.dispose();
   }
@@ -898,9 +730,9 @@ class _JoinedRoomPageState extends State<JoinedRoomPage> {
               const SizedBox(height: 20),
               Text(
                 '房间成员',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
               Expanded(
