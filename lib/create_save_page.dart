@@ -834,7 +834,7 @@ class _CharacterTab extends StatelessWidget {
           ],
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
-            value: raceCustom ? '__custom__' : race,
+            initialValue: raceCustom ? '__custom__' : race,
             decoration: const InputDecoration(
               labelText: '种族',
               border: OutlineInputBorder(),
@@ -1236,7 +1236,7 @@ class _MapListTab extends StatelessWidget {
                                 child: Image.memory(
                                   base64Decode(m.imageBase64),
                                   fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => const Icon(
+                                  errorBuilder: (_, _, _) => const Icon(
                                     Icons.map_outlined,
                                     size: 28,
                                     color: Colors.grey,
@@ -1489,7 +1489,7 @@ class _MapDialogState extends State<_MapDialog> {
                 child: Image.memory(
                   base64Decode(_imageBase64!),
                   fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => const Center(
+                  errorBuilder: (_, _, _) => const Center(
                     child: Icon(
                       Icons.broken_image,
                       size: 48,

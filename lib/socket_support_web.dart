@@ -42,7 +42,8 @@ class WebRoomClientHandle implements RoomClientHandle {
 
 Future<RoomServerHandle> startServer(
   int port, {
-  required void Function(String remoteAddress, String name) onClient,
+  required void Function(String remoteAddress, String name, String role)
+  onClient,
 }) async {
   return WebRoomServerHandle();
 }
@@ -51,6 +52,7 @@ Future<RoomClientHandle> connectToRoom(
   String host,
   int port, {
   required String playerName,
+  String role = '玩家',
 }) async {
   throw UnsupportedError('Socket is not supported on web.');
 }

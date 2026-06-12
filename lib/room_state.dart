@@ -10,6 +10,10 @@ class RoomSession {
 
   final ValueNotifier<List<String>> membersNotifier =
       ValueNotifier<List<String>>([]);
+
+  /// Maps member name → role (e.g. '玩家', '主持').
+  final ValueNotifier<Map<String, String>> memberRolesNotifier =
+      ValueNotifier<Map<String, String>>({});
   final ValueNotifier<String?> hostNameNotifier = ValueNotifier<String?>(null);
   final ValueNotifier<String?> roomAddressNotifier = ValueNotifier<String?>(
     null,
@@ -55,6 +59,7 @@ class RoomSession {
     hostNameNotifier.value = null;
     roomAddressNotifier.value = null;
     membersNotifier.value = [];
+    memberRolesNotifier.value = {};
     startAdventureNotifier.value = false;
     readyMembersNotifier.value = {};
     mapNotifier.value = null;
@@ -70,21 +75,27 @@ class RoomSession {
     hostNameNotifier.value = playerName;
     roomAddressNotifier.value = roomAddress;
     membersNotifier.value = [playerName];
+    memberRolesNotifier.value = {playerName: '玩家'};
     startAdventureNotifier.value = false;
     readyMembersNotifier.value = {};
     mapNotifier.value = null;
   }
 
-  void joinRoom(String playerName, {required String roomAddress}) {
+  void joinRoom(
+    String playerName, {
+    required String roomAddress,
+    String role = '玩家',
+  }) {
     currentPlayerName = playerName;
     isHost = false;
     isJoined = true;
     hostNameNotifier.value = '房主';
     roomAddressNotifier.value = roomAddress;
     membersNotifier.value = [playerName, '房主'];
+    memberRolesNotifier.value = {playerName: role, '房主': '主持'};
   }
 
-  void addMember(String name) {
+  void addMember(String name, {String role = '玩家'}) {
     final trimmed = name.trim();
     if (trimmed.isEmpty) {
       return;
@@ -94,9 +105,20 @@ class RoomSession {
       next.add(trimmed);
     }
     membersNotifier.value = next;
+
+    // Track the role
+    final nextRoles = {...memberRolesNotifier.value};
+    nextRoles[trimmed] = role;
+    memberRolesNotifier.value = nextRoles;
   }
 
-  /// Called by a player client when they are ready with a character selected.
+  /// Update the host's own role.
+  void setHostRole(String role) {
+    final nextRoles = {...memberRolesNotifier.value};
+    nextRoles[currentPlayerName] = role;
+    memberRolesNotifier.value = nextRoles;
+  }
+
   void setPlayerReady(String playerName) {
     final next = {...readyMembersNotifier.value, playerName};
     readyMembersNotifier.value = next;

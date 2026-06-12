@@ -23,7 +23,8 @@ class PlatformSocketSupport {
 
   static Future<RoomServerHandle> startServer(
     int port, {
-    required void Function(String remoteAddress, String name) onClient,
+    required void Function(String remoteAddress, String name, String role)
+    onClient,
   }) {
     return socket_impl.startServer(port, onClient: onClient);
   }
@@ -32,8 +33,14 @@ class PlatformSocketSupport {
     String host,
     int port, {
     required String playerName,
+    String role = '玩家',
   }) {
-    return socket_impl.connectToRoom(host, port, playerName: playerName);
+    return socket_impl.connectToRoom(
+      host,
+      port,
+      playerName: playerName,
+      role: role,
+    );
   }
 
   static String get unsupportedMessage => '当前 Web 端暂不支持直接使用网络套接字，请在桌面端运行。';

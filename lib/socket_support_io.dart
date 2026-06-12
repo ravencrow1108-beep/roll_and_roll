@@ -11,9 +11,10 @@ bool get isWebPlatform => false;
 // ──────────────────────────────────────────────
 
 class _ClientInfo {
-  _ClientInfo(this.socket, this.name);
+  _ClientInfo(this.socket, this.name, this.role);
   final Socket socket;
   final String name;
+  final String role;
 }
 
 class IoRoomServerHandle implements RoomServerHandle {
@@ -42,8 +43,8 @@ class IoRoomServerHandle implements RoomServerHandle {
     _clients.removeWhere((c) => dead.contains(c));
   }
 
-  void _addClient(Socket socket, String name) {
-    _clients.add(_ClientInfo(socket, name));
+  void _addClient(Socket socket, String name, String role) {
+    _clients.add(_ClientInfo(socket, name, role));
   }
 
   void _removeClient(Socket socket) {
@@ -69,7 +70,8 @@ class IoRoomServerHandle implements RoomServerHandle {
 
 Future<RoomServerHandle> startServer(
   int port, {
-  required void Function(String remoteAddress, String name) onClient,
+  required void Function(String remoteAddress, String name, String role)
+  onClient,
 }) async {
   final serverSocket = await ServerSocket.bind(InternetAddress.anyIPv4, port);
   final handle = IoRoomServerHandle(serverSocket);
@@ -90,8 +92,9 @@ Future<RoomServerHandle> startServer(
             if (!joined && msg['type'] == 'join') {
               joined = true;
               final name = (msg['name'] as String?) ?? remote;
-              handle._addClient(socket, name);
-              onClient(remote, name);
+              final role = (msg['role'] as String?) ?? '玩家';
+              handle._addClient(socket, name, role);
+              onClient(remote, name, role);
               continue;
             }
 
@@ -158,6 +161,7 @@ Future<RoomClientHandle> connectToRoom(
   String host,
   int port, {
   required String playerName,
+  String role = '玩家',
 }) async {
   final socket = await Socket.connect(
     host,
@@ -166,8 +170,10 @@ Future<RoomClientHandle> connectToRoom(
   );
   final sc = StreamController<String>();
 
-  // Send join message
-  socket.write(socketEncode({'type': 'join', 'name': playerName}));
+  // Send join message with role
+  socket.write(
+    socketEncode({'type': 'join', 'name': playerName, 'role': role}),
+  );
 
   socket.listen(
     (data) {
