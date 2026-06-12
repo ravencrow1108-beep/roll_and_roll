@@ -18,9 +18,15 @@ class _ClientInfo {
 }
 
 class IoRoomServerHandle implements RoomServerHandle {
-  IoRoomServerHandle(this._serverSocket) : _sc = StreamController<String>();
+  IoRoomServerHandle(
+    this._serverSocket, {
+    this.hostName = '',
+    this.hostRole = '玩家',
+  }) : _sc = StreamController<String>.broadcast();
 
   final ServerSocket _serverSocket;
+  final String hostName;
+  final String hostRole;
   StreamSubscription<Socket>? _serverSub;
   final StreamController<String> _sc;
   final List<_ClientInfo> _clients = [];
@@ -75,9 +81,15 @@ Future<RoomServerHandle> startServer(
   int port, {
   required void Function(String remoteAddress, String name, String role)
   onClient,
+  String hostName = '',
+  String hostRole = '玩家',
 }) async {
   final serverSocket = await ServerSocket.bind(InternetAddress.anyIPv4, port);
-  final handle = IoRoomServerHandle(serverSocket);
+  final handle = IoRoomServerHandle(
+    serverSocket,
+    hostName: hostName,
+    hostRole: hostRole,
+  );
 
   handle._serverSub = serverSocket.listen((socket) {
     final remote = socket.remoteAddress.address;
@@ -98,11 +110,44 @@ Future<RoomServerHandle> startServer(
               final role = (msg['role'] as String?) ?? '玩家';
               handle._addClient(socket, name, role);
               onClient(remote, name, role);
+
+              // Send full existing member list (host + other clients) to the new client
+              final existing = <Map<String, dynamic>>[
+                {'name': handle.hostName, 'role': handle.hostRole},
+              ];
+              for (final c in handle._clients) {
+                if (c.socket != socket) {
+                  existing.add({'name': c.name, 'role': c.role});
+                }
+              }
+              if (existing.isNotEmpty) {
+                try {
+                  socket.write(
+                    socketEncode({'type': 'members_list', 'members': existing}),
+                  );
+                } catch (_) {}
+              }
               continue;
             }
 
             // Relay to all OTHER clients (and notify host)
             if (joined) {
+              if (msg['type'] == 'request_members') {
+                // Reply with host + all clients
+                final all = <Map<String, dynamic>>[
+                  {'name': handle.hostName, 'role': handle.hostRole},
+                  ...handle._clients.map(
+                    (c) => {'name': c.name, 'role': c.role},
+                  ),
+                ];
+                try {
+                  socket.write(
+                    socketEncode({'type': 'members_list', 'members': all}),
+                  );
+                } catch (_) {}
+                continue;
+              }
+
               handle._onMessage('$trimmed\n');
               for (final c in [...handle._clients]) {
                 if (c.socket != socket) {
@@ -153,7 +198,9 @@ class IoRoomClientHandle implements RoomClientHandle {
 
   @override
   Future<void> close() async {
-    await _sc.close();
+    try {
+      await _sc.close();
+    } catch (_) {}
     try {
       await _socket.close();
     } catch (_) {}
@@ -171,7 +218,7 @@ Future<RoomClientHandle> connectToRoom(
     port,
     timeout: const Duration(seconds: 3),
   );
-  final sc = StreamController<String>();
+  final sc = StreamController<String>.broadcast();
 
   // Send join message with role
   socket.write(
@@ -190,10 +237,14 @@ Future<RoomClientHandle> connectToRoom(
       }
     },
     onDone: () {
-      if (!sc.isClosed) sc.close();
+      if (!sc.isClosed) {
+        sc.add(jsonEncode({'type': 'host_disconnected'}));
+      }
     },
     onError: (_) {
-      if (!sc.isClosed) sc.close();
+      if (!sc.isClosed) {
+        sc.add(jsonEncode({'type': 'host_disconnected'}));
+      }
     },
     cancelOnError: false,
   );

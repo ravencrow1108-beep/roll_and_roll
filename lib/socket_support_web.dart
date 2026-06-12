@@ -44,6 +44,8 @@ Future<RoomServerHandle> startServer(
   int port, {
   required void Function(String remoteAddress, String name, String role)
   onClient,
+  String hostName = '',
+  String hostRole = '玩家',
 }) async {
   return WebRoomServerHandle();
 }

@@ -256,124 +256,147 @@ class _MapEditPageState extends State<MapEditPage> {
   }
 
   Widget _buildMapSelection(ThemeData theme) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('选择地图')),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '主持模式 · ${widget.playerName}',
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) {
+          RoomSession.instance.broadcast({'type': 'return_to_room'});
+          Navigator.of(context).pop();
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('选择地图'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () {
+              RoomSession.instance.broadcast({'type': 'return_to_room'});
+              Navigator.of(context).pop();
+            },
+          ),
+        ),
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '主持模式 · ${widget.playerName}',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 20),
+                const SizedBox(height: 20),
 
-              // ── 存档选择 ──
-              Text(
-                '从存档中选择地图',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
+                // ── 存档选择 ──
+                Text(
+                  '从存档中选择地图',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: Card(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 14,
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.save_outlined),
-                            const SizedBox(width: 12),
-                            Expanded(child: Text(_saveFileName)),
-                            IconButton(
-                              icon: const Icon(Icons.folder_open),
-                              tooltip: '选择存档文件',
-                              onPressed: _pickSaveFile,
-                            ),
-                          ],
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Card(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 14,
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.save_outlined),
+                              const SizedBox(width: 12),
+                              Expanded(child: Text(_saveFileName)),
+                              IconButton(
+                                icon: const Icon(Icons.folder_open),
+                                tooltip: '选择存档文件',
+                                onPressed: _pickSaveFile,
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
+                  ],
+                ),
+
+                // ── 已加载的地图列表 ──
+                if (_loadedMaps.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: _loadedMaps.length,
+                      itemBuilder: (_, i) {
+                        final m = _loadedMaps[i];
+                        return Card(
+                          child: ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: Colors.teal.shade100,
+                              child: const Icon(
+                                Icons.map_outlined,
+                                color: Colors.teal,
+                              ),
+                            ),
+                            title: Text(
+                              m.name,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            subtitle: Text(
+                              '${m.width}×${m.height} · ${m.description.isNotEmpty ? m.description : "无描述"}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            trailing: const Icon(
+                              Icons.arrow_forward_ios,
+                              size: 16,
+                            ),
+                            onTap: () => _selectMap(m),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ] else if (_saveFilePath != null) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    '该存档中没有地图',
+                    style: TextStyle(color: Colors.grey.shade600),
                   ),
                 ],
-              ),
 
-              // ── 已加载的地图列表 ──
-              if (_loadedMaps.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Expanded(
-                  child: ListView.builder(
-                    itemCount: _loadedMaps.length,
-                    itemBuilder: (_, i) {
-                      final m = _loadedMaps[i];
-                      return Card(
-                        child: ListTile(
-                          leading: CircleAvatar(
-                            backgroundColor: Colors.teal.shade100,
-                            child: const Icon(
-                              Icons.map_outlined,
-                              color: Colors.teal,
-                            ),
-                          ),
-                          title: Text(
-                            m.name,
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          subtitle: Text(
-                            '${m.width}×${m.height} · ${m.description.isNotEmpty ? m.description : "无描述"}',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          trailing: const Icon(
-                            Icons.arrow_forward_ios,
-                            size: 16,
-                          ),
-                          onTap: () => _selectMap(m),
-                        ),
-                      );
-                    },
+                const SizedBox(height: 24),
+
+                // ── 创建 / 编辑地图 ──
+                Text(
+                  '或创建 / 编辑地图',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-              ] else if (_saveFilePath != null) ...[
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: _navigateToCreateSave,
+                    icon: const Icon(Icons.add_location_alt_outlined),
+                    label: const Text(
+                      '创建 / 编辑地图 (打开创建存档)',
+                      style: TextStyle(fontSize: 16),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 12),
-                Text('该存档中没有地图', style: TextStyle(color: Colors.grey.shade600)),
               ],
-
-              const SizedBox(height: 24),
-
-              // ── 创建 / 编辑地图 ──
-              Text(
-                '或创建 / 编辑地图',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: _navigateToCreateSave,
-                  icon: const Icon(Icons.add_location_alt_outlined),
-                  label: const Text(
-                    '创建 / 编辑地图 (打开创建存档)',
-                    style: TextStyle(fontSize: 16),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-            ],
+            ),
           ),
         ),
       ),

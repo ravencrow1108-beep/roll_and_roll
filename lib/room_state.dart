@@ -68,14 +68,18 @@ class RoomSession {
     _clientHandle = null;
   }
 
-  void initializeHost(String playerName, {String roomAddress = '等待开放端口'}) {
+  void initializeHost(
+    String playerName, {
+    String roomAddress = '等待开放端口',
+    String role = '玩家',
+  }) {
     currentPlayerName = playerName;
     isHost = true;
     isJoined = false;
     hostNameNotifier.value = playerName;
     roomAddressNotifier.value = roomAddress;
     membersNotifier.value = [playerName];
-    memberRolesNotifier.value = {playerName: '玩家'};
+    memberRolesNotifier.value = {playerName: role};
     startAdventureNotifier.value = false;
     readyMembersNotifier.value = {};
     mapNotifier.value = null;
@@ -89,10 +93,10 @@ class RoomSession {
     currentPlayerName = playerName;
     isHost = false;
     isJoined = true;
-    hostNameNotifier.value = '房主';
+    hostNameNotifier.value = '';
     roomAddressNotifier.value = roomAddress;
-    membersNotifier.value = [playerName, '房主'];
-    memberRolesNotifier.value = {playerName: role, '房主': '主持'};
+    membersNotifier.value = [playerName];
+    memberRolesNotifier.value = {playerName: role};
   }
 
   void addMember(String name, {String role = '玩家'}) {
@@ -137,5 +141,15 @@ class RoomSession {
   void setStateReady(String name) {
     final next = {...readyMembersNotifier.value, name};
     readyMembersNotifier.value = next;
+  }
+
+  /// Send the full member list to all connected clients (used by refresh).
+  void sendFullMemberList() {
+    if (_serverHandle == null) return;
+    final roles = memberRolesNotifier.value;
+    final allList = membersNotifier.value
+        .map((n) => {'name': n, 'role': roles[n] ?? '玩家'})
+        .toList();
+    broadcast({'type': 'members_list', 'members': allList});
   }
 }

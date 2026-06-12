@@ -115,6 +115,14 @@ class _AdventurePageState extends State<AdventurePage> {
             });
           }
         }
+        // Player receives return_to_room event
+        if (type == 'return_to_room') {
+          if (mounted) Navigator.of(context).pop();
+        }
+        // Player receives host_disconnected event
+        if (type == 'host_disconnected') {
+          if (mounted) Navigator.of(context).pop();
+        }
       }
     } catch (_) {}
   }

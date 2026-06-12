@@ -35,6 +35,12 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
     );
     RoomSession.instance.membersNotifier.addListener(_onMembersChanged);
     RoomSession.instance.memberRolesNotifier.addListener(_onMembersChanged);
+    RoomSession.instance.startAdventureNotifier.addListener(_onStateChanged);
+    RoomSession.instance.mapNotifier.addListener(_onStateChanged);
+  }
+
+  void _onStateChanged() {
+    if (mounted) setState(() {});
   }
 
   void _onMembersChanged() {
@@ -100,6 +106,8 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
             'role': role,
           });
         },
+        hostName: widget.playerName,
+        hostRole: _role,
       );
       _server = server;
       RoomSession.instance.setServerHandle(server);
@@ -116,6 +124,7 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
       RoomSession.instance.initializeHost(
         widget.playerName,
         roomAddress: _roomAddress,
+        role: _role,
       );
     } catch (e) {
       if (!mounted) {
@@ -137,6 +146,7 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
       _isHosting = false;
       _status = '已关闭端口';
       _roomAddress = '等待开放端口';
+      _role = '玩家';
     });
   }
 
@@ -170,6 +180,8 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
   void dispose() {
     RoomSession.instance.membersNotifier.removeListener(_onMembersChanged);
     RoomSession.instance.memberRolesNotifier.removeListener(_onMembersChanged);
+    RoomSession.instance.startAdventureNotifier.removeListener(_onStateChanged);
+    RoomSession.instance.mapNotifier.removeListener(_onStateChanged);
     _server?.close();
     _portController.dispose();
     super.dispose();
@@ -177,6 +189,10 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
 
   @override
   Widget build(BuildContext context) {
+    final adventureStarted =
+        RoomSession.instance.startAdventureNotifier.value ||
+        RoomSession.instance.mapNotifier.value != null;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('新建房间'),
@@ -192,6 +208,14 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
             }
           },
         ),
+        actions: [
+          if (_isHosting)
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              tooltip: '刷新成员列表',
+              onPressed: () => RoomSession.instance.sendFullMemberList(),
+            ),
+        ],
       ),
       body: SafeArea(
         child: Padding(
@@ -247,7 +271,21 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
                 ),
               ),
               const SizedBox(height: 24),
-              if (_isHosting)
+              if (_isHosting) ...[
+                if (adventureStarted)
+                  Card(
+                    color: Colors.orange.shade50,
+                    child: const Padding(
+                      padding: EdgeInsets.all(12),
+                      child: Row(
+                        children: [
+                          Icon(Icons.play_circle, color: Colors.orange),
+                          SizedBox(width: 8),
+                          Text('冒险进行中'),
+                        ],
+                      ),
+                    ),
+                  ),
                 ...() {
                   final members = RoomSession.instance.membersNotifier.value;
                   final roles = RoomSession.instance.memberRolesNotifier.value;
@@ -277,6 +315,7 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
                     const SizedBox(height: 24),
                   ];
                 }(),
+              ],
               Text(
                 '选择身份',
                 style: Theme.of(

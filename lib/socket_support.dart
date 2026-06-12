@@ -25,8 +25,15 @@ class PlatformSocketSupport {
     int port, {
     required void Function(String remoteAddress, String name, String role)
     onClient,
+    String hostName = '',
+    String hostRole = '玩家',
   }) {
-    return socket_impl.startServer(port, onClient: onClient);
+    return socket_impl.startServer(
+      port,
+      onClient: onClient,
+      hostName: hostName,
+      hostRole: hostRole,
+    );
   }
 
   static Future<RoomClientHandle> connectToRoom(

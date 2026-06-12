@@ -61,7 +61,6 @@ class _CharacterSelectPageState extends State<CharacterSelectPage> {
 
       if (type == 'adventure_started') {
         if (!mounted) return;
-        // Set the map immediately so AdventurePage can pick it up on init
         if (data['map'] != null) {
           RoomSession.instance.mapNotifier.value = MapData.fromJson(
             data['map'] as Map<String, dynamic>,
@@ -78,6 +77,11 @@ class _CharacterSelectPageState extends State<CharacterSelectPage> {
             ),
           ),
         );
+      } else if (type == 'return_to_room') {
+        if (mounted) Navigator.of(context).pop();
+      } else if (type == 'host_disconnected') {
+        // Host closed the room — pop back to join page
+        if (mounted) Navigator.of(context).pop();
       }
     } catch (_) {}
   }
