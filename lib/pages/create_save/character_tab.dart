@@ -187,7 +187,7 @@ class CharacterTab extends StatelessWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: DropdownButtonFormField<String>(
-                  value: raceCustom
+                  initialValue: raceCustom
                       ? '__custom__'
                       : ([
                             '人类',

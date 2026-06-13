@@ -172,16 +172,18 @@ class _AdventurePageState extends State<AdventurePage> {
         .where((m) => m != s.hostNameNotifier.value)
         .toList();
     if (nonHost.isEmpty ||
-        !nonHost.every((m) => s.readyMembersNotifier.value.contains(m)))
+        !nonHost.every((m) => s.readyMembersNotifier.value.contains(m))) {
       return;
+    }
     if (_selectedMap == null) return;
     s.mapNotifier.value = _selectedMap;
     s.broadcast({'type': 'adventure_started', 'map': _selectedMap!.toJson()});
-    if (mounted)
+    if (mounted) {
       setState(() {
         _adventureStarted = true;
         _displayedMap = _selectedMap;
       });
+    }
   }
 
   Future<void> _loadSaveData() async {
@@ -288,8 +290,9 @@ class _AdventurePageState extends State<AdventurePage> {
 
   @override
   Widget build(BuildContext context) {
-    if (_adventureStarted && _displayedMap != null)
+    if (_adventureStarted && _displayedMap != null) {
       return _buildAdventureView();
+    }
     if (!_isGM && _character != null) return _buildCharacterView();
     if (_isGM && _selectedMap != null) return _buildMapPreviewView();
     return _isGM ? _buildMapSelection() : _buildCharacterSelection();

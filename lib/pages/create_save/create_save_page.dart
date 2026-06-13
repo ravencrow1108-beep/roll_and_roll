@@ -20,15 +20,14 @@ class CreateSavePage extends StatefulWidget {
       _editRules = null;
 
   /// 编辑已有存档
-  CreateSavePage.edit({
-    required String filePath,
+  const CreateSavePage.edit({
+    required String this._filePath,
     required List<CharacterData> characters,
     required List<MapData> maps,
     RuleData? rules,
     this.allowMapEdit = true,
     super.key,
-  }) : _filePath = filePath,
-       _editCharacters = characters,
+  }) : _editCharacters = characters,
        _editMaps = maps,
        _editRules = rules;
 

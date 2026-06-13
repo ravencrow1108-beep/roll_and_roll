@@ -119,6 +119,28 @@ Future<RoomServerHandle> startServer(
               joined = true;
               final name = (msg['name'] as String?) ?? remote;
               final role = (msg['role'] as String?) ?? '玩家';
+
+              // ── 重名检测：不允许与房主或已有成员重名 ──
+              final trimmedName = name.trim();
+              final existingNames = <String>{
+                handle.hostName.trim(),
+                for (final c in handle._clients) c.name.trim(),
+              };
+              if (existingNames.contains(trimmedName)) {
+                try {
+                  socket.write(
+                    socketEncode({
+                      'type': 'name_taken',
+                      'message': '名称 "$trimmedName" 已被使用，请更换名称后重试',
+                    }),
+                  );
+                } catch (_) {}
+                try {
+                  socket.destroy();
+                } catch (_) {}
+                continue;
+              }
+
               handle._addClient(socket, name, role);
               onClient(remote, name, role);
 
@@ -222,7 +244,7 @@ Future<RoomServerHandle> startServer(
 // ──────────────────────────────────────────────
 
 class IoRoomClientHandle implements RoomClientHandle {
-  IoRoomClientHandle(this._socket, this._sc);
+  IoRoomClientHandle(this._socket) : _sc = StreamController<String>();
 
   final Socket _socket;
   final StreamController<String> _sc;
@@ -262,7 +284,7 @@ Future<RoomClientHandle> connectToRoom(
     port,
     timeout: const Duration(seconds: 3),
   );
-  final sc = StreamController<String>.broadcast();
+  final handle = IoRoomClientHandle(socket);
 
   // Send join message with role
   socket.write(
@@ -276,22 +298,22 @@ Future<RoomClientHandle> connectToRoom(
       for (final line in text.split('\n')) {
         final trimmed = line.trim();
         if (trimmed.isNotEmpty) {
-          sc.add(trimmed);
+          handle._sc.add(trimmed);
         }
       }
     },
     onDone: () {
-      if (!sc.isClosed) {
-        sc.add(jsonEncode({'type': 'host_disconnected'}));
+      if (!handle._sc.isClosed) {
+        handle._sc.add(jsonEncode({'type': 'host_disconnected'}));
       }
     },
     onError: (_) {
-      if (!sc.isClosed) {
-        sc.add(jsonEncode({'type': 'host_disconnected'}));
+      if (!handle._sc.isClosed) {
+        handle._sc.add(jsonEncode({'type': 'host_disconnected'}));
       }
     },
     cancelOnError: false,
   );
 
-  return IoRoomClientHandle(socket, sc);
+  return handle;
 }

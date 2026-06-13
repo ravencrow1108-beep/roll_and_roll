@@ -91,18 +91,15 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
       );
       RoomSession.instance.setClientHandle(clientHandle);
 
-      // Start listening
+      // Start listening — wait for server confirmation (members_list / name_taken)
       _msgSub = clientHandle.messages.listen(_handleMessage);
+      _clientHandle = clientHandle;
 
       if (!mounted) return;
 
       setState(() {
         _isJoining = false;
-        _isConnected = true;
-        _connectedIp = ip;
-        _connectedPort = port;
-        _clientHandle = clientHandle;
-        _status = '已成功加入房间';
+        _status = '等待房主确认...';
       });
     } catch (e) {
       if (!mounted) return;
@@ -178,7 +175,28 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
           if (hostSave.isNotEmpty) {
             _hostSaveName = hostSave;
           }
+          // Server confirmed join — mark as connected
+          if (!_isConnected && mounted) {
+            setState(() {
+              _isConnected = true;
+              _connectedIp = _ipController.text.trim();
+              _connectedPort = int.tryParse(_portController.text.trim()) ?? 0;
+              _status = '已成功加入房间';
+            });
+          }
           if (mounted) setState(() {});
+          break;
+
+        case 'name_taken':
+          if (mounted) {
+            setState(() {
+              _status = data['message'] as String? ?? '名称已被使用，请更换名称后重试';
+            });
+            // Close connection and reset
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) _leaveRoom();
+            });
+          }
           break;
 
         case 'host_save_changed':
