@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:roll_and_roll/models/chat_message.dart';
+import '../../models/chat_message.dart';
 
 /// 聊天面板组件
 class ChatPanel extends StatelessWidget {

@@ -1,8 +1,8 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:roll_and_roll/save_data.dart';
-import 'package:roll_and_roll/widgets/token_widget.dart';
+import '../../save_data.dart';
+import 'token_widget.dart';
 
 /// 地图中心展示区域
 class MapDisplay extends StatelessWidget {

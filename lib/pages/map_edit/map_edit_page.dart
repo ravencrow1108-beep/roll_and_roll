@@ -4,10 +4,10 @@ import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
-import 'create_save_page.dart';
-import 'room_state.dart';
-import 'save_data.dart';
-import 'token_placement_page.dart';
+import '../../room_state.dart';
+import '../../save_data.dart';
+import '../create_save/create_save_page.dart';
+import '../token_placement/token_placement_page.dart';
 
 class MapEditPage extends StatefulWidget {
   const MapEditPage({

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:roll_and_roll/room_state.dart';
+import '../../room_state.dart';
 
 /// 玩家准备状态面板
 class ReadyStatusPanel extends StatelessWidget {

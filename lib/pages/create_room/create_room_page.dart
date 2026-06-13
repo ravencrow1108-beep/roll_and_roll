@@ -1,10 +1,10 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
-import 'character_select_page.dart';
-import 'map_edit_page.dart';
-import 'room_state.dart';
-import 'socket_support.dart';
+import '../../room_state.dart';
+import '../../socket_support.dart';
+import '../character_select/character_select_page.dart';
+import '../map_edit/map_edit_page.dart';
 
 class CreateRoomPage extends StatefulWidget {
   const CreateRoomPage({required this.playerName, super.key});

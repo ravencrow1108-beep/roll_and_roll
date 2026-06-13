@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'home_page.dart';
+import 'pages/home/home_page.dart';
 // 【调试用】取消注释以启用单人快速入口
 // import 'live_mode_page.dart';
 

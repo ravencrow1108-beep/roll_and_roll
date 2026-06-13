@@ -2,13 +2,13 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'create_room_page.dart';
-import 'create_save_page.dart';
-import 'join_room_page.dart';
-import 'live_mode_page.dart';
-import 'room_state.dart';
-import 'save_data.dart';
-import 'socket_support.dart';
+import '../../room_state.dart';
+import '../../save_data.dart';
+import '../../socket_support.dart';
+import '../create_room/create_room_page.dart';
+import '../create_save/create_save_page.dart';
+import '../join_room/join_room_page.dart';
+import '../live_mode/live_mode_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});

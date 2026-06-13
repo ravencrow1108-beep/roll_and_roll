@@ -1,8 +1,8 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:roll_and_roll/save_data.dart';
-import 'package:roll_and_roll/widgets/ready_status_panel.dart';
+import '../../save_data.dart';
+import 'ready_status_panel.dart';
 
 /// 地图预览视图（主持查看地图详情 + 开始冒险）
 class MapPreviewView extends StatelessWidget {

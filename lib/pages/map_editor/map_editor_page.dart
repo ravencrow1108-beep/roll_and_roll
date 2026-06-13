@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
-import 'save_data.dart';
+import '../../save_data.dart';
 
 /// Standalone map editor for editing enemies on a map.
 /// Used from the modify-save page's map tab.

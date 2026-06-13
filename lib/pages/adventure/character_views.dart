@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:roll_and_roll/save_data.dart';
+import '../../save_data.dart';
 
 /// 角色详情视图（准备冒险前查看角色信息）
 class CharacterView extends StatelessWidget {

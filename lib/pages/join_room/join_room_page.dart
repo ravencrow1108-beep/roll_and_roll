@@ -3,9 +3,9 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
-import 'character_select_page.dart';
-import 'room_state.dart';
-import 'socket_support.dart';
+import '../../room_state.dart';
+import '../../socket_support.dart';
+import '../character_select/character_select_page.dart';
 
 class JoinRoomPage extends StatefulWidget {
   const JoinRoomPage({required this.playerName, super.key});

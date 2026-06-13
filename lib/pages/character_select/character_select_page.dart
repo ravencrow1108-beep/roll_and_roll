@@ -5,10 +5,11 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
-import 'adventure_page.dart';
-import 'create_save_page.dart';
-import 'room_state.dart';
-import 'save_data.dart';
+import '../../room_state.dart';
+import '../../save_data.dart';
+import '../adventure/adventure_page.dart';
+import '../create_save/char_edit_models.dart';
+import '../create_save/character_tab.dart';
 
 class CharacterSelectPage extends StatefulWidget {
   const CharacterSelectPage({

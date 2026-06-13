@@ -2,9 +2,9 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
-import 'adventure_page.dart';
-import 'room_state.dart';
-import 'save_data.dart';
+import '../../room_state.dart';
+import '../../save_data.dart';
+import '../adventure/adventure_page.dart';
 
 class TokenPlacementPage extends StatefulWidget {
   const TokenPlacementPage({

@@ -4,16 +4,16 @@ import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
-import 'create_save_page.dart';
-import 'models/chat_message.dart';
-import 'room_state.dart';
-import 'save_data.dart';
-import 'socket_support.dart';
-import 'widgets/character_views.dart';
-import 'widgets/dice_panel.dart';
-import 'widgets/map_display.dart';
-import 'widgets/map_views.dart';
-import 'widgets/right_panel.dart';
+import '../../models/chat_message.dart';
+import '../../room_state.dart';
+import '../../save_data.dart';
+import '../../socket_support.dart';
+import '../create_save/create_save_page.dart';
+import 'character_views.dart';
+import 'dice_panel.dart';
+import 'map_display.dart';
+import 'map_views.dart';
+import 'right_panel.dart';
 
 class AdventurePage extends StatefulWidget {
   const AdventurePage({

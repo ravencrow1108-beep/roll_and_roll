@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:roll_and_roll/models/chat_message.dart';
-import 'package:roll_and_roll/widgets/chat_panel.dart';
-import 'package:roll_and_roll/widgets/member_list.dart';
+import '../../models/chat_message.dart';
+import 'chat_panel.dart';
+import 'member_list.dart';
 
 /// 冒险模式右侧面板：成员列表 + 聊天
 class RightPanel extends StatelessWidget {
