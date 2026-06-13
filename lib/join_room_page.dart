@@ -150,6 +150,7 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
                       (data['saveFilePath'] as String?)?.isEmpty == true
                       ? null
                       : data['saveFilePath'] as String?,
+                  hostSaveName: data['saveFileName'] as String? ?? '',
                 ),
               ),
             );
@@ -164,15 +165,20 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
 
         case 'members_list':
           final members = data['members'] as List<dynamic>? ?? [];
+          var hostSave = '';
           for (final m in members) {
             final name = (m as Map<String, dynamic>)['name'] as String? ?? '';
             final role = m['role'] as String? ?? '玩家';
             RoomSession.instance.addMember(name, role: role);
             final saveName = m['hostSaveName'] as String?;
             if (saveName != null && saveName.isNotEmpty) {
-              _hostSaveName = saveName;
+              hostSave = saveName;
             }
           }
+          if (hostSave.isNotEmpty) {
+            _hostSaveName = hostSave;
+          }
+          if (mounted) setState(() {});
           break;
 
         case 'host_save_changed':

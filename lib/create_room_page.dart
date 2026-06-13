@@ -1,6 +1,7 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
+import 'character_select_page.dart';
 import 'map_edit_page.dart';
 import 'room_state.dart';
 import 'socket_support.dart';
@@ -164,19 +165,24 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
     };
     if (_saveFilePath != null && _saveFilePath!.isNotEmpty) {
       msg['saveFilePath'] = _saveFilePath;
+      msg['saveFileName'] = _saveFileName;
     }
     RoomSession.instance.broadcast(msg);
 
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => MapEditPage(
-          playerName: widget.playerName,
-          role: _role,
-          saveFilePath: _saveFilePath,
-        ),
-      ),
-    );
+    final page = _role == '主持'
+        ? MapEditPage(
+            playerName: widget.playerName,
+            role: _role,
+            saveFilePath: _saveFilePath,
+          )
+        : CharacterSelectPage(
+            playerName: widget.playerName,
+            role: _role,
+            saveFilePath: _saveFilePath,
+            hostSaveName: _saveFilePath != null ? _saveFileName : '',
+          );
+
+    Navigator.push(context, MaterialPageRoute(builder: (_) => page));
   }
 
   @override

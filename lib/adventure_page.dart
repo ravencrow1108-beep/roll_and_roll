@@ -38,6 +38,10 @@ class _AdventurePageState extends State<AdventurePage> {
   bool _adventureStarted = false;
   MapData? _displayedMap;
 
+  // ── Dice rolling ──
+  final TextEditingController _diceInputCtrl = TextEditingController();
+  String _diceResult = '';
+
   StreamSubscription<String>? _msgSub;
 
   bool get _isGM => widget.role == '主持';
@@ -217,9 +221,27 @@ class _AdventurePageState extends State<AdventurePage> {
     }
   }
 
+  void _rollDice(int sides) {
+    final rng = DateTime.now().millisecondsSinceEpoch;
+    final roll = ((rng % sides) + 1);
+    setState(() => _diceResult = 'd$sides = $roll');
+  }
+
+  void _rollCustomDice() {
+    final text = _diceInputCtrl.text.trim();
+    if (text.isEmpty) return;
+    try {
+      final result = DiceExpression.roll(text);
+      setState(() => _diceResult = result.toString());
+    } catch (_) {
+      setState(() => _diceResult = '表达式无效');
+    }
+  }
+
   @override
   void dispose() {
     _msgSub?.cancel();
+    _diceInputCtrl.dispose();
     RoomSession.instance.readyMembersNotifier.removeListener(_onReadyChanged);
     RoomSession.instance.mapNotifier.removeListener(_onMapChanged);
     super.dispose();
@@ -249,62 +271,403 @@ class _AdventurePageState extends State<AdventurePage> {
   }
 
   // ═══════════════════════════════════════════
-  //  冒险中：地图展示
+  //  冒险中：三栏布局（骰子 | 地图 | 玩家）
   // ═══════════════════════════════════════════
   Widget _buildAdventureView(ThemeData theme) {
     final m = _displayedMap!;
+    final positions = RoomSession.instance.playerPositionsNotifier.value;
+    final members = RoomSession.instance.membersNotifier.value;
+    final roles = RoomSession.instance.memberRolesNotifier.value;
+    final enemies = m.enemies;
+    final isWide = MediaQuery.of(context).size.width > 600;
+
     return Scaffold(
-      appBar: AppBar(title: Text('冒险中 · ${m.name}')),
+      appBar: AppBar(
+        title: Text('冒险中 · ${m.name}'),
+        actions: [
+          TextButton.icon(
+            onPressed: () {
+              RoomSession.instance.broadcast({'type': 'return_to_room'});
+              Navigator.of(context).pop();
+            },
+            icon: const Icon(Icons.exit_to_app),
+            label: const Text('返回房间'),
+          ),
+        ],
+      ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              if (_isGM) ...[
-                Text('你是主持', style: TextStyle(color: Colors.grey.shade600)),
-                const SizedBox(height: 8),
-              ],
-              if (_character != null) ...[
-                Text(
-                  '当前角色: ${_character!.name}',
-                  style: theme.textTheme.titleMedium,
-                ),
-                const SizedBox(height: 8),
-              ],
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    children: [
-                      Text(
-                        m.name,
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      if (m.description.isNotEmpty) ...[
-                        const SizedBox(height: 8),
-                        Text(m.description),
-                      ],
-                      const SizedBox(height: 8),
-                      Text('尺寸: ${m.width} × ${m.height} · 单位: ${m.unit}'),
-                      if (m.imageBase64.isNotEmpty) ...[
-                        const SizedBox(height: 16),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Image.memory(
-                            base64Decode(m.imageBase64),
-                            fit: BoxFit.contain,
-                          ),
-                        ),
-                      ],
-                    ],
+        child: isWide
+            ? Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // ── 左：骰子面板 ──
+                  _buildDicePanel(theme),
+                  // ── 中：地图 ──
+                  Expanded(
+                    flex: 4,
+                    child: _buildMapCenter(theme, m, positions, enemies),
+                  ),
+                  // ── 右：玩家/主持列表 ──
+                  _buildMemberPanel(theme, members, roles),
+                ],
+              )
+            : Column(
+                children: [
+                  Expanded(
+                    child: _buildMapCenter(theme, m, positions, enemies),
+                  ),
+                  _buildDicePanel(theme),
+                ],
+              ),
+      ),
+    );
+  }
+
+  // ── 骰子面板 ──
+  Widget _buildDicePanel(ThemeData theme) {
+    final isWide = MediaQuery.of(context).size.width > 600;
+    final dice = [4, 6, 8, 10, 12, 20];
+
+    return Container(
+      width: isWide ? 160 : null,
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+        border: isWide
+            ? Border(right: BorderSide(color: theme.dividerColor))
+            : Border(top: BorderSide(color: theme.dividerColor)),
+      ),
+      child: Column(
+        mainAxisSize: isWide ? MainAxisSize.max : MainAxisSize.min,
+        children: [
+          Text(
+            '骰子',
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 4,
+            runSpacing: 4,
+            children: dice.map((d) {
+              return SizedBox(
+                width: isWide ? 68 : 52,
+                height: 36,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    backgroundColor: Colors.deepPurple.shade100,
+                    foregroundColor: Colors.deepPurple.shade900,
+                  ),
+                  onPressed: () => _rollDice(d),
+                  child: Text(
+                    'd$d',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 4),
+          SizedBox(
+            width: isWide ? 140 : double.infinity,
+            height: 36,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                padding: EdgeInsets.zero,
+                backgroundColor: Colors.red.shade100,
+                foregroundColor: Colors.red.shade900,
               ),
+              onPressed: () => _rollDice(100),
+              child: const Text(
+                'd100',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          if (isWide) ...[
+            TextField(
+              controller: _diceInputCtrl,
+              decoration: const InputDecoration(
+                hintText: '2d6+3',
+                border: OutlineInputBorder(),
+                isDense: true,
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 8,
+                ),
+              ),
+              style: const TextStyle(fontSize: 13),
+              onSubmitted: (_) => _rollCustomDice(),
+            ),
+            const SizedBox(height: 4),
+            SizedBox(
+              width: double.infinity,
+              height: 32,
+              child: ElevatedButton(
+                onPressed: _rollCustomDice,
+                child: const Text('投掷', style: TextStyle(fontSize: 13)),
+              ),
+            ),
+          ],
+          if (_diceResult.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: Text(
+                  _diceResult,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // ── 地图中心 ──
+  Widget _buildMapCenter(
+    ThemeData theme,
+    MapData m,
+    List<PlayerPosition> positions,
+    List<EnemyData> enemies,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.all(10),
+      child: Column(
+        children: [
+          // Role / character header
+          Row(
+            children: [
+              if (_character != null) ...[
+                if (_character!.portraitBase64.isNotEmpty)
+                  ClipOval(
+                    child: Image.memory(
+                      base64Decode(_character!.portraitBase64),
+                      width: 28,
+                      height: 28,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    _character!.name,
+                    style: theme.textTheme.titleSmall,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ] else ...[
+                Expanded(
+                  child: Text(
+                    _isGM ? '主持模式' : widget.playerName,
+                    style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                  ),
+                ),
+              ],
             ],
           ),
-        ),
+          const SizedBox(height: 6),
+          Expanded(
+            child: m.imageBase64.isNotEmpty
+                ? LayoutBuilder(
+                    builder: (ctx, constraints) {
+                      return ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Stack(
+                          children: [
+                            Positioned.fill(
+                              child: Image.memory(
+                                base64Decode(m.imageBase64),
+                                fit: BoxFit.contain,
+                              ),
+                            ),
+                            // Player tokens
+                            for (final pos in positions)
+                              Positioned(
+                                left: pos.x * constraints.maxWidth - 16,
+                                top: pos.y * constraints.maxHeight - 16,
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(
+                                      width: 32,
+                                      height: 32,
+                                      decoration: BoxDecoration(
+                                        color: Colors.deepPurple,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: Colors.white,
+                                          width: 2,
+                                        ),
+                                      ),
+                                      child: Center(
+                                        child: Text(
+                                          pos.name[0].toUpperCase(),
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 3,
+                                        vertical: 1,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.black.withValues(
+                                          alpha: 0.6,
+                                        ),
+                                        borderRadius: BorderRadius.circular(3),
+                                      ),
+                                      child: Text(
+                                        pos.name,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 9,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            // Enemy tokens
+                            for (final e in enemies)
+                              Positioned(
+                                left: e.x * constraints.maxWidth - 16,
+                                top: e.y * constraints.maxHeight - 16,
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(
+                                      width: 32,
+                                      height: 32,
+                                      decoration: BoxDecoration(
+                                        color: Colors.red,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: Colors.white,
+                                          width: 2,
+                                        ),
+                                      ),
+                                      child: Center(
+                                        child: Text(
+                                          e.name.isNotEmpty
+                                              ? e.name[0].toUpperCase()
+                                              : 'E',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 3,
+                                        vertical: 1,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.black.withValues(
+                                          alpha: 0.6,
+                                        ),
+                                        borderRadius: BorderRadius.circular(3),
+                                      ),
+                                      child: Text(
+                                        '${e.name} HP${e.hp}',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 9,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                          ],
+                        ),
+                      );
+                    },
+                  )
+                : Center(
+                    child: Text(
+                      m.name,
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontSize: 18,
+                      ),
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── 成员/角色面板 ──
+  Widget _buildMemberPanel(
+    ThemeData theme,
+    List<String> members,
+    Map<String, String> roles,
+  ) {
+    return Container(
+      width: 170,
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+        border: Border(left: BorderSide(color: theme.dividerColor)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '房间成员',
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Expanded(
+            child: ListView(
+              children: members.map((name) {
+                final role = roles[name] ?? '';
+                final isHost = role == '主持';
+                return Card(
+                  child: ListTile(
+                    dense: true,
+                    leading: CircleAvatar(
+                      radius: 14,
+                      backgroundColor: isHost
+                          ? Colors.orange
+                          : Colors.deepPurple,
+                      child: Icon(
+                        isHost ? Icons.mic : Icons.person,
+                        color: Colors.white,
+                        size: 16,
+                      ),
+                    ),
+                    title: Text(name, style: const TextStyle(fontSize: 13)),
+                    subtitle: role.isNotEmpty
+                        ? Text(role, style: const TextStyle(fontSize: 11))
+                        : null,
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -333,6 +696,16 @@ class _AdventurePageState extends State<AdventurePage> {
                   fontWeight: FontWeight.bold,
                 ),
               ),
+              const SizedBox(height: 12),
+              if (c.portraitBase64.isNotEmpty)
+                ClipOval(
+                  child: Image.memory(
+                    base64Decode(c.portraitBase64),
+                    width: 100,
+                    height: 100,
+                    fit: BoxFit.cover,
+                  ),
+                ),
               const SizedBox(height: 12),
               Text('职业: ${c.className}'),
               Text('种族: ${c.race} · Lv${c.level}'),
@@ -523,8 +896,13 @@ class _AdventurePageState extends State<AdventurePage> {
                       final c = _loadedCharacters[i];
                       return Card(
                         child: ListTile(
-                          leading: const CircleAvatar(
-                            child: Icon(Icons.person),
+                          leading: CircleAvatar(
+                            backgroundImage: c.portraitBase64.isNotEmpty
+                                ? MemoryImage(base64Decode(c.portraitBase64))
+                                : null,
+                            child: c.portraitBase64.isEmpty
+                                ? const Icon(Icons.person)
+                                : null,
                           ),
                           title: Text(
                             c.name,

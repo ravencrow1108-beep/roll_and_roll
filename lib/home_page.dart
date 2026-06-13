@@ -1,3 +1,4 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -6,6 +7,7 @@ import 'create_save_page.dart';
 import 'join_room_page.dart';
 import 'live_mode_page.dart';
 import 'room_state.dart';
+import 'save_data.dart';
 import 'socket_support.dart';
 
 class HomePage extends StatefulWidget {
@@ -47,6 +49,45 @@ class _HomePageState extends State<HomePage> {
 
   void _openPage(BuildContext context, Widget page) {
     Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+  }
+
+  Future<void> _modifySaveFile() async {
+    final result = await FilePicker.platform.pickFiles(
+      dialogTitle: '选择要修改的存档文件 (.zip)',
+      type: FileType.any,
+    );
+    if (result == null || result.files.single.path == null) return;
+    final path = result.files.single.path!;
+    if (!path.endsWith('.zip')) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('请选择 .zip 格式的存档文件'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+    try {
+      final save = await SaveData.fromZip(path);
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => CreateSavePage.edit(
+            filePath: path,
+            characters: save.characters,
+            maps: save.maps,
+            rules: save.rules,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('读取存档失败: $e'), backgroundColor: Colors.red),
+      );
+    }
   }
 
   void _handleRoomAction(BuildContext context, Widget page) {
@@ -165,6 +206,12 @@ class _HomePageState extends State<HomePage> {
                     label: '创建存档',
                     icon: Icons.edit_note_rounded,
                     onPressed: () => _openPage(context, const CreateSavePage()),
+                  ),
+                  const SizedBox(height: 16),
+                  _ActionButton(
+                    label: '修改存档',
+                    icon: Icons.file_open_outlined,
+                    onPressed: _modifySaveFile,
                   ),
                 ],
               ),

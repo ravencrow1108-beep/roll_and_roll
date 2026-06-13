@@ -29,6 +29,10 @@ class RoomSession {
   /// The map data to display once all players are ready.
   final ValueNotifier<MapData?> mapNotifier = ValueNotifier<MapData?>(null);
 
+  /// Player token positions placed by the host.
+  final ValueNotifier<List<PlayerPosition>> playerPositionsNotifier =
+      ValueNotifier<List<PlayerPosition>>([]);
+
   bool isHost = false;
   bool isJoined = false;
   String currentPlayerName = '';
@@ -63,6 +67,7 @@ class RoomSession {
     startAdventureNotifier.value = false;
     readyMembersNotifier.value = {};
     mapNotifier.value = null;
+    playerPositionsNotifier.value = [];
     _serverHandle = null;
     _clientHandle?.close();
     _clientHandle = null;
@@ -83,6 +88,7 @@ class RoomSession {
     startAdventureNotifier.value = false;
     readyMembersNotifier.value = {};
     mapNotifier.value = null;
+    playerPositionsNotifier.value = [];
   }
 
   void joinRoom(

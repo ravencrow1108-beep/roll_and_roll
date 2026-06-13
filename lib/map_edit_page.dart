@@ -4,10 +4,10 @@ import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
-import 'adventure_page.dart';
 import 'create_save_page.dart';
 import 'room_state.dart';
 import 'save_data.dart';
+import 'token_placement_page.dart';
 
 class MapEditPage extends StatefulWidget {
   const MapEditPage({
@@ -32,6 +32,7 @@ class _MapEditPageState extends State<MapEditPage> {
   List<MapData> _loadedMaps = [];
 
   bool _isReady = false;
+  bool _hasStarted = false;
 
   StreamSubscription<String>? _msgSub;
 
@@ -72,7 +73,7 @@ class _MapEditPageState extends State<MapEditPage> {
     } catch (_) {}
   }
 
-  /// Check if all non-host members are ready, and if so, start the adventure.
+  /// Check if all non-host members are ready, and if so, start token placement.
   void _checkAllReady() {
     final session = RoomSession.instance;
     final allMembers = session.membersNotifier.value;
@@ -84,18 +85,18 @@ class _MapEditPageState extends State<MapEditPage> {
     if (nonHost.isEmpty) return;
 
     final allReady = nonHost.every((m) => readyMembers.contains(m));
-    if (allReady && _selectedMap != null) {
-      final mapJson = _selectedMap!.toJson();
+    if (allReady && _selectedMap != null && !_hasStarted) {
+      _hasStarted = true;
       session.mapNotifier.value = _selectedMap;
-      session.broadcast({'type': 'adventure_started', 'map': mapJson});
 
       if (mounted) {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => AdventurePage(
+            builder: (_) => TokenPlacementPage(
               playerName: widget.playerName,
               role: widget.role,
+              map: _selectedMap!,
               saveFilePath: _saveFilePath,
             ),
           ),

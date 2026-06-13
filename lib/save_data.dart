@@ -4,6 +4,34 @@ import 'dart:math';
 
 import 'package:archive/archive.dart';
 
+/// 玩家身份信息
+class PlayerInfo {
+  final String name;
+  final String role;
+
+  const PlayerInfo({required this.name, this.role = '玩家'});
+
+  bool get isHost => role == '主持';
+  bool get isPlayer => role == '玩家';
+}
+
+/// 玩家在地图上的位置
+class PlayerPosition {
+  final String name;
+  final double x; // 0..1 fraction
+  final double y; // 0..1 fraction
+
+  const PlayerPosition({required this.name, this.x = 0.5, this.y = 0.5});
+
+  Map<String, dynamic> toJson() => {'name': name, 'x': x, 'y': y};
+
+  factory PlayerPosition.fromJson(Map<String, dynamic> json) => PlayerPosition(
+    name: json['name'] as String,
+    x: (json['x'] as num).toDouble(),
+    y: (json['y'] as num).toDouble(),
+  );
+}
+
 /// 骰子表达式解析结果
 class DiceRollResult {
   final List<int> individualRolls;
@@ -138,6 +166,8 @@ class CharacterData {
   final int wisdom;
   final int charisma;
   final Map<String, int> customStats;
+  final int hp;
+  final int maxHp;
 
   /// Character portrait image (base64 PNG, may be empty).
   final String portraitBase64;
@@ -158,10 +188,10 @@ class CharacterData {
     this.wisdom = 10,
     this.charisma = 10,
     this.customStats = const {},
+    this.hp = 1,
+    this.maxHp = 1,
     this.portraitBase64 = '',
   });
-
-  int getStatModifier(int value) => (value - 10) ~/ 2;
 
   Map<String, dynamic> toJson() => {
     'name': name,
@@ -183,6 +213,8 @@ class CharacterData {
       'charisma': charisma,
     },
     if (customStats.isNotEmpty) 'customStats': customStats,
+    'hp': hp,
+    'maxHp': maxHp,
     if (portraitBase64.isNotEmpty) 'portraitBase64': portraitBase64,
   };
 
@@ -223,12 +255,52 @@ class CharacterData {
       customStats: cs != null
           ? cs.map((k, v) => MapEntry(k, (v as num).toInt()))
           : const {},
+      hp: json['hp'] as int? ?? 1,
+      maxHp: json['maxHp'] as int? ?? 1,
       portraitBase64: json['portraitBase64'] as String? ?? '',
     );
   }
 
-  String get statsSummary =>
-      '力量$strength 敏$dexterity 体$constitution 智$intelligence 感$wisdom 魅$charisma';
+  /// Create a modified copy with only the given fields replaced.
+  CharacterData copyWith({
+    String? name,
+    String? className,
+    List<String>? additionalClasses,
+    String? race,
+    int? level,
+    List<SkillData>? skills,
+    List<PersonalityData>? personalities,
+    List<ItemData>? backpack,
+    int? strength,
+    int? dexterity,
+    int? constitution,
+    int? intelligence,
+    int? wisdom,
+    int? charisma,
+    Map<String, int>? customStats,
+    int? hp,
+    int? maxHp,
+    String? portraitBase64,
+  }) => CharacterData(
+    name: name ?? this.name,
+    className: className ?? this.className,
+    additionalClasses: additionalClasses ?? this.additionalClasses,
+    race: race ?? this.race,
+    level: level ?? this.level,
+    skills: skills ?? this.skills,
+    personalities: personalities ?? this.personalities,
+    backpack: backpack ?? this.backpack,
+    strength: strength ?? this.strength,
+    dexterity: dexterity ?? this.dexterity,
+    constitution: constitution ?? this.constitution,
+    intelligence: intelligence ?? this.intelligence,
+    wisdom: wisdom ?? this.wisdom,
+    charisma: charisma ?? this.charisma,
+    customStats: customStats ?? this.customStats,
+    hp: hp ?? this.hp,
+    maxHp: maxHp ?? this.maxHp,
+    portraitBase64: portraitBase64 ?? this.portraitBase64,
+  );
 }
 
 /// 地图数据模型
@@ -240,6 +312,7 @@ class MapData {
   final String imageBase64;
   final String unit;
   final List<MapTile> tiles;
+  final List<EnemyData> enemies;
 
   const MapData({
     this.name = '无名地图',
@@ -249,6 +322,7 @@ class MapData {
     required this.imageBase64,
     this.unit = '米',
     this.tiles = const [],
+    this.enemies = const [],
   });
 
   Map<String, dynamic> toJson() => {
@@ -259,6 +333,7 @@ class MapData {
     'unit': unit,
     'imageBase64': imageBase64,
     'tiles': tiles.map((t) => t.toJson()).toList(),
+    if (enemies.isNotEmpty) 'enemies': enemies.map((e) => e.toJson()).toList(),
   };
 
   factory MapData.fromJson(Map<String, dynamic> json) {
@@ -274,8 +349,34 @@ class MapData {
               ?.map((t) => MapTile.fromJson(t as Map<String, dynamic>))
               .toList() ??
           [],
+      enemies:
+          (json['enemies'] as List<dynamic>?)
+              ?.map((e) => EnemyData.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          [],
     );
   }
+
+  /// Create a modified copy with only the given fields replaced.
+  MapData copyWith({
+    String? name,
+    String? description,
+    int? width,
+    int? height,
+    String? imageBase64,
+    String? unit,
+    List<MapTile>? tiles,
+    List<EnemyData>? enemies,
+  }) => MapData(
+    name: name ?? this.name,
+    description: description ?? this.description,
+    width: width ?? this.width,
+    height: height ?? this.height,
+    imageBase64: imageBase64 ?? this.imageBase64,
+    unit: unit ?? this.unit,
+    tiles: tiles ?? this.tiles,
+    enemies: enemies ?? this.enemies,
+  );
 }
 
 class MapTile {
@@ -351,6 +452,151 @@ class ItemData {
   }
 }
 
+/// 敌人数据模型
+class EnemyData {
+  final String name;
+  final double x; // 0..1 fraction
+  final double y; // 0..1 fraction
+  final int hp;
+  final int maxHp;
+  final int ac;
+  final int initiative;
+  final String? attackDice;
+  final String? description;
+  final int strength;
+  final int dexterity;
+  final int constitution;
+  final int intelligence;
+  final int wisdom;
+  final int charisma;
+
+  const EnemyData({
+    required this.name,
+    this.x = 0.5,
+    this.y = 0.5,
+    this.hp = 10,
+    this.maxHp = 10,
+    this.ac = 10,
+    this.initiative = 0,
+    this.attackDice,
+    this.description,
+    this.strength = 10,
+    this.dexterity = 10,
+    this.constitution = 10,
+    this.intelligence = 10,
+    this.wisdom = 10,
+    this.charisma = 10,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    'x': x,
+    'y': y,
+    'hp': hp,
+    'maxHp': maxHp,
+    'ac': ac,
+    'initiative': initiative,
+    if (attackDice != null) 'attackDice': attackDice,
+    if (description != null) 'description': description,
+    'stats': {
+      'strength': strength,
+      'dexterity': dexterity,
+      'constitution': constitution,
+      'intelligence': intelligence,
+      'wisdom': wisdom,
+      'charisma': charisma,
+    },
+  };
+
+  factory EnemyData.fromJson(Map<String, dynamic> json) {
+    final stats = json['stats'] as Map<String, dynamic>? ?? {};
+    return EnemyData(
+      name: json['name'] as String? ?? '无名敌人',
+      x: (json['x'] as num?)?.toDouble() ?? 0.5,
+      y: (json['y'] as num?)?.toDouble() ?? 0.5,
+      hp: json['hp'] as int? ?? 10,
+      maxHp: json['maxHp'] as int? ?? 10,
+      ac: json['ac'] as int? ?? 10,
+      initiative: json['initiative'] as int? ?? 0,
+      attackDice: json['attackDice'] as String?,
+      description: json['description'] as String?,
+      strength: stats['strength'] as int? ?? 10,
+      dexterity: stats['dexterity'] as int? ?? 10,
+      constitution: stats['constitution'] as int? ?? 10,
+      intelligence: stats['intelligence'] as int? ?? 10,
+      wisdom: stats['wisdom'] as int? ?? 10,
+      charisma: stats['charisma'] as int? ?? 10,
+    );
+  }
+
+  /// Create a modified copy with only the given fields replaced.
+  EnemyData copyWith({
+    String? name,
+    double? x,
+    double? y,
+    int? hp,
+    int? maxHp,
+    int? ac,
+    int? initiative,
+    String? attackDice,
+    String? description,
+    int? strength,
+    int? dexterity,
+    int? constitution,
+    int? intelligence,
+    int? wisdom,
+    int? charisma,
+  }) => EnemyData(
+    name: name ?? this.name,
+    x: x ?? this.x,
+    y: y ?? this.y,
+    hp: hp ?? this.hp,
+    maxHp: maxHp ?? this.maxHp,
+    ac: ac ?? this.ac,
+    initiative: initiative ?? this.initiative,
+    attackDice: attackDice ?? this.attackDice,
+    description: description ?? this.description,
+    strength: strength ?? this.strength,
+    dexterity: dexterity ?? this.dexterity,
+    constitution: constitution ?? this.constitution,
+    intelligence: intelligence ?? this.intelligence,
+    wisdom: wisdom ?? this.wisdom,
+    charisma: charisma ?? this.charisma,
+  );
+}
+
+/// 规则数据模型 — 回合设置、环节设置
+class RuleData {
+  /// 回合设置 (暂时留空)
+  final List<String> turnSettings;
+
+  /// 环节设置 (默认：先攻、战斗)
+  final List<String> phaseSettings;
+
+  const RuleData({
+    this.turnSettings = const [],
+    this.phaseSettings = const ['先攻', '战斗'],
+  });
+
+  Map<String, dynamic> toJson() => {
+    if (turnSettings.isNotEmpty) 'turnSettings': turnSettings,
+    'phaseSettings': phaseSettings,
+  };
+
+  factory RuleData.fromJson(Map<String, dynamic> json) => RuleData(
+    turnSettings:
+        (json['turnSettings'] as List<dynamic>?)
+            ?.map((e) => e as String)
+            .toList() ??
+        const [],
+    phaseSettings:
+        (json['phaseSettings'] as List<dynamic>?)
+            ?.map((e) => e as String)
+            .toList() ??
+        const ['先攻', '战斗'],
+  );
+}
+
 /// 存档数据模型（整合三类对象）— ZIP 格式
 class SaveData {
   final int version;
@@ -358,6 +604,8 @@ class SaveData {
   final List<CharacterData> characters;
   final List<MapData> maps;
   final List<ItemData> items;
+  final List<PlayerPosition> playerPositions;
+  final RuleData rules;
 
   const SaveData({
     this.version = 1,
@@ -365,6 +613,8 @@ class SaveData {
     this.characters = const [],
     this.maps = const [],
     this.items = const [],
+    this.playerPositions = const [],
+    this.rules = const RuleData(),
   });
 
   Map<String, dynamic> toJson() => {
@@ -373,9 +623,10 @@ class SaveData {
     'maps': maps.map((m) => m.toJson()).toList(),
     'items': items.map((i) => i.toJson()).toList(),
     'createdAt': createdAt,
+    if (playerPositions.isNotEmpty)
+      'playerPositions': playerPositions.map((p) => p.toJson()).toList(),
+    'rules': rules.toJson(),
   };
-
-  String toJsonString() => const JsonEncoder.withIndent('  ').convert(toJson());
 
   factory SaveData.fromJson(Map<String, dynamic> json) {
     List<CharacterData> chars;
@@ -407,6 +658,14 @@ class SaveData {
               ?.map((i) => ItemData.fromJson(i as Map<String, dynamic>))
               .toList() ??
           [],
+      playerPositions:
+          (json['playerPositions'] as List<dynamic>?)
+              ?.map((p) => PlayerPosition.fromJson(p as Map<String, dynamic>))
+              .toList() ??
+          [],
+      rules: json.containsKey('rules')
+          ? RuleData.fromJson(json['rules'] as Map<String, dynamic>)
+          : const RuleData(),
     );
   }
 
@@ -487,6 +746,9 @@ class SaveData {
       'characters': charJson,
       'maps': mapJson,
       'items': items.map((i) => i.toJson()).toList(),
+      if (playerPositions.isNotEmpty)
+        'playerPositions': playerPositions.map((p) => p.toJson()).toList(),
+      'rules': rules.toJson(),
     };
   }
 
@@ -547,6 +809,14 @@ class SaveData {
               ?.map((i) => ItemData.fromJson(i as Map<String, dynamic>))
               .toList() ??
           [],
+      playerPositions:
+          (manifest['playerPositions'] as List<dynamic>?)
+              ?.map((p) => PlayerPosition.fromJson(p as Map<String, dynamic>))
+              .toList() ??
+          [],
+      rules: manifest.containsKey('rules')
+          ? RuleData.fromJson(manifest['rules'] as Map<String, dynamic>)
+          : const RuleData(),
     );
   }
 

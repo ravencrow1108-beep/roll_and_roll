@@ -6,13 +6,38 @@ import 'dart:ui' as ui;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
+import 'map_editor_page.dart';
 import 'save_data.dart';
 
 class CreateSavePage extends StatefulWidget {
-  const CreateSavePage({this.allowMapEdit = true, super.key});
+  const CreateSavePage({this.allowMapEdit = true, super.key})
+    : _filePath = null,
+      _editCharacters = null,
+      _editMaps = null,
+      _editRules = null;
+
+  /// 编辑已有存档
+  CreateSavePage.edit({
+    required String filePath,
+    required List<CharacterData> characters,
+    required List<MapData> maps,
+    RuleData? rules,
+    this.allowMapEdit = true,
+    super.key,
+  }) : _filePath = filePath,
+       _editCharacters = characters,
+       _editMaps = maps,
+       _editRules = rules;
 
   /// 是否允许编辑地图（玩家为 false，主持为 true）
   final bool allowMapEdit;
+
+  final String? _filePath;
+  final List<CharacterData>? _editCharacters;
+  final List<MapData>? _editMaps;
+  final RuleData? _editRules;
+
+  bool get isEditMode => _filePath != null;
 
   @override
   State<CreateSavePage> createState() => _CreateSavePageState();
@@ -23,21 +48,21 @@ extension on _CreateSavePageState {
   int get _tabCount => _allowMap ? 3 : 2;
 }
 
-class _ClassEdit {
+class ClassEdit {
   final TextEditingController ctrl = TextEditingController();
 
-  _ClassEdit({String text = ''}) {
+  ClassEdit({String text = ''}) {
     ctrl.text = text;
   }
 
   void dispose() => ctrl.dispose();
 }
 
-class _PersonalityEdit {
+class PersonalityEdit {
   final TextEditingController traitCtrl = TextEditingController();
   final TextEditingController descCtrl = TextEditingController();
 
-  _PersonalityEdit({String trait = '', String description = ''}) {
+  PersonalityEdit({String trait = '', String description = ''}) {
     traitCtrl.text = trait;
     descCtrl.text = description;
   }
@@ -48,16 +73,18 @@ class _PersonalityEdit {
   }
 }
 
-class _CharEdit {
+class CharEdit {
   final nameCtrl = TextEditingController(text: '无名冒险者');
-  final List<_ClassEdit> classes = [_ClassEdit(text: '战士')];
+  final List<ClassEdit> classes = [ClassEdit(text: '战士')];
   final raceCtrl = TextEditingController();
   String race = '人类';
   bool raceCustom = false;
   int level = 1;
   List<SkillData> skills = [];
-  List<_PersonalityEdit> personalities = [];
+  List<PersonalityEdit> personalities = [];
   List<ItemData> backpack = [];
+  int hp = 1;
+  int maxHp = 1;
   String portraitBase64 = '';
   Uint8List? portraitBytes;
   final Map<String, int> baseStats = {
@@ -110,6 +137,8 @@ class _CharEdit {
     wisdom: baseStats['感知'] ?? 0,
     charisma: baseStats['魅力'] ?? 0,
     customStats: Map<String, int>.from(customStats),
+    hp: hp,
+    maxHp: maxHp,
     portraitBase64: portraitBase64,
   );
 }
@@ -119,19 +148,72 @@ class _CreateSavePageState extends State<CreateSavePage>
   late final TabController _tabController;
   bool _isSaving = false;
 
-  final List<_CharEdit> _chars = [_CharEdit()];
+  final List<CharEdit> _chars = [CharEdit()];
   int _charIndex = 0;
 
-  _CharEdit get _cur => _chars[_charIndex];
+  CharEdit get _cur => _chars[_charIndex];
 
-  // ---------- 地图 / 物品 ----------
+  // ---------- 地图 / 规则 ----------
   final List<MapData> _maps = [];
-  final List<ItemData> _items = [];
+  final List<String> _turnSettings = [];
+  final List<String> _phaseSettings = ['先攻', '战斗'];
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: _tabCount, vsync: this);
+
+    // Pre-populate in edit mode
+    if (widget.isEditMode) {
+      final editChars = widget._editCharacters ?? [];
+      if (editChars.isNotEmpty) {
+        _chars.clear();
+        for (final c in editChars) {
+          _chars.add(_charDataToEdit(c));
+        }
+      }
+      _maps.addAll(widget._editMaps ?? []);
+      if (widget._editRules case final r?) {
+        _turnSettings.addAll(r.turnSettings);
+        _phaseSettings
+          ..clear()
+          ..addAll(r.phaseSettings);
+      }
+    }
+  }
+
+  CharEdit _charDataToEdit(CharacterData c) {
+    final ce = CharEdit();
+    ce.nameCtrl.text = c.name;
+    ce.classes.clear();
+    ce.classes.add(ClassEdit(text: c.className));
+    for (final ac in c.additionalClasses) {
+      ce.classes.add(ClassEdit(text: ac));
+    }
+    ce.race = c.race;
+    ce.level = c.level;
+    ce.skills = c.skills.toList();
+    ce.personalities = c.personalities
+        .map(
+          (p) =>
+              PersonalityEdit(trait: p.trait, description: p.description ?? ''),
+        )
+        .toList();
+    ce.backpack = c.backpack.toList();
+    ce.baseStats['力量'] = c.strength;
+    ce.baseStats['敏捷'] = c.dexterity;
+    ce.baseStats['体质'] = c.constitution;
+    ce.baseStats['智力'] = c.intelligence;
+    ce.baseStats['感知'] = c.wisdom;
+    ce.baseStats['魅力'] = c.charisma;
+    ce.customStats.addAll(Map<String, int>.from(c.customStats));
+    ce.hp = c.hp;
+    ce.maxHp = c.maxHp;
+    ce.portraitBase64 = c.portraitBase64;
+    if (c.portraitBase64.isNotEmpty) {
+      ce.portraitBytes = base64Decode(c.portraitBase64);
+    }
+    return ce;
   }
 
   @override
@@ -145,7 +227,7 @@ class _CreateSavePageState extends State<CreateSavePage>
 
   void _addCharacter() {
     setState(() {
-      _chars.add(_CharEdit());
+      _chars.add(CharEdit());
       _charIndex = _chars.length - 1;
     });
   }
@@ -173,8 +255,15 @@ class _CreateSavePageState extends State<CreateSavePage>
     });
   }
 
+  void _setStatValue(String stat, int value) {
+    setState(() {
+      if (value < 0 || value > 99) return;
+      _setStat(stat, value);
+    });
+  }
+
   void _addClass() {
-    setState(() => _cur.classes.add(_ClassEdit()));
+    setState(() => _cur.classes.add(ClassEdit()));
   }
 
   void _removeClass(int index) {
@@ -247,7 +336,7 @@ class _CreateSavePageState extends State<CreateSavePage>
   }
 
   void _addPersonality() {
-    setState(() => _cur.personalities.add(_PersonalityEdit()));
+    setState(() => _cur.personalities.add(PersonalityEdit()));
   }
 
   void _removePersonality(int index) {
@@ -341,11 +430,16 @@ class _CreateSavePageState extends State<CreateSavePage>
     setState(() => _maps.removeAt(index));
   }
 
-  void _addItem() {
-    showDialog(
-      context: context,
-      builder: (ctx) =>
-          _ItemDialog(onSave: (item) => setState(() => _items.add(item))),
+  Future<void> _editMapInList(int index) async {
+    final map = _maps[index];
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MapEditorPage(
+          mapData: map,
+          onSave: (updated) => setState(() => _maps[index] = updated),
+        ),
+      ),
     );
   }
 
@@ -395,7 +489,6 @@ class _CreateSavePageState extends State<CreateSavePage>
               );
               setState(() {
                 _cur.backpack.add(item);
-                _items.add(item);
               });
               Navigator.pop(ctx);
             },
@@ -442,8 +535,23 @@ class _CreateSavePageState extends State<CreateSavePage>
         createdAt: DateTime.now().toIso8601String(),
         characters: _chars.map((c) => c.toCharacterData()).toList(),
         maps: _maps,
-        items: _items,
+        rules: RuleData(
+          turnSettings: List<String>.from(_turnSettings),
+          phaseSettings: List<String>.from(_phaseSettings),
+        ),
       );
+
+      if (widget.isEditMode) {
+        // Edit mode: overwrite existing file
+        await save.packToZip(widget._filePath!);
+        if (!mounted) return;
+        setState(() => _isSaving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('存档已更新'), backgroundColor: Colors.green),
+        );
+        return;
+      }
+
       final fileName =
           '${_chars.first.nameCtrl.text.trim()}_${DateTime.now().millisecondsSinceEpoch}.zip';
       String? outputPath = await FilePicker.platform.saveFile(
@@ -463,9 +571,7 @@ class _CreateSavePageState extends State<CreateSavePage>
       setState(() => _isSaving = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            '存档已保存 (角色:${_chars.length} 地图:${_maps.length} 物品:${_items.length})',
-          ),
+          content: Text('存档已保存 (角色:${_chars.length} 地图:${_maps.length})'),
           backgroundColor: Colors.green,
         ),
       );
@@ -485,11 +591,11 @@ class _CreateSavePageState extends State<CreateSavePage>
     if (_allowMap) {
       tabs.add(const Tab(icon: Icon(Icons.map_outlined), text: '地图'));
     }
-    tabs.add(const Tab(icon: Icon(Icons.inventory_2_outlined), text: '物品'));
+    tabs.add(const Tab(icon: Icon(Icons.rule), text: '规则'));
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('创建存档'),
+        title: Text(widget.isEditMode ? '修改存档' : '创建存档'),
         bottom: TabBar(controller: _tabController, tabs: tabs),
       ),
       body: SafeArea(
@@ -551,7 +657,7 @@ class _CreateSavePageState extends State<CreateSavePage>
                         ),
                       ),
                       Expanded(
-                        child: _CharacterTab(
+                        child: CharacterTab(
                           nameCtrl: _cur.nameCtrl,
                           classes: _cur.classes,
                           onAddClass: _addClass,
@@ -571,6 +677,10 @@ class _CreateSavePageState extends State<CreateSavePage>
                           },
                           level: _cur.level,
                           onLevelChanged: (v) => setState(() => _cur.level = v),
+                          hp: _cur.hp,
+                          maxHp: _cur.maxHp,
+                          onHpChanged: (v) => setState(() => _cur.hp = v),
+                          onMaxHpChanged: (v) => setState(() => _cur.maxHp = v),
                           skills: _cur.skills,
                           onAddSkill: _addSkill,
                           backpack: _cur.backpack,
@@ -585,6 +695,7 @@ class _CreateSavePageState extends State<CreateSavePage>
                           onRemoveCustomStat: _removeCustomStat,
                           onRemoveBaseStat: _removeBaseStat,
                           onAdjust: _adjustStat,
+                          onStatChanged: _setStatValue,
                           portraitBase64: _cur.portraitBase64,
                           portraitBytes: _cur.portraitBytes,
                           onPickPortrait: _pickPortrait,
@@ -597,8 +708,30 @@ class _CreateSavePageState extends State<CreateSavePage>
                       maps: _maps,
                       onAdd: _addMap,
                       onDelete: _removeMap,
+                      onEdit: (i) => _editMapInList(i),
                     ),
-                  _ItemListTab(items: _items, onAdd: _addItem),
+                  _RulesTab(
+                    turnSettings: _turnSettings,
+                    phaseSettings: _phaseSettings,
+                    onAddTurn: () {
+                      setState(() => _turnSettings.add(''));
+                    },
+                    onRemoveTurn: (i) {
+                      setState(() => _turnSettings.removeAt(i));
+                    },
+                    onTurnChanged: (i, v) {
+                      setState(() => _turnSettings[i] = v);
+                    },
+                    onAddPhase: () {
+                      setState(() => _phaseSettings.add(''));
+                    },
+                    onRemovePhase: (i) {
+                      setState(() => _phaseSettings.removeAt(i));
+                    },
+                    onPhaseChanged: (i, v) {
+                      setState(() => _phaseSettings[i] = v);
+                    },
+                  ),
                 ],
               ),
             ),
@@ -616,7 +749,9 @@ class _CreateSavePageState extends State<CreateSavePage>
                         )
                       : const Icon(Icons.save_outlined),
                   label: Text(
-                    _isSaving ? '保存中...' : '保存存档',
+                    _isSaving
+                        ? '保存中...'
+                        : (widget.isEditMode ? '保存修改' : '保存存档'),
                     style: const TextStyle(fontSize: 16),
                   ),
                   style: ElevatedButton.styleFrom(
@@ -636,8 +771,9 @@ class _CreateSavePageState extends State<CreateSavePage>
 }
 
 // ─── 角色 Tab ───
-class _CharacterTab extends StatelessWidget {
-  const _CharacterTab({
+class CharacterTab extends StatelessWidget {
+  const CharacterTab({
+    super.key,
     required this.nameCtrl,
     required this.classes,
     required this.onAddClass,
@@ -648,6 +784,10 @@ class _CharacterTab extends StatelessWidget {
     required this.onRaceChanged,
     required this.level,
     required this.onLevelChanged,
+    required this.hp,
+    required this.maxHp,
+    required this.onHpChanged,
+    required this.onMaxHpChanged,
     required this.skills,
     required this.onAddSkill,
     required this.backpack,
@@ -662,13 +802,14 @@ class _CharacterTab extends StatelessWidget {
     required this.onRemoveCustomStat,
     required this.onRemoveBaseStat,
     required this.onAdjust,
+    required this.onStatChanged,
     required this.portraitBase64,
     required this.portraitBytes,
     required this.onPickPortrait,
   });
 
   final TextEditingController nameCtrl;
-  final List<_ClassEdit> classes;
+  final List<ClassEdit> classes;
   final VoidCallback onAddClass;
   final void Function(int index) onRemoveClass;
   final String race;
@@ -677,12 +818,16 @@ class _CharacterTab extends StatelessWidget {
   final ValueChanged<String?> onRaceChanged;
   final int level;
   final ValueChanged<int> onLevelChanged;
+  final int hp;
+  final int maxHp;
+  final ValueChanged<int> onHpChanged;
+  final ValueChanged<int> onMaxHpChanged;
   final List<SkillData> skills;
   final VoidCallback onAddSkill;
   final List<ItemData> backpack;
   final VoidCallback onAddBackpackItem;
   final void Function(int index) onRemoveBackpackItem;
-  final List<_PersonalityEdit> personalities;
+  final List<PersonalityEdit> personalities;
   final VoidCallback onAddPersonality;
   final void Function(int index) onRemovePersonality;
   final Map<String, int> baseStats;
@@ -691,6 +836,7 @@ class _CharacterTab extends StatelessWidget {
   final void Function(String name) onRemoveCustomStat;
   final void Function(String stat) onRemoveBaseStat;
   final void Function(String stat, int delta) onAdjust;
+  final void Function(String stat, int value) onStatChanged;
   final String portraitBase64;
   final Uint8List? portraitBytes;
   final VoidCallback onPickPortrait;
@@ -929,7 +1075,12 @@ class _CharacterTab extends StatelessWidget {
           const SizedBox(height: 12),
           Row(
             children: [
-              const Text('等级', style: TextStyle(fontSize: 16)),
+              Text(
+                '等级',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
               const Spacer(),
               IconButton(
                 onPressed: level > 1 ? () => onLevelChanged(level - 1) : null,
@@ -951,6 +1102,138 @@ class _CharacterTab extends StatelessWidget {
                 icon: const Icon(Icons.add_circle_outline),
               ),
             ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            '血量',
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Column(
+                children: [
+                  // 血条进度
+                  Row(
+                    children: [
+                      const Icon(Icons.favorite, color: Colors.red, size: 20),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(
+                            value: maxHp > 0 ? hp / maxHp : 0,
+                            minHeight: 14,
+                            backgroundColor: Colors.grey.shade200,
+                            valueColor: const AlwaysStoppedAnimation(
+                              Colors.red,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        '$hp/$maxHp',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  // 当前血量调节
+                  Row(
+                    children: [
+                      const SizedBox(width: 32),
+                      const Text('当前', style: TextStyle(fontSize: 14)),
+                      const Spacer(),
+                      IconButton(
+                        onPressed: hp > 0 ? () => onHpChanged(hp - 1) : null,
+                        icon: const Icon(Icons.remove_circle_outline, size: 20),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                      SizedBox(
+                        width: 52,
+                        child: TextFormField(
+                          initialValue: '$hp',
+                          textAlign: TextAlign.center,
+                          keyboardType: TextInputType.number,
+                          style: const TextStyle(fontSize: 15),
+                          decoration: const InputDecoration(
+                            isDense: true,
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: 4,
+                              vertical: 6,
+                            ),
+                            border: OutlineInputBorder(),
+                          ),
+                          onFieldSubmitted: (v) {
+                            final n = int.tryParse(v);
+                            if (n != null && n >= 0 && n <= maxHp) {
+                              onHpChanged(n);
+                            }
+                          },
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: hp < maxHp
+                            ? () => onHpChanged(hp + 1)
+                            : null,
+                        icon: const Icon(Icons.add_circle_outline, size: 20),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ],
+                  ),
+                  // 上限血量调节
+                  Row(
+                    children: [
+                      const SizedBox(width: 32),
+                      const Text('上限', style: TextStyle(fontSize: 14)),
+                      const Spacer(),
+                      IconButton(
+                        onPressed: maxHp > 1
+                            ? () => onMaxHpChanged(maxHp - 1)
+                            : null,
+                        icon: const Icon(Icons.remove_circle_outline, size: 20),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                      SizedBox(
+                        width: 52,
+                        child: TextFormField(
+                          initialValue: '$maxHp',
+                          textAlign: TextAlign.center,
+                          keyboardType: TextInputType.number,
+                          style: const TextStyle(fontSize: 15),
+                          decoration: const InputDecoration(
+                            isDense: true,
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: 4,
+                              vertical: 6,
+                            ),
+                            border: OutlineInputBorder(),
+                          ),
+                          onFieldSubmitted: (v) {
+                            final n = int.tryParse(v);
+                            if (n != null && n >= 1) {
+                              onMaxHpChanged(n);
+                            }
+                          },
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => onMaxHpChanged(maxHp + 1),
+                        icon: const Icon(Icons.add_circle_outline, size: 20),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
           ),
           const SizedBox(height: 12),
           Row(
@@ -1126,6 +1409,7 @@ class _CharacterTab extends StatelessWidget {
               icon,
               e.value < 99,
               onAdjust,
+              onValueSet: onStatChanged,
               canDelete: true,
               onDelete: () => onRemoveBaseStat(e.key),
             );
@@ -1137,6 +1421,7 @@ class _CharacterTab extends StatelessWidget {
               Icons.star_outline,
               e.value < 99,
               onAdjust,
+              onValueSet: onStatChanged,
               canDelete: true,
               onDelete: () => onRemoveCustomStat(e.key),
             ),
@@ -1163,6 +1448,7 @@ class _StatLine extends StatelessWidget {
     this.icon,
     this.canIncrement,
     this.onAdjust, {
+    this.onValueSet,
     this.canDelete = false,
     this.onDelete,
   });
@@ -1172,6 +1458,7 @@ class _StatLine extends StatelessWidget {
   final IconData icon;
   final bool canIncrement;
   final void Function(String, int) onAdjust;
+  final void Function(String, int)? onValueSet;
   final bool canDelete;
   final VoidCallback? onDelete;
 
@@ -1195,14 +1482,29 @@ class _StatLine extends StatelessWidget {
               tooltip: '减少',
             ),
             SizedBox(
-              width: 36,
-              child: Text(
-                '$value',
+              width: 48,
+              child: TextFormField(
+                initialValue: '$value',
                 textAlign: TextAlign.center,
+                keyboardType: TextInputType.number,
                 style: const TextStyle(
-                  fontSize: 18,
+                  fontSize: 16,
                   fontWeight: FontWeight.bold,
                 ),
+                decoration: const InputDecoration(
+                  isDense: true,
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 6,
+                  ),
+                  border: OutlineInputBorder(),
+                ),
+                onFieldSubmitted: (v) {
+                  final n = int.tryParse(v);
+                  if (n != null && n >= 0 && n <= 99) {
+                    onValueSet?.call(label, n);
+                  }
+                },
               ),
             ),
             IconButton(
@@ -1233,11 +1535,13 @@ class _MapListTab extends StatelessWidget {
     required this.maps,
     required this.onAdd,
     required this.onDelete,
+    required this.onEdit,
   });
 
   final List<MapData> maps;
   final VoidCallback onAdd;
   final void Function(int index) onDelete;
+  final void Function(int index) onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -1330,6 +1634,11 @@ class _MapListTab extends StatelessWidget {
                                 ),
                               ),
                               IconButton(
+                                onPressed: () => onEdit(i),
+                                icon: const Icon(Icons.edit, size: 22),
+                                tooltip: '编辑地图',
+                              ),
+                              IconButton(
                                 onPressed: () => onDelete(i),
                                 icon: const Icon(
                                   Icons.delete_outline,
@@ -1351,74 +1660,145 @@ class _MapListTab extends StatelessWidget {
   }
 }
 
-// ─── 物品列表 Tab ───
-class _ItemListTab extends StatelessWidget {
-  const _ItemListTab({required this.items, required this.onAdd});
+// ─── 规则 Tab ───
+class _RulesTab extends StatelessWidget {
+  const _RulesTab({
+    required this.turnSettings,
+    required this.phaseSettings,
+    required this.onAddTurn,
+    required this.onRemoveTurn,
+    required this.onTurnChanged,
+    required this.onAddPhase,
+    required this.onRemovePhase,
+    required this.onPhaseChanged,
+  });
 
-  final List<ItemData> items;
-  final VoidCallback onAdd;
+  final List<String> turnSettings;
+  final List<String> phaseSettings;
+  final VoidCallback onAddTurn;
+  final void Function(int) onRemoveTurn;
+  final void Function(int, String) onTurnChanged;
+  final VoidCallback onAddPhase;
+  final void Function(int) onRemovePhase;
+  final void Function(int, String) onPhaseChanged;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Padding(
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '物品列表',
+            '回合设置',
             style: theme.textTheme.titleLarge?.copyWith(
               fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 4),
           Text(
-            '已添加 ${items.length} 件物品',
+            turnSettings.isEmpty ? '暂未设置回合参数' : '已设置 ${turnSettings.length} 项',
             style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey),
           ),
           const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: onAdd,
-              icon: const Icon(Icons.add),
-              label: const Text('添加物品', style: TextStyle(fontSize: 16)),
+            child: OutlinedButton.icon(
+              onPressed: onAddTurn,
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('添加回合设置', style: TextStyle(fontSize: 16)),
             ),
           ),
-          const SizedBox(height: 12),
-          Expanded(
-            child: items.isEmpty
-                ? Center(
-                    child: Text(
-                      '暂无物品，点击上方按钮添加',
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        color: Colors.grey,
+          if (turnSettings.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            ...List.generate(turnSettings.length, (i) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        initialValue: turnSettings[i],
+                        decoration: InputDecoration(
+                          labelText: '回合设置 #${i + 1}',
+                          border: const OutlineInputBorder(),
+                          isDense: true,
+                        ),
+                        onChanged: (v) => onTurnChanged(i, v),
                       ),
                     ),
-                  )
-                : ListView.builder(
-                    itemCount: items.length,
-                    itemBuilder: (_, i) {
-                      final it = items[i];
-                      return Card(
-                        child: ListTile(
-                          leading: const Icon(
-                            Icons.inventory_2_outlined,
-                            color: Colors.deepPurple,
-                          ),
-                          title: Text(
-                            it.name,
-                            style: const TextStyle(fontSize: 16),
-                          ),
-                          subtitle: Text(
-                            '${it.type} · ×${it.quantity} · ${it.weight}磅 · ${it.value}金币${it.description.isNotEmpty ? ' · ${it.description}' : ''}',
-                          ),
-                        ),
-                      );
-                    },
-                  ),
+                    IconButton(
+                      onPressed: () => onRemoveTurn(i),
+                      icon: const Icon(
+                        Icons.remove_circle_outline,
+                        color: Colors.red,
+                        size: 20,
+                      ),
+                      tooltip: '删除',
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
+          const SizedBox(height: 32),
+          Text(
+            '环节设置',
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
           ),
+          const SizedBox(height: 4),
+          Text(
+            '已设置 ${phaseSettings.length} 个环节',
+            style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: onAddPhase,
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('添加环节', style: TextStyle(fontSize: 16)),
+            ),
+          ),
+          const SizedBox(height: 8),
+          ...List.generate(phaseSettings.length, (i) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.flag_outlined,
+                    size: 20,
+                    color: Colors.deepPurple,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextFormField(
+                      initialValue: phaseSettings[i],
+                      decoration: InputDecoration(
+                        labelText: '环节 #${i + 1}',
+                        border: const OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                      onChanged: (v) => onPhaseChanged(i, v),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => onRemovePhase(i),
+                    icon: const Icon(
+                      Icons.remove_circle_outline,
+                      color: Colors.red,
+                      size: 20,
+                    ),
+                    tooltip: '删除环节',
+                  ),
+                ],
+              ),
+            );
+          }),
         ],
       ),
     );
@@ -1627,133 +2007,6 @@ class _MapDialogState extends State<_MapDialog> {
                 width: int.tryParse(_widthCtrl.text.trim()) ?? 20,
                 height: int.tryParse(_heightCtrl.text.trim()) ?? 20,
                 imageBase64: _imageBase64!,
-              ),
-            );
-            Navigator.pop(context);
-          },
-          child: const Text('添加'),
-        ),
-      ],
-    );
-  }
-}
-
-// ─── 添加物品对话框 ───
-class _ItemDialog extends StatefulWidget {
-  const _ItemDialog({required this.onSave});
-
-  final void Function(ItemData) onSave;
-
-  @override
-  State<_ItemDialog> createState() => _ItemDialogState();
-}
-
-class _ItemDialogState extends State<_ItemDialog> {
-  final _nameCtrl = TextEditingController(text: '无名物品');
-  final _descCtrl = TextEditingController();
-  String _type = '杂物';
-  int _quantity = 1, _weight = 0, _value = 0;
-
-  static const _types = ['武器', '防具', '药水', '卷轴', '杂物', '饰品', '食物', '材料'];
-
-  @override
-  void dispose() {
-    _nameCtrl.dispose();
-    _descCtrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('添加物品'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: _nameCtrl,
-              decoration: const InputDecoration(
-                labelText: '物品名称',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              initialValue: _type,
-              decoration: const InputDecoration(
-                labelText: '类型',
-                border: OutlineInputBorder(),
-              ),
-              items: _types
-                  .map((t) => DropdownMenuItem(value: t, child: Text(t)))
-                  .toList(),
-              onChanged: (v) => setState(() => _type = v ?? '杂物'),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _descCtrl,
-              decoration: const InputDecoration(
-                labelText: '描述',
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 2,
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: '数量',
-                      border: OutlineInputBorder(),
-                    ),
-                    onChanged: (v) => _quantity = int.tryParse(v) ?? 1,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextField(
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: '重量(磅)',
-                      border: OutlineInputBorder(),
-                    ),
-                    onChanged: (v) => _weight = int.tryParse(v) ?? 0,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: '价值(金币)',
-                border: OutlineInputBorder(),
-              ),
-              onChanged: (v) => _value = int.tryParse(v) ?? 0,
-            ),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('取消'),
-        ),
-        ElevatedButton(
-          onPressed: () {
-            final name = _nameCtrl.text.trim();
-            if (name.isEmpty) return;
-            widget.onSave(
-              ItemData(
-                name: name,
-                type: _type,
-                description: _descCtrl.text.trim(),
-                quantity: _quantity,
-                weight: _weight,
-                value: _value,
               ),
             );
             Navigator.pop(context);
