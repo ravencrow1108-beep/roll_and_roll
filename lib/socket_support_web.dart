@@ -17,6 +17,12 @@ class WebRoomServerHandle implements RoomServerHandle {
   void broadcast(String message) {}
 
   @override
+  void updateHostRole(String role) {}
+
+  @override
+  void updateHostSaveName(String name) {}
+
+  @override
   Future<void> close() async {
     await _sc.close();
   }

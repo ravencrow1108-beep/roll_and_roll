@@ -8,6 +8,8 @@ abstract class RoomServerHandle {
   bool get isActive;
   Stream<String> get messages;
   void broadcast(String message);
+  void updateHostRole(String role) {}
+  void updateHostSaveName(String name) {}
   Future<void> close();
 }
 

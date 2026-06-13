@@ -59,6 +59,9 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
         _saveFilePath = result.files.single.path!;
         _saveFileName = result.files.single.name;
       });
+      if (_isHosting) {
+        RoomSession.instance.hostSetSave(_saveFileName);
+      }
     }
   }
 

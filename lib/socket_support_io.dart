@@ -14,7 +14,7 @@ class _ClientInfo {
   _ClientInfo(this.socket, this.name, this.role);
   final Socket socket;
   final String name;
-  final String role;
+  String role;
 }
 
 class IoRoomServerHandle implements RoomServerHandle {
@@ -26,10 +26,21 @@ class IoRoomServerHandle implements RoomServerHandle {
 
   final ServerSocket _serverSocket;
   final String hostName;
-  final String hostRole;
+  String hostRole;
+  String hostSaveFileName = '';
   StreamSubscription<Socket>? _serverSub;
   final StreamController<String> _sc;
   final List<_ClientInfo> _clients = [];
+
+  @override
+  void updateHostRole(String role) {
+    hostRole = role;
+  }
+
+  @override
+  void updateHostSaveName(String name) {
+    hostSaveFileName = name;
+  }
 
   @override
   bool get isActive => true;
@@ -113,7 +124,12 @@ Future<RoomServerHandle> startServer(
 
               // Send full existing member list (host + other clients) to the new client
               final existing = <Map<String, dynamic>>[
-                {'name': handle.hostName, 'role': handle.hostRole},
+                {
+                  'name': handle.hostName,
+                  'role': handle.hostRole,
+                  if (handle.hostSaveFileName.isNotEmpty)
+                    'hostSaveName': handle.hostSaveFileName,
+                },
               ];
               for (final c in handle._clients) {
                 if (c.socket != socket) {
@@ -134,8 +150,15 @@ Future<RoomServerHandle> startServer(
             if (joined) {
               if (msg['type'] == 'request_members') {
                 // Reply with host + all clients
+                final hostEntry = <String, dynamic>{
+                  'name': handle.hostName,
+                  'role': handle.hostRole,
+                };
+                if (handle.hostSaveFileName.isNotEmpty) {
+                  hostEntry['hostSaveName'] = handle.hostSaveFileName;
+                }
                 final all = <Map<String, dynamic>>[
-                  {'name': handle.hostName, 'role': handle.hostRole},
+                  hostEntry,
                   ...handle._clients.map(
                     (c) => {'name': c.name, 'role': c.role},
                   ),
@@ -145,6 +168,27 @@ Future<RoomServerHandle> startServer(
                     socketEncode({'type': 'members_list', 'members': all}),
                   );
                 } catch (_) {}
+                continue;
+              }
+
+              // Handle role change from a client
+              if (msg['type'] == 'role_change') {
+                final newRole = (msg['role'] as String?) ?? '玩家';
+                final clientName = (msg['name'] as String?) ?? '';
+                for (final c in handle._clients) {
+                  if (c.socket == socket) {
+                    c.role = newRole;
+                    break;
+                  }
+                }
+                // Tell host about the role change
+                handle._onMessage(
+                  socketEncode({
+                    'type': 'role_change',
+                    'name': clientName,
+                    'role': newRole,
+                  }).trim(),
+                );
                 continue;
               }
 

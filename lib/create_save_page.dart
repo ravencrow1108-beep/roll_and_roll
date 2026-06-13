@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:file_picker/file_picker.dart';
@@ -57,6 +58,8 @@ class _CharEdit {
   List<SkillData> skills = [];
   List<_PersonalityEdit> personalities = [];
   List<ItemData> backpack = [];
+  String portraitBase64 = '';
+  Uint8List? portraitBytes;
   final Map<String, int> baseStats = {
     '力量': 10,
     '敏捷': 10,
@@ -107,6 +110,7 @@ class _CharEdit {
     wisdom: baseStats['感知'] ?? 0,
     charisma: baseStats['魅力'] ?? 0,
     customStats: Map<String, int>.from(customStats),
+    portraitBase64: portraitBase64,
   );
 }
 
@@ -406,6 +410,20 @@ class _CreateSavePageState extends State<CreateSavePage>
     setState(() => _cur.backpack.removeAt(index));
   }
 
+  Future<void> _pickPortrait() async {
+    final result = await FilePicker.platform.pickFiles(
+      dialogTitle: '选择角色头像',
+      type: FileType.image,
+    );
+    if (result == null || result.files.single.path == null) return;
+    final bytes = await File(result.files.single.path!).readAsBytes();
+    if (!mounted) return;
+    setState(() {
+      _cur.portraitBytes = bytes;
+      _cur.portraitBase64 = base64Encode(bytes);
+    });
+  }
+
   Future<void> _saveToFile() async {
     final first = _chars.first.nameCtrl.text.trim();
     if (first.isEmpty) {
@@ -426,11 +444,10 @@ class _CreateSavePageState extends State<CreateSavePage>
         maps: _maps,
         items: _items,
       );
-      final jsonString = save.toJsonString();
       final fileName =
-          '${_chars.first.nameCtrl.text.trim()}_${DateTime.now().millisecondsSinceEpoch}.json';
+          '${_chars.first.nameCtrl.text.trim()}_${DateTime.now().millisecondsSinceEpoch}.zip';
       String? outputPath = await FilePicker.platform.saveFile(
-        dialogTitle: '保存存档文件',
+        dialogTitle: '保存存档文件 (ZIP)',
         fileName: fileName,
         type: FileType.any,
       );
@@ -438,8 +455,10 @@ class _CreateSavePageState extends State<CreateSavePage>
         if (mounted) setState(() => _isSaving = false);
         return;
       }
-      final file = File(outputPath);
-      await file.writeAsString(jsonString, flush: true);
+      if (!outputPath.endsWith('.zip')) {
+        outputPath = '$outputPath.zip';
+      }
+      await save.packToZip(outputPath);
       if (!mounted) return;
       setState(() => _isSaving = false);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -566,6 +585,9 @@ class _CreateSavePageState extends State<CreateSavePage>
                           onRemoveCustomStat: _removeCustomStat,
                           onRemoveBaseStat: _removeBaseStat,
                           onAdjust: _adjustStat,
+                          portraitBase64: _cur.portraitBase64,
+                          portraitBytes: _cur.portraitBytes,
+                          onPickPortrait: _pickPortrait,
                         ),
                       ),
                     ],
@@ -640,6 +662,9 @@ class _CharacterTab extends StatelessWidget {
     required this.onRemoveCustomStat,
     required this.onRemoveBaseStat,
     required this.onAdjust,
+    required this.portraitBase64,
+    required this.portraitBytes,
+    required this.onPickPortrait,
   });
 
   final TextEditingController nameCtrl;
@@ -666,6 +691,9 @@ class _CharacterTab extends StatelessWidget {
   final void Function(String name) onRemoveCustomStat;
   final void Function(String stat) onRemoveBaseStat;
   final void Function(String stat, int delta) onAdjust;
+  final String portraitBase64;
+  final Uint8List? portraitBytes;
+  final VoidCallback onPickPortrait;
 
   @override
   Widget build(BuildContext context) {
@@ -688,6 +716,43 @@ class _CharacterTab extends StatelessWidget {
               labelText: '角色名称',
               border: OutlineInputBorder(),
               prefixIcon: Icon(Icons.person),
+            ),
+          ),
+          const SizedBox(height: 12),
+          // ── 角色头像 ──
+          InkWell(
+            onTap: onPickPortrait,
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey.shade300),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: portraitBytes != null
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(11),
+                      child: Image.memory(portraitBytes!, fit: BoxFit.cover),
+                    )
+                  : Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.add_a_photo,
+                          size: 36,
+                          color: Colors.grey.shade500,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '选择头像',
+                          style: TextStyle(
+                            color: Colors.grey.shade600,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
             ),
           ),
           const SizedBox(height: 12),

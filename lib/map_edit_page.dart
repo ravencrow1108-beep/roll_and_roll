@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -105,11 +104,10 @@ class _MapEditPageState extends State<MapEditPage> {
     }
   }
 
-  void _loadSaveData() {
+  Future<void> _loadSaveData() async {
     if (_saveFilePath == null) return;
     try {
-      final json = jsonDecode(File(_saveFilePath!).readAsStringSync());
-      final save = SaveData.fromJson(json as Map<String, dynamic>);
+      final save = await SaveData.fromZip(_saveFilePath!);
       _loadedMaps = save.maps;
     } catch (_) {
       _loadedMaps = [];

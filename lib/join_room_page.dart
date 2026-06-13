@@ -34,6 +34,7 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
   int _connectedPort = 0;
   RoomClientHandle? _clientHandle;
   StreamSubscription<String>? _msgSub;
+  String _hostSaveName = '';
 
   String get _playerName => widget.playerName;
 
@@ -167,6 +168,24 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
             final name = (m as Map<String, dynamic>)['name'] as String? ?? '';
             final role = m['role'] as String? ?? '玩家';
             RoomSession.instance.addMember(name, role: role);
+            final saveName = m['hostSaveName'] as String?;
+            if (saveName != null && saveName.isNotEmpty) {
+              _hostSaveName = saveName;
+            }
+          }
+          break;
+
+        case 'host_save_changed':
+          _hostSaveName = data['fileName'] as String? ?? '';
+          if (mounted) setState(() {});
+          break;
+
+        case 'role_change':
+          final name = data['name'] as String? ?? '';
+          final role = data['role'] as String? ?? '玩家';
+          RoomSession.instance.addMember(name, role: role);
+          if (name == _playerName) {
+            setState(() => _role = role);
           }
           break;
 
@@ -193,6 +212,21 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
     if (mounted) {
       setState(() {});
     }
+  }
+
+  void _changeRole(String newRole) {
+    setState(() => _role = newRole);
+    RoomSession.instance.memberRolesNotifier.value = {
+      ...RoomSession.instance.memberRolesNotifier.value,
+      _playerName: newRole,
+    };
+    _clientHandle?.send(
+      socketEncode({
+        'type': 'role_change',
+        'name': _playerName,
+        'role': newRole,
+      }),
+    );
   }
 
   @override
@@ -337,6 +371,53 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
               const SizedBox(height: 8),
               Text('你的名称: $_playerName'),
               Text('你的身份: $_role'),
+              const SizedBox(height: 12),
+              Text(
+                '切换身份',
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 4),
+              SegmentedButton<String>(
+                segments: const [
+                  ButtonSegment(
+                    value: '玩家',
+                    label: Text('玩家'),
+                    icon: Icon(Icons.person),
+                  ),
+                  ButtonSegment(
+                    value: '主持',
+                    label: Text('主持'),
+                    icon: Icon(Icons.mic),
+                  ),
+                ],
+                selected: {_role},
+                onSelectionChanged: (v) => _changeRole(v.first),
+              ),
+              const SizedBox(height: 16),
+              if (_hostSaveName.isNotEmpty)
+                Card(
+                  color: Colors.blue.shade50,
+                  child: Padding(
+                    padding: const EdgeInsets.all(10),
+                    child: Row(
+                      children: [
+                        Icon(Icons.save, size: 18, color: Colors.blue.shade700),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '房主备档: $_hostSaveName',
+                            style: TextStyle(
+                              color: Colors.blue.shade800,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               const SizedBox(height: 20),
               if (adventureStarted)
                 Card(

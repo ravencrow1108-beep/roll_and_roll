@@ -1,5 +1,8 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
+
+import 'package:archive/archive.dart';
 
 /// 骰子表达式解析结果
 class DiceRollResult {
@@ -136,6 +139,9 @@ class CharacterData {
   final int charisma;
   final Map<String, int> customStats;
 
+  /// Character portrait image (base64 PNG, may be empty).
+  final String portraitBase64;
+
   const CharacterData({
     this.name = '无名冒险者',
     this.className = '战士',
@@ -152,6 +158,7 @@ class CharacterData {
     this.wisdom = 10,
     this.charisma = 10,
     this.customStats = const {},
+    this.portraitBase64 = '',
   });
 
   int getStatModifier(int value) => (value - 10) ~/ 2;
@@ -176,6 +183,7 @@ class CharacterData {
       'charisma': charisma,
     },
     if (customStats.isNotEmpty) 'customStats': customStats,
+    if (portraitBase64.isNotEmpty) 'portraitBase64': portraitBase64,
   };
 
   factory CharacterData.fromJson(Map<String, dynamic> json) {
@@ -215,6 +223,7 @@ class CharacterData {
       customStats: cs != null
           ? cs.map((k, v) => MapEntry(k, (v as num).toInt()))
           : const {},
+      portraitBase64: json['portraitBase64'] as String? ?? '',
     );
   }
 
@@ -342,7 +351,7 @@ class ItemData {
   }
 }
 
-/// 存档数据模型（整合三类对象）
+/// 存档数据模型（整合三类对象）— ZIP 格式
 class SaveData {
   final int version;
   final String createdAt;
@@ -399,5 +408,150 @@ class SaveData {
               .toList() ??
           [],
     );
+  }
+
+  // ═══════════════════════════════════════════════
+  //  ZIP 存档（v2）
+  // ═══════════════════════════════════════════════
+
+  /// Write this SaveData to a ZIP file at [path].
+  /// Images are stored as raw PNG bytes inside the archive.
+  Future<void> packToZip(String path) async {
+    final archive = Archive();
+
+    // 1. JSON manifest (without base64 blobs — images are separate files)
+    final manifest = _toZipManifest();
+    archive.addFile(
+      ArchiveFile(
+        'save.json',
+        utf8
+            .encode(const JsonEncoder.withIndent('  ').convert(manifest))
+            .length,
+        utf8.encode(const JsonEncoder.withIndent('  ').convert(manifest)),
+      ),
+    );
+
+    // 2. Map images
+    for (final m in maps) {
+      if (m.imageBase64.isNotEmpty) {
+        final bytes = base64Decode(m.imageBase64);
+        archive.addFile(
+          ArchiveFile('maps/${_safeFileName(m.name)}.png', bytes.length, bytes),
+        );
+      }
+    }
+
+    // 3. Character portraits
+    for (final c in characters) {
+      if (c.portraitBase64.isNotEmpty) {
+        final bytes = base64Decode(c.portraitBase64);
+        archive.addFile(
+          ArchiveFile(
+            'portraits/${_safeFileName(c.name)}.png',
+            bytes.length,
+            bytes,
+          ),
+        );
+      }
+    }
+
+    final encoded = ZipEncoder().encode(archive);
+    await File(path).writeAsBytes(encoded, flush: true);
+  }
+
+  /// Generate a clean manifest that references image paths instead of
+  /// embedding base64 blobs.
+  Map<String, dynamic> _toZipManifest() {
+    final mapJson = maps.map((m) {
+      final j = m.toJson();
+      if (m.imageBase64.isNotEmpty) {
+        j['imageFile'] = 'maps/${_safeFileName(m.name)}.png';
+        j.remove('imageBase64');
+      }
+      return j;
+    }).toList();
+
+    final charJson = characters.map((c) {
+      final j = c.toJson();
+      if (c.portraitBase64.isNotEmpty) {
+        j['portraitFile'] = 'portraits/${_safeFileName(c.name)}.png';
+        j.remove('portraitBase64');
+      }
+      return j;
+    }).toList();
+
+    return {
+      'version': 2,
+      'format': 'zip',
+      'createdAt': createdAt,
+      'characters': charJson,
+      'maps': mapJson,
+      'items': items.map((i) => i.toJson()).toList(),
+    };
+  }
+
+  /// Read a ZIP archive and reconstruct SaveData with images loaded
+  /// into base64 fields.
+  static Future<SaveData> fromZip(String path) async {
+    final bytes = await File(path).readAsBytes();
+    final archive = ZipDecoder().decodeBytes(bytes);
+
+    // Find save.json
+    final manifestFile = archive.findFile('save.json');
+    if (manifestFile == null) {
+      throw FormatException('ZIP 存档中缺少 save.json');
+    }
+
+    final manifest =
+        jsonDecode(utf8.decode(manifestFile.content as List<int>))
+            as Map<String, dynamic>;
+
+    // Load maps, injecting imageBase64 from ZIP image entries
+    final maps = <MapData>[];
+    for (final m in (manifest['maps'] as List<dynamic>? ?? <dynamic>[])) {
+      final j = m as Map<String, dynamic>;
+      final imageFile = j['imageFile'] as String?;
+      if (imageFile != null) {
+        final img = archive.findFile(imageFile);
+        if (img != null) {
+          j['imageBase64'] = base64Encode(img.content as List<int>);
+        }
+      }
+      j.remove('imageFile');
+      maps.add(MapData.fromJson(j));
+    }
+
+    // Load characters, injecting portraitBase64 from ZIP image entries
+    final characters = <CharacterData>[];
+    for (final c in (manifest['characters'] as List<dynamic>? ?? <dynamic>[])) {
+      final j = c as Map<String, dynamic>;
+      final portraitFile = j['portraitFile'] as String?;
+      if (portraitFile != null) {
+        final img = archive.findFile(portraitFile);
+        if (img != null) {
+          j['portraitBase64'] = base64Encode(img.content as List<int>);
+        }
+      }
+      j.remove('portraitFile');
+      characters.add(CharacterData.fromJson(j));
+    }
+
+    return SaveData(
+      version: manifest['version'] as int? ?? 1,
+      createdAt:
+          manifest['createdAt'] as String? ?? DateTime.now().toIso8601String(),
+      characters: characters,
+      maps: maps,
+      items:
+          (manifest['items'] as List<dynamic>?)
+              ?.map((i) => ItemData.fromJson(i as Map<String, dynamic>))
+              .toList() ??
+          [],
+    );
+  }
+
+  /// Sanitize a name for use as a file name inside the ZIP.
+  static String _safeFileName(String name) {
+    return name.replaceAll(RegExp(r'[<>:"/\\|?*]'), '_').trim();
   }
 }

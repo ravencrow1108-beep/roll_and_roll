@@ -121,6 +121,16 @@ class RoomSession {
     final nextRoles = {...memberRolesNotifier.value};
     nextRoles[currentPlayerName] = role;
     memberRolesNotifier.value = nextRoles;
+    _serverHandle?.updateHostRole(role);
+  }
+
+  void hostSetSave(String fileName) {
+    if (_serverHandle != null) {
+      _serverHandle!.broadcast(
+        socketEncode({'type': 'host_save_changed', 'fileName': fileName}),
+      );
+      _serverHandle!.updateHostSaveName(fileName);
+    }
   }
 
   void setPlayerReady(String playerName) {

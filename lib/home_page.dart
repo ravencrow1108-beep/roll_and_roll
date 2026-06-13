@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'create_room_page.dart';
 import 'create_save_page.dart';
@@ -15,16 +16,33 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  final TextEditingController _playerNameController = TextEditingController(
-    text: '玩家1',
-  );
+  final TextEditingController _playerNameController = TextEditingController();
+  bool _nameLoaded = false;
 
   bool get _webUnsupported => !PlatformSocketSupport.isSupported;
+  bool get _nameEmpty => _playerNameController.text.trim().isEmpty;
+
+  static const _keyPlayerName = 'player_name';
 
   @override
   void initState() {
     super.initState();
     RoomSession.instance.reset();
+    _loadSavedName();
+  }
+
+  Future<void> _loadSavedName() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getString(_keyPlayerName) ?? '';
+    if (mounted) {
+      _playerNameController.text = saved;
+      setState(() => _nameLoaded = true);
+    }
+  }
+
+  Future<void> _saveName(String name) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyPlayerName, name);
   }
 
   void _openPage(BuildContext context, Widget page) {
@@ -32,6 +50,8 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _handleRoomAction(BuildContext context, Widget page) {
+    if (_nameEmpty) return;
+    _saveName(_playerNameController.text.trim());
     if (_webUnsupported) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('当前 Web 端无法使用房间创建与加入功能，请在桌面端运行。')),
@@ -41,10 +61,7 @@ class _HomePageState extends State<HomePage> {
     _openPage(context, page);
   }
 
-  String _getPlayerName() {
-    final name = _playerNameController.text.trim();
-    return name.isEmpty ? '玩家1' : name;
-  }
+  String _getPlayerName() => _playerNameController.text.trim();
 
   @override
   void dispose() {
@@ -101,19 +118,27 @@ class _HomePageState extends State<HomePage> {
                       ),
                     ),
                   if (_webUnsupported) const SizedBox(height: 16),
-                  TextField(
-                    controller: _playerNameController,
-                    textAlign: TextAlign.center,
-                    decoration: const InputDecoration(
-                      labelText: '你的玩家名称',
-                      hintText: '例如：阿宇',
-                      border: OutlineInputBorder(),
+                  if (_nameLoaded)
+                    TextField(
+                      controller: _playerNameController,
+                      textAlign: TextAlign.center,
+                      onChanged: (_) => setState(() {}),
+                      decoration: const InputDecoration(
+                        labelText: '你的玩家名称',
+                        hintText: '例如：阿宇',
+                        border: OutlineInputBorder(),
+                      ),
+                    )
+                  else
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: Center(child: CircularProgressIndicator()),
                     ),
-                  ),
                   const SizedBox(height: 24),
                   _ActionButton(
                     label: '新建房间',
                     icon: Icons.add_circle_outline,
+                    enabled: !_nameEmpty,
                     onPressed: () => _handleRoomAction(
                       context,
                       CreateRoomPage(playerName: _getPlayerName()),
@@ -123,6 +148,7 @@ class _HomePageState extends State<HomePage> {
                   _ActionButton(
                     label: '加入房间',
                     icon: Icons.login_rounded,
+                    enabled: !_nameEmpty,
                     onPressed: () => _handleRoomAction(
                       context,
                       JoinRoomPage(playerName: _getPlayerName()),
@@ -155,18 +181,20 @@ class _ActionButton extends StatelessWidget {
     required this.label,
     required this.icon,
     required this.onPressed,
+    this.enabled = true,
   });
 
   final String label;
   final IconData icon;
   final VoidCallback? onPressed;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton.icon(
-        onPressed: onPressed,
+        onPressed: enabled ? onPressed : null,
         icon: Icon(icon, size: 22),
         label: Text(label, style: const TextStyle(fontSize: 16)),
         style: ElevatedButton.styleFrom(
