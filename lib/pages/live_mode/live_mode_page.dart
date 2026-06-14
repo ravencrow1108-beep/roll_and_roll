@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../save_data.dart';
 
+/// 直播模式页面：单人离线地图展示、骰子投掷与敌人 HP 管理
 class LiveModePage extends StatefulWidget {
   const LiveModePage({super.key});
 
@@ -157,6 +158,7 @@ class _LiveModePageState extends State<LiveModePage> {
     super.dispose();
   }
 
+  /// 根据存档加载状态构建界面：空状态提示或地图/骰子/敌人面板
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -271,6 +273,7 @@ class _LiveModePageState extends State<LiveModePage> {
     );
   }
 
+  /// 构建骰子快捷投掷面板与自定义表达式输入
   Widget _buildDicePanel(ThemeData theme, bool isWide) {
     final dice = [4, 6, 8, 10, 12, 20];
     return Container(
@@ -378,6 +381,7 @@ class _LiveModePageState extends State<LiveModePage> {
     );
   }
 
+  /// 构建地图中心区域，叠加显示玩家标记与敌人指示器
   Widget _buildMapCenter(ThemeData theme, MapData m, List<EnemyData> enemies) {
     return Padding(
       padding: const EdgeInsets.all(10),
@@ -520,6 +524,7 @@ class _LiveModePageState extends State<LiveModePage> {
     );
   }
 
+  /// 构建敌人列表面板，支持选中与 HP 变化显示
   Widget _buildEnemyPanel(ThemeData theme, List<EnemyData> enemies) {
     return Container(
       width: 200,

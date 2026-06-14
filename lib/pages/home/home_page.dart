@@ -10,6 +10,7 @@ import '../create_save/create_save_page.dart';
 import '../join_room/join_room_page.dart';
 import '../live_mode/live_mode_page.dart';
 
+/// 首页：玩家命名、房间创建/加入入口、直播模式与存档管理
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
@@ -110,6 +111,7 @@ class _HomePageState extends State<HomePage> {
     super.dispose();
   }
 
+  /// 构建首页布局，包含标题、玩家名称输入与各功能入口按钮
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -223,6 +225,7 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
+/// 统一样式的操作按钮组件，支持启用/禁用状态
 class _ActionButton extends StatelessWidget {
   const _ActionButton({
     required this.label,
@@ -236,6 +239,7 @@ class _ActionButton extends StatelessWidget {
   final VoidCallback? onPressed;
   final bool enabled;
 
+  /// 构建带图标和标签的圆角全宽按钮
   @override
   Widget build(BuildContext context) {
     return SizedBox(

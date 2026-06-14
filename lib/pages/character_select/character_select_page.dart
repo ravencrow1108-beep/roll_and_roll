@@ -11,6 +11,7 @@ import '../adventure/adventure_page.dart';
 import '../create_save/char_edit_models.dart';
 import '../create_save/character_tab.dart';
 
+/// 角色选择页面：加载存档角色、编辑技能并准备开始冒险
 class CharacterSelectPage extends StatefulWidget {
   const CharacterSelectPage({
     required this.playerName,
@@ -320,6 +321,7 @@ class _CharacterSelectPageState extends State<CharacterSelectPage> {
     super.dispose();
   }
 
+  /// 根据已选角色切换显示角色详情或选择列表
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -333,6 +335,7 @@ class _CharacterSelectPageState extends State<CharacterSelectPage> {
     return _buildCharacterSelection(theme);
   }
 
+  /// 构建角色详情视图，显示属性、技能与准备按钮
   Widget _buildCharacterView(ThemeData theme) {
     final c = _character!;
     final idx = _loadedCharacters.indexOf(c);
@@ -522,6 +525,7 @@ class _CharacterSelectPageState extends State<CharacterSelectPage> {
     );
   }
 
+  /// 构建角色选择列表、存档加载与新建角色入口
   Widget _buildCharacterSelection(ThemeData theme) {
     return Scaffold(
       appBar: AppBar(title: const Text('选择角色')),
@@ -703,6 +707,7 @@ class _CharacterSelectPageState extends State<CharacterSelectPage> {
 //  在当前存档新建角色页面（复用 CharacterTab）
 // ═══════════════════════════════════════════════════════
 
+/// 在当前存档新建或编辑角色的页面，复用 CharacterTab 组件
 class _AddCharacterPage extends StatefulWidget {
   const _AddCharacterPage({required this.saveFilePath, this.existing});
 
@@ -811,6 +816,7 @@ class _AddCharacterPageState extends State<_AddCharacterPage> {
     Navigator.pop(context, _char.toCharacterData());
   }
 
+  /// 构建角色编辑表单与提交按钮
   @override
   Widget build(BuildContext context) {
     return Scaffold(

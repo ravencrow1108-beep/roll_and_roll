@@ -4,15 +4,18 @@ import 'socket_support_io.dart'
     if (dart.library.html) 'socket_support_web.dart'
     as socket_impl;
 
+/// 房主服务端句柄抽象，提供消息广播与客户端管理接口
 abstract class RoomServerHandle {
   bool get isActive;
   Stream<String> get messages;
   void broadcast(String message);
   void updateHostRole(String role) {}
   void updateHostSaveName(String name) {}
+  void kickClient(String name) {}
   Future<void> close();
 }
 
+/// 客户端连接句柄抽象，提供消息收发与断连接口
 abstract class RoomClientHandle {
   bool get isConnected;
   Stream<String> get messages;

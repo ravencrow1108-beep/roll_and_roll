@@ -66,7 +66,36 @@ class IoRoomServerHandle implements RoomServerHandle {
   }
 
   void _removeClient(Socket socket) {
+    final leaving = _clients.where((c) => c.socket == socket).toList();
     _clients.removeWhere((c) => c.socket == socket);
+    for (final c in leaving) {
+      final msg = socketEncode({'type': 'member_left', 'name': c.name});
+      // Notify remaining clients
+      broadcast(msg);
+      // Notify host
+      _onMessage(msg.trim());
+    }
+  }
+
+  @override
+  void kickClient(String name) {
+    final target = _clients.where((c) => c.name.trim() == name.trim()).toList();
+    for (final c in target) {
+      try {
+        c.socket.write(
+          socketEncode({'type': 'kicked', 'message': '你已被房主踢出房间'}),
+        );
+      } catch (_) {}
+      try {
+        c.socket.destroy();
+      } catch (_) {}
+    }
+    if (target.isNotEmpty) {
+      _clients.removeWhere((c) => target.contains(c));
+      final msg = socketEncode({'type': 'member_left', 'name': name});
+      broadcast(msg);
+      _onMessage(msg.trim());
+    }
   }
 
   void _onMessage(String message) {

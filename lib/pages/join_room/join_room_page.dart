@@ -7,6 +7,7 @@ import '../../room_state.dart';
 import '../../socket_support.dart';
 import '../character_select/character_select_page.dart';
 
+/// 加入房间页面：通过 IP/端口连接、切换身份并等待房主开始冒险
 class JoinRoomPage extends StatefulWidget {
   const JoinRoomPage({required this.playerName, super.key});
 
@@ -44,9 +45,27 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
     RoomSession.instance.membersNotifier.addListener(_handleMembersChanged);
     RoomSession.instance.memberRolesNotifier.addListener(_handleMembersChanged);
     RoomSession.instance.startAdventureNotifier.addListener(
-      _handleMembersChanged,
+      _onAdventureStarted,
     );
     RoomSession.instance.mapNotifier.addListener(_handleMembersChanged);
+  }
+
+  void _onAdventureStarted() {
+    if (!RoomSession.instance.startAdventureNotifier.value) return;
+    if (!mounted || !_isConnected) return;
+    final saveName = _hostSaveName;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => CharacterSelectPage(
+            playerName: _playerName,
+            role: _role,
+            hostSaveName: saveName,
+          ),
+        ),
+      );
+    });
   }
 
   Future<void> _joinRoom() async {
@@ -134,24 +153,8 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
           break;
 
         case 'start_adventure':
-          if (!mounted) return;
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (!mounted) return;
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => CharacterSelectPage(
-                  playerName: _playerName,
-                  role: _role,
-                  saveFilePath:
-                      (data['saveFilePath'] as String?)?.isEmpty == true
-                      ? null
-                      : data['saveFilePath'] as String?,
-                  hostSaveName: data['saveFileName'] as String? ?? '',
-                ),
-              ),
-            );
-          });
+          _hostSaveName = data['saveFileName'] as String? ?? '';
+          RoomSession.instance.startAdventureNotifier.value = true;
           break;
 
         case 'member_joined':
@@ -220,6 +223,23 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
           }
           break;
 
+        case 'member_left':
+          final name = data['name'] as String? ?? '';
+          RoomSession.instance.removeMember(name);
+          if (mounted) setState(() {});
+          break;
+
+        case 'kicked':
+          if (mounted) {
+            setState(() {
+              _status = data['message'] as String? ?? '你已被踢出房间';
+            });
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) _leaveRoom();
+            });
+          }
+          break;
+
         case 'host_disconnected':
           // Host closed the room — go back to join form (deferred)
           if (mounted) {
@@ -261,7 +281,7 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
       _handleMembersChanged,
     );
     RoomSession.instance.startAdventureNotifier.removeListener(
-      _handleMembersChanged,
+      _onAdventureStarted,
     );
     RoomSession.instance.mapNotifier.removeListener(_handleMembersChanged);
     _ipController.dispose();
@@ -270,6 +290,7 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
   }
 
   // ═══════════════════════════════════════════════════════
+  /// 根据连接状态切换显示加入表单或已连接房间视图
   @override
   Widget build(BuildContext context) {
     if (_isConnected) {
@@ -278,6 +299,7 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
     return _buildJoinForm();
   }
 
+  /// 构建 IP/端口输入表单与身份选择界面
   Widget _buildJoinForm() {
     return Scaffold(
       appBar: AppBar(title: const Text('加入房间')),
@@ -359,6 +381,7 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
     );
   }
 
+  /// 构建已加入房间视图，显示成员列表、身份切换与准备状态
   Widget _buildRoomView() {
     final roomMembers = RoomSession.instance.membersNotifier.value.isEmpty
         ? <String>[_playerName]

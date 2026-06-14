@@ -15,6 +15,7 @@ import 'map_display.dart';
 import 'map_views.dart';
 import 'right_panel.dart';
 
+/// 冒险主页面：骰子投掷、地图显示、聊天面板与角色管理
 class AdventurePage extends StatefulWidget {
   const AdventurePage({
     required this.playerName,
@@ -171,8 +172,20 @@ class _AdventurePageState extends State<AdventurePage> {
     final nonHost = s.membersNotifier.value
         .where((m) => m != s.hostNameNotifier.value)
         .toList();
-    if (nonHost.isEmpty ||
-        !nonHost.every((m) => s.readyMembersNotifier.value.contains(m))) {
+    if (nonHost.isEmpty) {
+      // 仅房主一人，直接开始
+      if (_selectedMap == null) return;
+      s.mapNotifier.value = _selectedMap;
+      s.broadcast({'type': 'adventure_started', 'map': _selectedMap!.toJson()});
+      if (mounted) {
+        setState(() {
+          _adventureStarted = true;
+          _displayedMap = _selectedMap;
+        });
+      }
+      return;
+    }
+    if (!nonHost.every((m) => s.readyMembersNotifier.value.contains(m))) {
       return;
     }
     if (_selectedMap == null) return;
@@ -288,6 +301,7 @@ class _AdventurePageState extends State<AdventurePage> {
     super.dispose();
   }
 
+  /// 根据冒险状态与角色切换显示冒险视图、角色详情或选择界面
   @override
   Widget build(BuildContext context) {
     if (_adventureStarted && _displayedMap != null) {
@@ -298,6 +312,7 @@ class _AdventurePageState extends State<AdventurePage> {
     return _isGM ? _buildMapSelection() : _buildCharacterSelection();
   }
 
+  /// 构建冒险主界面，根据屏幕宽度切换横竖布局
   Widget _buildAdventureView() {
     final m = _displayedMap!;
     final positions = RoomSession.instance.playerPositionsNotifier.value;
@@ -376,6 +391,7 @@ class _AdventurePageState extends State<AdventurePage> {
     );
   }
 
+  /// 构建玩家角色详情与准备冒险界面
   Widget _buildCharacterView() {
     return CharacterView(
       character: _character!,
@@ -386,6 +402,7 @@ class _AdventurePageState extends State<AdventurePage> {
     );
   }
 
+  /// 构建主持地图预览与开始冒险界面
   Widget _buildMapPreviewView() {
     return MapPreviewView(
       mapData: _selectedMap!,
@@ -396,6 +413,7 @@ class _AdventurePageState extends State<AdventurePage> {
     );
   }
 
+  /// 构建角色选择列表界面
   Widget _buildCharacterSelection() {
     return CharacterSelectionView(
       playerName: widget.playerName,
@@ -407,6 +425,7 @@ class _AdventurePageState extends State<AdventurePage> {
     );
   }
 
+  /// 构建主持地图选择界面
   Widget _buildMapSelection() {
     return MapSelectionView(
       playerName: widget.playerName,

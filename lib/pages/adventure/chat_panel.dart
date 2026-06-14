@@ -18,6 +18,7 @@ class ChatPanel extends StatelessWidget {
   final String playerName;
   final VoidCallback onSend;
 
+  /// 构建聊天消息列表与底部发送输入框
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -25,9 +26,12 @@ class ChatPanel extends StatelessWidget {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(8, 6, 8, 2),
-          child: Text('聊天',
-              style: theme.textTheme.titleSmall
-                  ?.copyWith(fontWeight: FontWeight.w600)),
+          child: Text(
+            '聊天',
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ),
         Expanded(
           child: ListView.builder(
@@ -44,26 +48,29 @@ class ChatPanel extends StatelessWidget {
                       ? Alignment.centerRight
                       : Alignment.centerLeft,
                   child: Container(
-                    constraints:
-                        const BoxConstraints(maxWidth: 180),
+                    constraints: const BoxConstraints(maxWidth: 180),
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 6),
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: msg.isSystem
                           ? Colors.grey.shade200
                           : isMe
-                              ? Colors.deepPurple.shade100
-                              : Colors.white,
+                          ? Colors.deepPurple.shade100
+                          : Colors.white,
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: msg.isSystem
-                        ? Text(msg.text,
+                        ? Text(
+                            msg.text,
                             style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey.shade700))
+                              fontSize: 12,
+                              color: Colors.grey.shade700,
+                            ),
+                          )
                         : Column(
-                            crossAxisAlignment:
-                                CrossAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               if (!isMe)
@@ -72,13 +79,13 @@ class ChatPanel extends StatelessWidget {
                                   style: TextStyle(
                                     fontSize: 10,
                                     fontWeight: FontWeight.w700,
-                                    color: Colors
-                                        .deepPurple.shade700,
+                                    color: Colors.deepPurple.shade700,
                                   ),
                                 ),
-                              Text(msg.text,
-                                  style: const TextStyle(
-                                      fontSize: 13)),
+                              Text(
+                                msg.text,
+                                style: const TextStyle(fontSize: 13),
+                              ),
                             ],
                           ),
                   ),
@@ -91,8 +98,7 @@ class ChatPanel extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(6, 4, 6, 6),
           decoration: BoxDecoration(
             color: theme.colorScheme.surfaceContainerHighest,
-            border:
-                Border(top: BorderSide(color: theme.dividerColor)),
+            border: Border(top: BorderSide(color: theme.dividerColor)),
           ),
           child: Row(
             children: [
@@ -104,7 +110,9 @@ class ChatPanel extends StatelessWidget {
                     border: OutlineInputBorder(),
                     isDense: true,
                     contentPadding: EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 8),
+                      horizontal: 10,
+                      vertical: 8,
+                    ),
                   ),
                   style: const TextStyle(fontSize: 13),
                   onSubmitted: (_) => onSend(),

@@ -11,9 +11,11 @@ void main() async {
   runApp(const MyApp());
 }
 
+/// 应用根组件，配置 Material 3 主题与首页入口
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
+  /// 构建带有 Material 3 主题与调试横幅关闭的应用入口
   @override
   Widget build(BuildContext context) {
     return MaterialApp(

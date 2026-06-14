@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
@@ -6,6 +9,7 @@ import '../../socket_support.dart';
 import '../character_select/character_select_page.dart';
 import '../map_edit/map_edit_page.dart';
 
+/// 创建房间页面：开放端口、管理成员身份、选档并开始冒险
 class CreateRoomPage extends StatefulWidget {
   const CreateRoomPage({required this.playerName, super.key});
 
@@ -20,6 +24,7 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
     text: '33333',
   );
   RoomServerHandle? _server;
+  StreamSubscription<String>? _serverSub;
   bool _isHosting = false;
   String _status = '尚未开放端口';
   String _roomAddress = '等待开放端口';
@@ -116,6 +121,9 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
       _server = server;
       RoomSession.instance.setServerHandle(server);
 
+      // Listen to server messages (member_left, player_ready, etc.)
+      _serverSub = server.messages.listen(_handleServerMessage);
+
       if (!mounted) {
         return;
       }
@@ -138,7 +146,31 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
     }
   }
 
+  void _handleServerMessage(String raw) {
+    try {
+      final data = jsonDecode(raw) as Map<String, dynamic>;
+      final type = data['type'] as String? ?? '';
+      switch (type) {
+        case 'member_left':
+          final name = data['name'] as String? ?? '';
+          RoomSession.instance.removeMember(name);
+          break;
+        case 'player_ready':
+          final name = data['name'] as String? ?? '';
+          RoomSession.instance.onPlayerReady(name);
+          break;
+        case 'role_change':
+          final name = data['name'] as String? ?? '';
+          final role = data['role'] as String? ?? '玩家';
+          RoomSession.instance.addMember(name, role: role);
+          break;
+      }
+    } catch (_) {}
+  }
+
   Future<void> _stopHosting() async {
+    _serverSub?.cancel();
+    _serverSub = null;
     final server = _server;
     _server = null;
     if (server != null) {
@@ -157,14 +189,16 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
   void _startAdventure(BuildContext context) {
     if (!mounted || !context.mounted) return;
 
+    // Mark adventure as started
+    RoomSession.instance.startAdventureNotifier.value = true;
+
     // Broadcast the start_adventure event to all players
     final msg = <String, dynamic>{
       'type': 'start_adventure',
       'from': widget.playerName,
       'role': _role,
     };
-    if (_saveFilePath != null && _saveFilePath!.isNotEmpty) {
-      msg['saveFilePath'] = _saveFilePath;
+    if (_saveFileName != '未选择') {
       msg['saveFileName'] = _saveFileName;
     }
     RoomSession.instance.broadcast(msg);
@@ -191,11 +225,13 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
     RoomSession.instance.memberRolesNotifier.removeListener(_onMembersChanged);
     RoomSession.instance.startAdventureNotifier.removeListener(_onStateChanged);
     RoomSession.instance.mapNotifier.removeListener(_onStateChanged);
+    _serverSub?.cancel();
     _server?.close();
     _portController.dispose();
     super.dispose();
   }
 
+  /// 构建房间创建界面，包含端口设置、成员列表、身份/存档选择与冒险控制
   @override
   Widget build(BuildContext context) {
     final adventureStarted =
@@ -308,6 +344,7 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
                     const SizedBox(height: 8),
                     ...members.map((name) {
                       final role = roles[name] ?? '';
+                      final isSelf = name == widget.playerName;
                       final roleIcon = role == '主持'
                           ? Icons.mic
                           : role == '玩家'
@@ -318,6 +355,46 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
                           leading: Icon(roleIcon),
                           title: Text(name),
                           subtitle: role.isNotEmpty ? Text(role) : null,
+                          trailing: !isSelf
+                              ? IconButton(
+                                  icon: const Icon(
+                                    Icons.remove_circle_outline,
+                                    color: Colors.red,
+                                  ),
+                                  tooltip: '踢出 $name',
+                                  onPressed: () {
+                                    showDialog(
+                                      context: context,
+                                      builder: (ctx) => AlertDialog(
+                                        title: const Text('确认踢出'),
+                                        content: Text('确定要将 $name 踢出房间吗？'),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(ctx),
+                                            child: const Text('取消'),
+                                          ),
+                                          TextButton(
+                                            onPressed: () {
+                                              Navigator.pop(ctx);
+                                              RoomSession.instance.kickMember(
+                                                name,
+                                              );
+                                              RoomSession.instance.removeMember(
+                                                name,
+                                              );
+                                              RoomSession.instance.broadcast({
+                                                'type': 'member_left',
+                                                'name': name,
+                                              });
+                                            },
+                                            child: const Text('踢出'),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                )
+                              : null,
                         ),
                       );
                     }),

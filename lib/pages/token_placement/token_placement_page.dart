@@ -6,6 +6,7 @@ import '../../room_state.dart';
 import '../../save_data.dart';
 import '../adventure/adventure_page.dart';
 
+/// 主持布置玩家位置页面：在地图上点击放置各玩家的初始标记
 class TokenPlacementPage extends StatefulWidget {
   const TokenPlacementPage({
     required this.playerName,
@@ -55,20 +56,20 @@ class _TokenPlacementPageState extends State<TokenPlacementPage> {
   }
 
   void _confirmAndStart() {
-    if (_players.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('没有玩家需要放置')));
-      return;
-    }
-
-    final placements = <Map<String, dynamic>>[];
-    for (final name in _players) {
-      final pos = _positions[name];
-      placements.add({'name': name, 'x': pos?.dx ?? 0.5, 'y': pos?.dy ?? 0.5});
-    }
-
     final session = RoomSession.instance;
+    final placements = <Map<String, dynamic>>[];
+
+    if (_players.isNotEmpty) {
+      for (final name in _players) {
+        final pos = _positions[name];
+        placements.add({
+          'name': name,
+          'x': pos?.dx ?? 0.5,
+          'y': pos?.dy ?? 0.5,
+        });
+      }
+    }
+
     session.mapNotifier.value = widget.map;
     session.playerPositionsNotifier.value = placements
         .map(
@@ -98,6 +99,7 @@ class _TokenPlacementPageState extends State<TokenPlacementPage> {
     );
   }
 
+  /// 构建地图放置区域与底部玩家选择列表
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);

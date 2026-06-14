@@ -9,6 +9,7 @@ import '../../save_data.dart';
 import '../create_save/create_save_page.dart';
 import '../token_placement/token_placement_page.dart';
 
+/// 主持地图编辑页面：选择地图、查看详情并等待所有玩家准备后开始布置
 class MapEditPage extends StatefulWidget {
   const MapEditPage({
     required this.playerName,
@@ -82,7 +83,26 @@ class _MapEditPageState extends State<MapEditPage> {
     final nonHost = allMembers
         .where((m) => m != session.hostNameNotifier.value)
         .toList();
-    if (nonHost.isEmpty) return;
+    if (nonHost.isEmpty && _selectedMap != null && !_hasStarted) {
+      // 仅房主一人，直接进入布置阶段
+      _hasStarted = true;
+      session.mapNotifier.value = _selectedMap;
+
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => TokenPlacementPage(
+              playerName: widget.playerName,
+              role: widget.role,
+              map: _selectedMap!,
+              saveFilePath: _saveFilePath,
+            ),
+          ),
+        );
+      }
+      return;
+    }
 
     final allReady = nonHost.every((m) => readyMembers.contains(m));
     if (allReady && _selectedMap != null && !_hasStarted) {
@@ -165,6 +185,7 @@ class _MapEditPageState extends State<MapEditPage> {
     super.dispose();
   }
 
+  /// 根据已选地图切换显示地图详情或选择列表
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -178,6 +199,7 @@ class _MapEditPageState extends State<MapEditPage> {
     return _buildMapSelection(theme);
   }
 
+  /// 构建地图详情视图，显示尺寸、描述与准备就绪按钮
   Widget _buildMapView(ThemeData theme) {
     final m = _selectedMap!;
     return Scaffold(
@@ -254,6 +276,7 @@ class _MapEditPageState extends State<MapEditPage> {
     );
   }
 
+  /// 构建地图选择列表与存档加载界面
   Widget _buildMapSelection(ThemeData theme) {
     return PopScope(
       canPop: false,
@@ -402,6 +425,7 @@ class _MapEditPageState extends State<MapEditPage> {
     );
   }
 
+  /// 构建玩家准备状态指示面板
   Widget _buildReadyStatus() {
     final session = RoomSession.instance;
     final allMembers = session.membersNotifier.value;

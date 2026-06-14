@@ -12,6 +12,7 @@ import 'map_dialog.dart';
 import 'map_list_tab.dart';
 import 'rules_tab.dart';
 
+/// 创建/编辑存档页面：标签页管理角色、地图与规则的完整编辑
 class CreateSavePage extends StatefulWidget {
   const CreateSavePage({this.allowMapEdit = true, super.key})
     : _filePath = null,
@@ -492,6 +493,7 @@ class _CreateSavePageState extends State<CreateSavePage>
     }
   }
 
+  /// 构建标签页布局，包含角色编辑、地图列表与规则设置面板
   @override
   Widget build(BuildContext context) {
     final tabs = <Widget>[const Tab(icon: Icon(Icons.person), text: '角色')];

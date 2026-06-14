@@ -24,6 +24,7 @@ class RightPanel extends StatelessWidget {
   final String playerName;
   final VoidCallback onSend;
 
+  /// 构建成员列表与聊天面板的组合布局
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -31,8 +32,7 @@ class RightPanel extends StatelessWidget {
       width: 240,
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerHighest,
-        border:
-            Border(left: BorderSide(color: theme.dividerColor)),
+        border: Border(left: BorderSide(color: theme.dividerColor)),
       ),
       child: Column(
         children: [

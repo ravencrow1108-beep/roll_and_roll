@@ -23,6 +23,9 @@ class WebRoomServerHandle implements RoomServerHandle {
   void updateHostSaveName(String name) {}
 
   @override
+  void kickClient(String name) {}
+
+  @override
   Future<void> close() async {
     await _sc.close();
   }

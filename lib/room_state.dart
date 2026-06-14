@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'save_data.dart';
 import 'socket_support.dart';
 
+/// 房间会话单例，管理成员列表、角色、准备状态、地图数据与网络句柄
 class RoomSession {
   RoomSession._();
 
@@ -157,6 +158,20 @@ class RoomSession {
   void setStateReady(String name) {
     final next = {...readyMembersNotifier.value, name};
     readyMembersNotifier.value = next;
+  }
+
+  /// Remove a member from the member list.
+  void removeMember(String name) {
+    final trimmed = name.trim();
+    final next = [...membersNotifier.value]..remove(trimmed);
+    membersNotifier.value = next;
+    final nextRoles = {...memberRolesNotifier.value}..remove(trimmed);
+    memberRolesNotifier.value = nextRoles;
+  }
+
+  /// Kick a member (host only).
+  void kickMember(String name) {
+    _serverHandle?.kickClient(name);
   }
 
   /// Send the full member list to all connected clients (used by refresh).

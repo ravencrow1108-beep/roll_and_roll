@@ -20,6 +20,7 @@ class CharacterView extends StatelessWidget {
   final VoidCallback onStart;
   final String? saveFileName;
 
+  /// 构建角色信息展示卡片、头像、技能列表与准备按钮
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -29,17 +30,21 @@ class CharacterView extends StatelessWidget {
       appBar: AppBar(
         title: Text(c.name),
         leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: onBack),
+          icon: const Icon(Icons.arrow_back),
+          onPressed: onBack,
+        ),
       ),
       body: SafeArea(
         child: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text('欢迎，${c.name}',
-                  style: theme.textTheme.headlineSmall
-                      ?.copyWith(fontWeight: FontWeight.bold)),
+              Text(
+                '欢迎，${c.name}',
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               const SizedBox(height: 12),
               if (c.portraitBase64.isNotEmpty)
                 ClipOval(
@@ -55,15 +60,14 @@ class CharacterView extends StatelessWidget {
               Text('种族: ${c.race} · Lv${c.level}'),
               if (c.skills.isNotEmpty) ...[
                 const SizedBox(height: 12),
-                Text(
-                    '技能: ${c.skills.map((s) => s.name).join(", ")}'),
+                Text('技能: ${c.skills.map((s) => s.name).join(", ")}'),
               ],
               if (saveFileName != null) ...[
                 const SizedBox(height: 16),
-                Text('已加载存档: $saveFileName',
-                    style: TextStyle(
-                        color: Colors.grey.shade600,
-                        fontSize: 12)),
+                Text(
+                  '已加载存档: $saveFileName',
+                  style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                ),
               ],
               const SizedBox(height: 32),
               if (!isReady)
@@ -71,10 +75,8 @@ class CharacterView extends StatelessWidget {
                   width: 200,
                   child: ElevatedButton.icon(
                     onPressed: onStart,
-                    icon: const Icon(
-                        Icons.check_circle_outline),
-                    label: const Text('准备',
-                        style: TextStyle(fontSize: 18)),
+                    icon: const Icon(Icons.check_circle_outline),
+                    label: const Text('准备', style: TextStyle(fontSize: 18)),
                   ),
                 )
               else
@@ -85,8 +87,7 @@ class CharacterView extends StatelessWidget {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.check_circle,
-                            color: Colors.green),
+                        Icon(Icons.check_circle, color: Colors.green),
                         SizedBox(width: 8),
                         Text('已准备，等待主持开始…'),
                       ],
@@ -120,6 +121,7 @@ class CharacterSelectionView extends StatelessWidget {
   final void Function(CharacterData c) onSelectCharacter;
   final VoidCallback onCreateSave;
 
+  /// 构建角色列表、存档选择入口与新建角色按钮
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -132,13 +134,19 @@ class CharacterSelectionView extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('你好，$playerName',
-                  style: theme.textTheme.titleLarge
-                      ?.copyWith(fontWeight: FontWeight.bold)),
+              Text(
+                '你好，$playerName',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               const SizedBox(height: 20),
-              Text('从存档中选择角色',
-                  style: theme.textTheme.titleMedium
-                      ?.copyWith(fontWeight: FontWeight.w600)),
+              Text(
+                '从存档中选择角色',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
               const SizedBox(height: 8),
               Row(
                 children: [
@@ -146,16 +154,16 @@ class CharacterSelectionView extends StatelessWidget {
                     child: Card(
                       child: Padding(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 14),
+                          horizontal: 12,
+                          vertical: 14,
+                        ),
                         child: Row(
                           children: [
                             const Icon(Icons.save_outlined),
                             const SizedBox(width: 12),
-                            Expanded(
-                                child: Text(saveFileName)),
+                            Expanded(child: Text(saveFileName)),
                             IconButton(
-                              icon: const Icon(
-                                  Icons.folder_open),
+                              icon: const Icon(Icons.folder_open),
                               tooltip: '选择存档文件',
                               onPressed: onPickSaveFile,
                             ),
@@ -176,24 +184,24 @@ class CharacterSelectionView extends StatelessWidget {
                       return Card(
                         child: ListTile(
                           leading: CircleAvatar(
-                            backgroundImage:
-                                c.portraitBase64.isNotEmpty
-                                    ? MemoryImage(base64Decode(
-                                        c.portraitBase64))
-                                    : null,
+                            backgroundImage: c.portraitBase64.isNotEmpty
+                                ? MemoryImage(base64Decode(c.portraitBase64))
+                                : null,
                             child: c.portraitBase64.isEmpty
                                 ? const Icon(Icons.person)
                                 : null,
                           ),
-                          title: Text(c.name,
-                              style: const TextStyle(
-                                  fontWeight:
-                                      FontWeight.bold)),
+                          title: Text(
+                            c.name,
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
                           subtitle: Text(
-                              '${c.className} · ${c.race} · Lv${c.level}'),
+                            '${c.className} · ${c.race} · Lv${c.level}',
+                          ),
                           trailing: const Icon(
-                              Icons.arrow_forward_ios,
-                              size: 16),
+                            Icons.arrow_forward_ios,
+                            size: 16,
+                          ),
                           onTap: () => onSelectCharacter(c),
                         ),
                       );
@@ -202,20 +210,24 @@ class CharacterSelectionView extends StatelessWidget {
                 ),
               ],
               const SizedBox(height: 24),
-              Text('或自行创建角色',
-                  style: theme.textTheme.titleMedium
-                      ?.copyWith(fontWeight: FontWeight.w600)),
+              Text(
+                '或自行创建角色',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
               const SizedBox(height: 8),
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
                   onPressed: onCreateSave,
                   icon: const Icon(Icons.person_add),
-                  label: const Text('创建新角色 (完整创建)',
-                      style: TextStyle(fontSize: 16)),
+                  label: const Text(
+                    '创建新角色 (完整创建)',
+                    style: TextStyle(fontSize: 16),
+                  ),
                   style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                        vertical: 14),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
                 ),
               ),
