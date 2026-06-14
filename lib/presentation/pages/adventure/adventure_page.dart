@@ -212,7 +212,7 @@ class _AdventurePageState extends State<AdventurePage> {
   }
 
   Future<void> _pickSaveFile() async {
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       dialogTitle: '选择存档文件',
       type: FileType.any,
     );

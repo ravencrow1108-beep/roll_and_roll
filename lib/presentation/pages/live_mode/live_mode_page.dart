@@ -27,7 +27,7 @@ class _LiveModePageState extends State<LiveModePage> {
   String? _selectedEnemyIndex;
 
   Future<void> _loadSave() async {
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       dialogTitle: '选择存档文件 (.zip)',
       type: FileType.any,
     );

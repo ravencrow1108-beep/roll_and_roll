@@ -58,7 +58,7 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
   }
 
   Future<void> _selectSaveFile() async {
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       dialogTitle: '选择存档文件',
       type: FileType.any,
     );

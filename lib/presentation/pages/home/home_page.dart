@@ -50,7 +50,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _modifySaveFile() async {
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       dialogTitle: '选择要修改的存档文件 (.zip)',
       type: FileType.any,
     );

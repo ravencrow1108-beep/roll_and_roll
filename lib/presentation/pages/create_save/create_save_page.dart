@@ -412,7 +412,7 @@ class _CreateSavePageState extends State<CreateSavePage>
   }
 
   Future<void> _pickPortrait() async {
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       dialogTitle: '选择角色头像',
       type: FileType.image,
     );
@@ -462,7 +462,7 @@ class _CreateSavePageState extends State<CreateSavePage>
 
       final fileName =
           '${_chars.first.nameCtrl.text.trim()}_${DateTime.now().millisecondsSinceEpoch}.zip';
-      String? outputPath = await FilePicker.platform.saveFile(
+      String? outputPath = await FilePicker.saveFile(
         dialogTitle: '保存存档文件 (ZIP)',
         fileName: fileName,
         type: FileType.any,

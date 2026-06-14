@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.example.roll_and_roll"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

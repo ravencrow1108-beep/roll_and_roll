@@ -115,7 +115,7 @@ class _CharacterSelectPageState extends State<CharacterSelectPage> {
   }
 
   Future<void> _pickSaveFile() async {
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       dialogTitle: '选择存档文件',
       type: FileType.any,
     );
@@ -789,7 +789,7 @@ class _AddCharacterPageState extends State<_AddCharacterPage> {
   }
 
   Future<void> _pickPortrait() async {
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       dialogTitle: '选择角色头像',
       type: FileType.image,
     );
