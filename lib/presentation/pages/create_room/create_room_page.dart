@@ -5,8 +5,10 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../../providers/room_state.dart';
+import '../../../data/models/save_data.dart';
 import '../../../data/services/socket_support.dart';
 import '../character_select/character_select_page.dart';
+import '../create_save/create_save_page.dart';
 import '../map_edit/map_edit_page.dart';
 
 /// 创建房间页面：开放端口、管理成员身份、选档并开始冒险
@@ -67,6 +69,48 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
       });
       if (_isHosting) {
         RoomSession.instance.hostSetSave(_saveFileName);
+      }
+    }
+  }
+
+  Future<void> _editSaveFile() async {
+    if (_saveFilePath == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('请先选择存档文件')));
+      }
+      return;
+    }
+
+    try {
+      final saveData = await SaveData.fromZip(_saveFilePath!);
+      if (!mounted) return;
+
+      final result = await Navigator.push<String>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => CreateSavePage.edit(
+            filePath: _saveFilePath!,
+            characters: saveData.characters,
+            maps: saveData.maps,
+            rules: saveData.rules,
+            allowMapEdit: _role == '主持',
+          ),
+        ),
+      );
+
+      // If the user saved changes (result is the save path), broadcast update
+      if (result != null && mounted) {
+        if (_isHosting) {
+          RoomSession.instance.hostSetSave(_saveFileName);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('打开存档失败: $e')));
       }
     }
   }
@@ -186,7 +230,7 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
     });
   }
 
-  void _startAdventure(BuildContext context) {
+  Future<void> _startAdventure(BuildContext context) async {
     if (!mounted || !context.mounted) return;
 
     // Mark adventure as started
@@ -216,7 +260,14 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
             hostSaveName: _saveFilePath != null ? _saveFileName : '',
           );
 
-    Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+
+    // User came back without starting the adventure — reset state so they can try again
+    if (mounted) {
+      RoomSession.instance.startAdventureNotifier.value = false;
+      RoomSession.instance.readyMembersNotifier.value = {};
+      setState(() {});
+    }
   }
 
   @override
@@ -450,6 +501,12 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
                             const Icon(Icons.save_outlined),
                             const SizedBox(width: 12),
                             Expanded(child: Text(_saveFileName)),
+                            if (_saveFilePath != null)
+                              IconButton(
+                                icon: const Icon(Icons.edit),
+                                tooltip: '编辑存档',
+                                onPressed: _editSaveFile,
+                              ),
                             IconButton(
                               icon: const Icon(Icons.folder_open),
                               tooltip: '选择存档文件',

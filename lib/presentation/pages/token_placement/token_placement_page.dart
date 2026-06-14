@@ -6,7 +6,7 @@ import '../../providers/room_state.dart';
 import '../../../data/models/models.dart';
 import '../adventure/adventure_page.dart';
 
-/// 主持布置玩家位置页面：在地图上点击放置各玩家的初始标记
+/// 主持布置角色位置页面：在地图上点击放置各角色的初始标记
 class TokenPlacementPage extends StatefulWidget {
   const TokenPlacementPage({
     required this.playerName,
@@ -26,48 +26,61 @@ class TokenPlacementPage extends StatefulWidget {
 }
 
 class _TokenPlacementPageState extends State<TokenPlacementPage> {
-  /// Map from player name → (x fraction, y fraction)
+  /// Map from character name → (x fraction, y fraction)
   final Map<String, Offset> _positions = {};
-  String? _selectedPlayer;
+  String? _selectedCharacter;
+
+  /// Characters loaded from the save file.
+  List<CharacterData> _characters = [];
 
   @override
   void initState() {
     super.initState();
     // Broadcast host is setting up
     RoomSession.instance.broadcast({'type': 'host_setting_up'});
+    _loadCharacters();
   }
 
-  List<String> get _players {
-    final all = RoomSession.instance.membersNotifier.value;
-    final host =
-        RoomSession.instance.hostNameNotifier.value ?? widget.playerName;
-    return all.where((n) => n != host).toList();
+  Future<void> _loadCharacters() async {
+    if (widget.saveFilePath == null) return;
+    try {
+      final save = await SaveData.fromZip(widget.saveFilePath!);
+      if (mounted) {
+        setState(() => _characters = save.characters);
+      }
+    } catch (_) {
+      _characters = [];
+    }
   }
 
-  void _placePlayer(String name, Offset fraction) {
+  List<String> get _characterNames => _characters.map((c) => c.name).toList();
+
+  void _placeCharacter(String name, Offset fraction) {
     setState(() => _positions[name] = fraction);
   }
 
-  void _removePlayer(String name) {
+  void _removeCharacter(String name) {
     setState(() {
       _positions.remove(name);
-      if (_selectedPlayer == name) _selectedPlayer = null;
+      if (_selectedCharacter == name) _selectedCharacter = null;
     });
+  }
+
+  void _cancelPlacement() {
+    RoomSession.instance.broadcast({'type': 'return_to_room'});
+    // Reset adventure state so the host can re-enter from the room
+    RoomSession.instance.startAdventureNotifier.value = false;
+    RoomSession.instance.mapNotifier.value = null;
+    Navigator.of(context).pop();
   }
 
   void _confirmAndStart() {
     final session = RoomSession.instance;
     final placements = <Map<String, dynamic>>[];
 
-    if (_players.isNotEmpty) {
-      for (final name in _players) {
-        final pos = _positions[name];
-        placements.add({
-          'name': name,
-          'x': pos?.dx ?? 0.5,
-          'y': pos?.dy ?? 0.5,
-        });
-      }
+    for (final name in _characterNames) {
+      final pos = _positions[name];
+      placements.add({'name': name, 'x': pos?.dx ?? 0.5, 'y': pos?.dy ?? 0.5});
     }
 
     session.mapNotifier.value = widget.map;
@@ -99,7 +112,7 @@ class _TokenPlacementPageState extends State<TokenPlacementPage> {
     );
   }
 
-  /// 构建地图放置区域与底部玩家选择列表
+  /// 构建地图放置区域与底部角色选择列表
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -108,19 +121,15 @@ class _TokenPlacementPageState extends State<TokenPlacementPage> {
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) {
-          RoomSession.instance.broadcast({'type': 'return_to_room'});
-          Navigator.of(context).pop();
+          _cancelPlacement();
         }
       },
       child: Scaffold(
         appBar: AppBar(
-          title: Text('布置玩家位置 · ${widget.map.name}'),
+          title: Text('布置角色位置 · ${widget.map.name}'),
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
-            onPressed: () {
-              RoomSession.instance.broadcast({'type': 'return_to_room'});
-              Navigator.of(context).pop();
-            },
+            onPressed: _cancelPlacement,
           ),
           actions: [
             TextButton.icon(
@@ -141,16 +150,16 @@ class _TokenPlacementPageState extends State<TokenPlacementPage> {
                   builder: (ctx, constraints) {
                     return GestureDetector(
                       onTapUp: (details) {
-                        if (_selectedPlayer == null) return;
+                        if (_selectedCharacter == null) return;
                         final fx =
                             details.localPosition.dx / constraints.maxWidth;
                         final fy =
                             details.localPosition.dy / constraints.maxHeight;
-                        _placePlayer(
-                          _selectedPlayer!,
+                        _placeCharacter(
+                          _selectedCharacter!,
                           Offset(fx.clamp(0, 1), fy.clamp(0, 1)),
                         );
-                        _selectedPlayer = null;
+                        _selectedCharacter = null;
                       },
                       child: Stack(
                         children: [
@@ -200,7 +209,7 @@ class _TokenPlacementPageState extends State<TokenPlacementPage> {
                               left: entry.value.dx * constraints.maxWidth - 16,
                               top: entry.value.dy * constraints.maxHeight - 16,
                               child: GestureDetector(
-                                onTap: () => _removePlayer(entry.key),
+                                onTap: () => _removeCharacter(entry.key),
                                 child: Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
@@ -259,7 +268,7 @@ class _TokenPlacementPageState extends State<TokenPlacementPage> {
                               ),
                             ),
                           // Hint text
-                          if (_selectedPlayer != null)
+                          if (_selectedCharacter != null)
                             Positioned(
                               bottom: 12,
                               left: 12,
@@ -273,7 +282,7 @@ class _TokenPlacementPageState extends State<TokenPlacementPage> {
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Text(
-                                  '点击地图放置「$_selectedPlayer」的位置',
+                                  '点击地图放置「$_selectedCharacter」的位置',
                                   textAlign: TextAlign.center,
                                   style: const TextStyle(color: Colors.white),
                                 ),
@@ -287,107 +296,175 @@ class _TokenPlacementPageState extends State<TokenPlacementPage> {
               ),
             ),
 
-            // ── 玩家列表 ──
+            // ── 角色列表 ──
             Container(
               height: 140,
               decoration: BoxDecoration(
                 color: theme.colorScheme.surfaceContainerHighest,
                 border: Border(top: BorderSide(color: theme.dividerColor)),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-                    child: Text(
-                      '玩家 (${_players.length}) — 选择玩家后点击地图放置',
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
+              child: _characters.isEmpty
+                  ? Center(
+                      child: Text(
+                        '存档中没有角色',
+                        style: TextStyle(color: Colors.grey.shade600),
                       ),
-                    ),
-                  ),
-                  Expanded(
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      itemCount: _players.length,
-                      itemBuilder: (_, i) {
-                        final name = _players[i];
-                        final placed = _positions.containsKey(name);
-                        final selected = _selectedPlayer == name;
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 6),
-                          child: GestureDetector(
-                            onTap: () {
-                              setState(() {
-                                _selectedPlayer = selected ? null : name;
-                              });
-                            },
-                            child: Container(
-                              width: 90,
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: selected
-                                    ? Colors.deepPurple.shade50
-                                    : Colors.white,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: selected
-                                      ? Colors.deepPurple
-                                      : Colors.grey.shade300,
-                                  width: selected ? 2 : 1,
-                                ),
-                              ),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Container(
-                                    width: 36,
-                                    height: 36,
-                                    decoration: BoxDecoration(
-                                      color: placed
-                                          ? Colors.green
-                                          : Colors.grey.shade300,
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: Center(
-                                      child: placed
-                                          ? const Icon(
-                                              Icons.check,
-                                              color: Colors.white,
-                                              size: 20,
-                                            )
-                                          : const Icon(
-                                              Icons.person,
-                                              color: Colors.white,
-                                              size: 20,
-                                            ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    name,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: selected
-                                          ? FontWeight.bold
-                                          : FontWeight.normal,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                          child: Text(
+                            '角色 (${_characterNames.length}) — 选择角色后点击地图放置',
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
-                        );
-                      },
+                        ),
+                        Expanded(
+                          child: ListView.builder(
+                            scrollDirection: Axis.horizontal,
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            itemCount: _characterNames.length,
+                            itemBuilder: (_, i) {
+                              final name = _characterNames[i];
+                              final character = _characters[i];
+                              final placed = _positions.containsKey(name);
+                              final selected = _selectedCharacter == name;
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                ),
+                                child: GestureDetector(
+                                  onTap: () {
+                                    setState(() {
+                                      _selectedCharacter = selected
+                                          ? null
+                                          : name;
+                                    });
+                                  },
+                                  child: Container(
+                                    width: 90,
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: selected
+                                          ? Colors.deepPurple.shade50
+                                          : Colors.white,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: selected
+                                            ? Colors.deepPurple
+                                            : Colors.grey.shade300,
+                                        width: selected ? 2 : 1,
+                                      ),
+                                    ),
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        _PortraitCircle(
+                                          portraitBase64:
+                                              character.portraitBase64,
+                                          placed: placed,
+                                          name: name,
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          name,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: selected
+                                                ? FontWeight.bold
+                                                : FontWeight.normal,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 角色头像圆形组件，有图片时显示图片，无图片时显示首字母
+class _PortraitCircle extends StatelessWidget {
+  const _PortraitCircle({
+    required this.portraitBase64,
+    required this.placed,
+    required this.name,
+  });
+
+  final String portraitBase64;
+  final bool placed;
+  final String name;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 36,
+      height: 36,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: placed ? Colors.green : Colors.grey.shade400,
+          width: placed ? 2.5 : 1,
+        ),
+      ),
+      child: ClipOval(
+        child: placed
+            ? Stack(
+                fit: StackFit.expand,
+                children: [
+                  _portraitOrInitial(),
+                  Container(
+                    color: Colors.green.withValues(alpha: 0.4),
+                    child: const Icon(
+                      Icons.check,
+                      color: Colors.white,
+                      size: 20,
                     ),
                   ),
                 ],
-              ),
-            ),
-          ],
+              )
+            : _portraitOrInitial(),
+      ),
+    );
+  }
+
+  Widget _portraitOrInitial() {
+    if (portraitBase64.isNotEmpty) {
+      return Image.memory(
+        base64Decode(portraitBase64),
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stack) => _initialFallback(),
+      );
+    }
+    return _initialFallback();
+  }
+
+  Widget _initialFallback() {
+    return Container(
+      color: Colors.deepPurple.shade200,
+      alignment: Alignment.center,
+      child: Text(
+        name.isNotEmpty ? name[0].toUpperCase() : '?',
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+          fontSize: 16,
         ),
       ),
     );

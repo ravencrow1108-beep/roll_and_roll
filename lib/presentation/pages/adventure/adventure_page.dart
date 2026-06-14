@@ -353,6 +353,7 @@ class _AdventurePageState extends State<AdventurePage> {
                       isGM: _isGM,
                       playerName: widget.playerName,
                       character: _character,
+                      characters: _loadedCharacters,
                     ),
                   ),
                   RightPanel(
@@ -376,6 +377,7 @@ class _AdventurePageState extends State<AdventurePage> {
                       isGM: _isGM,
                       playerName: widget.playerName,
                       character: _character,
+                      characters: _loadedCharacters,
                     ),
                   ),
                   DicePanel(

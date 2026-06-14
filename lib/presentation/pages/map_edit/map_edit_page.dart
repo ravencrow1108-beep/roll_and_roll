@@ -87,20 +87,7 @@ class _MapEditPageState extends State<MapEditPage> {
       // 仅房主一人，直接进入布置阶段
       _hasStarted = true;
       session.mapNotifier.value = _selectedMap;
-
-      if (mounted) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => TokenPlacementPage(
-              playerName: widget.playerName,
-              role: widget.role,
-              map: _selectedMap!,
-              saveFilePath: _saveFilePath,
-            ),
-          ),
-        );
-      }
+      _navigateToTokenPlacement();
       return;
     }
 
@@ -108,20 +95,31 @@ class _MapEditPageState extends State<MapEditPage> {
     if (allReady && _selectedMap != null && !_hasStarted) {
       _hasStarted = true;
       session.mapNotifier.value = _selectedMap;
+      _navigateToTokenPlacement();
+    }
+  }
 
-      if (mounted) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => TokenPlacementPage(
-              playerName: widget.playerName,
-              role: widget.role,
-              map: _selectedMap!,
-              saveFilePath: _saveFilePath,
-            ),
-          ),
-        );
-      }
+  Future<void> _navigateToTokenPlacement() async {
+    if (!mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => TokenPlacementPage(
+          playerName: widget.playerName,
+          role: widget.role,
+          map: _selectedMap!,
+          saveFilePath: _saveFilePath,
+        ),
+      ),
+    );
+    // User came back without confirming — reset state so they can try again
+    if (mounted) {
+      setState(() {
+        _hasStarted = false;
+        _isReady = false;
+      });
+      RoomSession.instance.mapNotifier.value = null;
+      RoomSession.instance.readyMembersNotifier.value = {};
     }
   }
 

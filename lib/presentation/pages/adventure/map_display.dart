@@ -13,6 +13,7 @@ class MapDisplay extends StatelessWidget {
     required this.isGM,
     required this.playerName,
     this.character,
+    this.characters = const [],
     super.key,
   });
 
@@ -22,6 +23,7 @@ class MapDisplay extends StatelessWidget {
   final bool isGM;
   final String playerName;
   final CharacterData? character;
+  final List<CharacterData> characters;
 
   @override
   Widget build(BuildContext context) {
@@ -54,8 +56,7 @@ class MapDisplay extends StatelessWidget {
                 Expanded(
                   child: Text(
                     isGM ? '主持模式' : playerName,
-                    style: TextStyle(
-                        color: Colors.grey.shade600, fontSize: 13),
+                    style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
                   ),
                 ),
             ],
@@ -75,15 +76,7 @@ class MapDisplay extends StatelessWidget {
                             ),
                           ),
                           for (final pos in positions)
-                            TokenWidget(
-                              x: pos.x,
-                              y: pos.y,
-                              initial:
-                                  pos.name[0].toUpperCase(),
-                              label: pos.name,
-                              isPlayer: true,
-                              constraints: constraints,
-                            ),
+                            _buildPlayerToken(pos, constraints),
                           for (final e in enemies)
                             TokenWidget(
                               x: e.x,
@@ -103,13 +96,43 @@ class MapDisplay extends StatelessWidget {
                     child: Text(
                       mapData.name,
                       style: TextStyle(
-                          color: Colors.grey.shade600,
-                          fontSize: 18),
+                        color: Colors.grey.shade600,
+                        fontSize: 18,
+                      ),
                     ),
                   ),
           ),
         ],
       ),
     );
+  }
+
+  Widget _buildPlayerToken(PlayerPosition pos, BoxConstraints constraints) {
+    final char = _findCharacter(pos.name);
+    return TokenWidget(
+      x: pos.x,
+      y: pos.y,
+      initial: pos.name[0].toUpperCase(),
+      label: pos.name,
+      isPlayer: true,
+      constraints: constraints,
+      portraitBase64: char?.portraitBase64,
+      hp: char?.hp,
+      maxHp: char?.maxHp,
+    );
+  }
+
+  CharacterData? _findCharacter(String name) {
+    // First check the player's own character
+    if (character?.name == name) return character;
+    // Then search the full character list
+    try {
+      return characters.cast<CharacterData?>().firstWhere(
+        (c) => c?.name == name,
+        orElse: () => null,
+      );
+    } catch (_) {
+      return null;
+    }
   }
 }
