@@ -7,28 +7,28 @@ import 'socket_support.dart';
 bool get isWebPlatform => false;
 
 // ──────────────────────────────────────────────
-//  Server
+//  Server (WebSocket based)
 // ──────────────────────────────────────────────
 
 class _ClientInfo {
-  _ClientInfo(this.socket, this.name, this.role);
-  final Socket socket;
+  _ClientInfo(this.ws, this.name, this.role);
+  final WebSocket ws;
   final String name;
   String role;
 }
 
 class IoRoomServerHandle implements RoomServerHandle {
   IoRoomServerHandle(
-    this._serverSocket, {
+    this._httpServer, {
     this.hostName = '',
     this.hostRole = '玩家',
   }) : _sc = StreamController<String>.broadcast();
 
-  final ServerSocket _serverSocket;
+  final HttpServer _httpServer;
   final String hostName;
   String hostRole;
   String hostSaveFileName = '';
-  StreamSubscription<Socket>? _serverSub;
+  StreamSubscription<HttpRequest>? _serverSub;
   final StreamController<String> _sc;
   final List<_ClientInfo> _clients = [];
 
@@ -53,7 +53,7 @@ class IoRoomServerHandle implements RoomServerHandle {
     final dead = <_ClientInfo>[];
     for (final c in _clients) {
       try {
-        c.socket.write(message);
+        c.ws.add(message);
       } catch (_) {
         dead.add(c);
       }
@@ -61,18 +61,16 @@ class IoRoomServerHandle implements RoomServerHandle {
     _clients.removeWhere((c) => dead.contains(c));
   }
 
-  void _addClient(Socket socket, String name, String role) {
-    _clients.add(_ClientInfo(socket, name, role));
+  void _addClient(WebSocket ws, String name, String role) {
+    _clients.add(_ClientInfo(ws, name, role));
   }
 
-  void _removeClient(Socket socket) {
-    final leaving = _clients.where((c) => c.socket == socket).toList();
-    _clients.removeWhere((c) => c.socket == socket);
+  void _removeClient(WebSocket ws) {
+    final leaving = _clients.where((c) => c.ws == ws).toList();
+    _clients.removeWhere((c) => c.ws == ws);
     for (final c in leaving) {
       final msg = socketEncode({'type': 'member_left', 'name': c.name});
-      // Notify remaining clients
       broadcast(msg);
-      // Notify host
       _onMessage(msg.trim());
     }
   }
@@ -82,12 +80,10 @@ class IoRoomServerHandle implements RoomServerHandle {
     final target = _clients.where((c) => c.name.trim() == name.trim()).toList();
     for (final c in target) {
       try {
-        c.socket.write(
-          socketEncode({'type': 'kicked', 'message': '你已被房主踢出房间'}),
-        );
+        c.ws.add(socketEncode({'type': 'kicked', 'message': '你已被房主踢出房间'}));
       } catch (_) {}
       try {
-        c.socket.destroy();
+        c.ws.close();
       } catch (_) {}
     }
     if (target.isNotEmpty) {
@@ -108,12 +104,12 @@ class IoRoomServerHandle implements RoomServerHandle {
     _serverSub = null;
     for (final c in [..._clients]) {
       try {
-        c.socket.destroy();
+        c.ws.close();
       } catch (_) {}
     }
     _clients.clear();
     await _sc.close();
-    await _serverSocket.close();
+    await _httpServer.close();
   }
 }
 
@@ -124,158 +120,159 @@ Future<RoomServerHandle> startServer(
   String hostName = '',
   String hostRole = '玩家',
 }) async {
-  final serverSocket = await ServerSocket.bind(InternetAddress.anyIPv4, port);
+  final httpServer = await HttpServer.bind(InternetAddress.anyIPv4, port);
   final handle = IoRoomServerHandle(
-    serverSocket,
+    httpServer,
     hostName: hostName,
     hostRole: hostRole,
   );
 
-  handle._serverSub = serverSocket.listen((socket) {
-    final remote = socket.remoteAddress.address;
-    bool joined = false;
-
-    socket.listen(
-      (data) {
-        try {
-          final text = utf8.decode(data);
-          for (final line in text.split('\n')) {
-            final trimmed = line.trim();
-            if (trimmed.isEmpty) continue;
-            final msg = jsonDecode(trimmed) as Map<String, dynamic>;
-
-            if (!joined && msg['type'] == 'join') {
-              joined = true;
-              final name = (msg['name'] as String?) ?? remote;
-              final role = (msg['role'] as String?) ?? '玩家';
-
-              // ── 重名检测：不允许与房主或已有成员重名 ──
-              final trimmedName = name.trim();
-              final existingNames = <String>{
-                handle.hostName.trim(),
-                for (final c in handle._clients) c.name.trim(),
-              };
-              if (existingNames.contains(trimmedName)) {
-                try {
-                  socket.write(
-                    socketEncode({
-                      'type': 'name_taken',
-                      'message': '名称 "$trimmedName" 已被使用，请更换名称后重试',
-                    }),
-                  );
-                } catch (_) {}
-                try {
-                  socket.destroy();
-                } catch (_) {}
-                continue;
-              }
-
-              handle._addClient(socket, name, role);
-              onClient(remote, name, role);
-
-              // Send full existing member list (host + other clients) to the new client
-              final existing = <Map<String, dynamic>>[
-                {
-                  'name': handle.hostName,
-                  'role': handle.hostRole,
-                  if (handle.hostSaveFileName.isNotEmpty)
-                    'hostSaveName': handle.hostSaveFileName,
-                },
-              ];
-              for (final c in handle._clients) {
-                if (c.socket != socket) {
-                  existing.add({'name': c.name, 'role': c.role});
-                }
-              }
-              if (existing.isNotEmpty) {
-                try {
-                  socket.write(
-                    socketEncode({'type': 'members_list', 'members': existing}),
-                  );
-                } catch (_) {}
-              }
-              continue;
-            }
-
-            // Relay to all OTHER clients (and notify host)
-            if (joined) {
-              if (msg['type'] == 'request_members') {
-                // Reply with host + all clients
-                final hostEntry = <String, dynamic>{
-                  'name': handle.hostName,
-                  'role': handle.hostRole,
-                };
-                if (handle.hostSaveFileName.isNotEmpty) {
-                  hostEntry['hostSaveName'] = handle.hostSaveFileName;
-                }
-                final all = <Map<String, dynamic>>[
-                  hostEntry,
-                  ...handle._clients.map(
-                    (c) => {'name': c.name, 'role': c.role},
-                  ),
-                ];
-                try {
-                  socket.write(
-                    socketEncode({'type': 'members_list', 'members': all}),
-                  );
-                } catch (_) {}
-                continue;
-              }
-
-              // Handle role change from a client
-              if (msg['type'] == 'role_change') {
-                final newRole = (msg['role'] as String?) ?? '玩家';
-                final clientName = (msg['name'] as String?) ?? '';
-                for (final c in handle._clients) {
-                  if (c.socket == socket) {
-                    c.role = newRole;
-                    break;
-                  }
-                }
-                // Tell host about the role change
-                handle._onMessage(
-                  socketEncode({
-                    'type': 'role_change',
-                    'name': clientName,
-                    'role': newRole,
-                  }).trim(),
-                );
-                continue;
-              }
-
-              handle._onMessage('$trimmed\n');
-              for (final c in [...handle._clients]) {
-                if (c.socket != socket) {
-                  try {
-                    c.socket.write('$trimmed\n');
-                  } catch (_) {}
-                }
-              }
-            }
-          }
-        } catch (_) {
-          try {
-            socket.destroy();
-          } catch (_) {}
-        }
-      },
-      onDone: () => handle._removeClient(socket),
-      onError: (_) => handle._removeClient(socket),
-      cancelOnError: false,
-    );
+  handle._serverSub = httpServer.listen((HttpRequest request) {
+    final remote = request.connectionInfo?.remoteAddress.address ?? 'unknown';
+    WebSocketTransformer.upgrade(request).then((WebSocket ws) {
+      _handleWebSocket(ws, remote, handle, onClient);
+    });
   });
 
   return handle;
 }
 
+void _handleWebSocket(
+  WebSocket ws,
+  String remote,
+  IoRoomServerHandle handle,
+  void Function(String remoteAddress, String name, String role) onClient,
+) {
+  bool joined = false;
+
+  ws.listen(
+    (data) {
+      try {
+        final text = data is String ? data : utf8.decode(data as List<int>);
+        for (final line in text.split('\n')) {
+          final trimmed = line.trim();
+          if (trimmed.isEmpty) continue;
+          final msg = jsonDecode(trimmed) as Map<String, dynamic>;
+
+          if (!joined && msg['type'] == 'join') {
+            joined = true;
+            final name = (msg['name'] as String?) ?? remote;
+            final role = (msg['role'] as String?) ?? '玩家';
+
+            final trimmedName = name.trim();
+            final existingNames = <String>{
+              handle.hostName.trim(),
+              for (final c in handle._clients) c.name.trim(),
+            };
+            if (existingNames.contains(trimmedName)) {
+              try {
+                ws.add(
+                  socketEncode({
+                    'type': 'name_taken',
+                    'message': '名称 "$trimmedName" 已被使用，请更换名称后重试',
+                  }),
+                );
+              } catch (_) {}
+              try {
+                ws.close();
+              } catch (_) {}
+              return;
+            }
+
+            handle._addClient(ws, name, role);
+            onClient(remote, name, role);
+
+            final existing = <Map<String, dynamic>>[
+              {
+                'name': handle.hostName,
+                'role': handle.hostRole,
+                if (handle.hostSaveFileName.isNotEmpty)
+                  'hostSaveName': handle.hostSaveFileName,
+              },
+            ];
+            for (final c in handle._clients) {
+              if (c.ws != ws) {
+                existing.add({'name': c.name, 'role': c.role});
+              }
+            }
+            if (existing.isNotEmpty) {
+              try {
+                ws.add(
+                  socketEncode({'type': 'members_list', 'members': existing}),
+                );
+              } catch (_) {}
+            }
+            continue;
+          }
+
+          if (joined) {
+            if (msg['type'] == 'request_members') {
+              final hostEntry = <String, dynamic>{
+                'name': handle.hostName,
+                'role': handle.hostRole,
+              };
+              if (handle.hostSaveFileName.isNotEmpty) {
+                hostEntry['hostSaveName'] = handle.hostSaveFileName;
+              }
+              final all = <Map<String, dynamic>>[
+                hostEntry,
+                ...handle._clients.map((c) => {'name': c.name, 'role': c.role}),
+              ];
+              try {
+                ws.add(socketEncode({'type': 'members_list', 'members': all}));
+              } catch (_) {}
+              continue;
+            }
+
+            if (msg['type'] == 'role_change') {
+              final newRole = (msg['role'] as String?) ?? '玩家';
+              final clientName = (msg['name'] as String?) ?? '';
+              for (final c in handle._clients) {
+                if (c.ws == ws) {
+                  c.role = newRole;
+                  break;
+                }
+              }
+              handle._onMessage(
+                socketEncode({
+                  'type': 'role_change',
+                  'name': clientName,
+                  'role': newRole,
+                }).trim(),
+              );
+              continue;
+            }
+
+            handle._onMessage('$trimmed\n');
+            for (final c in [...handle._clients]) {
+              if (c.ws != ws) {
+                try {
+                  c.ws.add('$trimmed\n');
+                } catch (_) {}
+              }
+            }
+          }
+        }
+      } catch (_) {
+        try {
+          ws.close();
+        } catch (_) {}
+      }
+    },
+    onDone: () => handle._removeClient(ws),
+    onError: (_) => handle._removeClient(ws),
+    cancelOnError: false,
+  );
+}
+
 // ──────────────────────────────────────────────
-//  Client
+//  Client (WebSocket based)
 // ──────────────────────────────────────────────
 
 class IoRoomClientHandle implements RoomClientHandle {
-  IoRoomClientHandle(this._socket) : _sc = StreamController<String>();
+  IoRoomClientHandle(this._ws) : _sc = StreamController<String>();
 
-  final Socket _socket;
+  final WebSocket _ws;
   final StreamController<String> _sc;
 
   @override
@@ -287,7 +284,7 @@ class IoRoomClientHandle implements RoomClientHandle {
   @override
   void send(String message) {
     try {
-      _socket.write(message);
+      _ws.add(message);
     } catch (_) {}
   }
 
@@ -297,7 +294,7 @@ class IoRoomClientHandle implements RoomClientHandle {
       await _sc.close();
     } catch (_) {}
     try {
-      await _socket.close();
+      await _ws.close();
     } catch (_) {}
   }
 }
@@ -308,22 +305,17 @@ Future<RoomClientHandle> connectToRoom(
   required String playerName,
   String role = '玩家',
 }) async {
-  final socket = await Socket.connect(
-    host,
-    port,
-    timeout: const Duration(seconds: 3),
-  );
-  final handle = IoRoomClientHandle(socket);
+  final ws = await WebSocket.connect(
+    'ws://$host:$port',
+  ).timeout(const Duration(seconds: 5));
+  final handle = IoRoomClientHandle(ws);
 
   // Send join message with role
-  socket.write(
-    socketEncode({'type': 'join', 'name': playerName, 'role': role}),
-  );
+  ws.add(socketEncode({'type': 'join', 'name': playerName, 'role': role}));
 
-  socket.listen(
+  ws.listen(
     (data) {
-      final text = utf8.decode(data);
-      // A single write may contain multiple newline-delimited messages
+      final text = data is String ? data : utf8.decode(data as List<int>);
       for (final line in text.split('\n')) {
         final trimmed = line.trim();
         if (trimmed.isNotEmpty) {

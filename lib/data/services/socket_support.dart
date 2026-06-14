@@ -24,7 +24,14 @@ abstract class RoomClientHandle {
 }
 
 class PlatformSocketSupport {
-  static bool get isSupported => !socket_impl.isWebPlatform;
+  /// Whether this platform can host a room (desktop only).
+  static bool get canHost => !socket_impl.isWebPlatform;
+
+  /// Whether this platform can connect to a room (desktop + web via WebSocket).
+  static bool get canConnect => true;
+
+  /// Alias for [canHost].
+  static bool get isSupported => canHost;
 
   static Future<RoomServerHandle> startServer(
     int port, {
@@ -55,7 +62,7 @@ class PlatformSocketSupport {
     );
   }
 
-  static String get unsupportedMessage => '当前 Web 端暂不支持直接使用网络套接字，请在桌面端运行。';
+  static String get unsupportedHostMessage => '当前 Web 端暂不支持创建房间，请在桌面端运行。';
 }
 
 /// Encode a JSON map as a newline-terminated socket message.

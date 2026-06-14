@@ -83,11 +83,6 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
       return;
     }
 
-    if (!PlatformSocketSupport.isSupported) {
-      setState(() => _status = PlatformSocketSupport.unsupportedMessage);
-      return;
-    }
-
     setState(() {
       _isJoining = true;
       _status = '正在连接...';

@@ -128,13 +128,13 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
       return;
     }
 
-    if (!PlatformSocketSupport.isSupported) {
+    if (!PlatformSocketSupport.canHost) {
       if (!mounted) {
         return;
       }
       setState(() {
         _isHosting = false;
-        _status = PlatformSocketSupport.unsupportedMessage;
+        _status = PlatformSocketSupport.unsupportedHostMessage;
         _roomAddress = '请在桌面端运行';
       });
       return;

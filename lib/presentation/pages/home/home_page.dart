@@ -20,9 +20,8 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final TextEditingController _playerNameController = TextEditingController();
-  bool _nameLoaded = false;
 
-  bool get _webUnsupported => !PlatformSocketSupport.isSupported;
+  bool get _webCannotHost => !PlatformSocketSupport.canHost;
   bool get _nameEmpty => _playerNameController.text.trim().isEmpty;
 
   static const _keyPlayerName = 'player_name';
@@ -37,10 +36,8 @@ class _HomePageState extends State<HomePage> {
   Future<void> _loadSavedName() async {
     final prefs = await SharedPreferences.getInstance();
     final saved = prefs.getString(_keyPlayerName) ?? '';
-    if (mounted) {
-      _playerNameController.text = saved;
-      setState(() => _nameLoaded = true);
-    }
+    _playerNameController.text = saved;
+    if (mounted) setState(() {});
   }
 
   Future<void> _saveName(String name) async {
@@ -91,13 +88,17 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  void _handleRoomAction(BuildContext context, Widget page) {
+  void _handleRoomAction(
+    BuildContext context,
+    Widget page, {
+    bool isHost = false,
+  }) {
     if (_nameEmpty) return;
     _saveName(_playerNameController.text.trim());
-    if (_webUnsupported) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('当前 Web 端无法使用房间创建与加入功能，请在桌面端运行。')),
-      );
+    if (isHost && _webCannotHost) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Web 端不支持创建房间，请在桌面端运行。')));
       return;
     }
     _openPage(context, page);
@@ -138,7 +139,7 @@ class _HomePageState extends State<HomePage> {
                     ).textTheme.titleMedium?.copyWith(color: Colors.grey[700]),
                   ),
                   const SizedBox(height: 24),
-                  if (_webUnsupported)
+                  if (_webCannotHost)
                     Card(
                       color: Colors.amber.shade50,
                       child: Padding(
@@ -146,13 +147,13 @@ class _HomePageState extends State<HomePage> {
                         child: Row(
                           children: [
                             const Icon(
-                              Icons.warning_amber_rounded,
+                              Icons.info_outline,
                               color: Colors.orange,
                             ),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                'Web 端当前无法创建或加入房间，请使用桌面版或者APP版运行。',
+                                'Web 端不支持创建房间。你可以加入桌面端创建的房间，或直接使用直播模式。',
                                 style: Theme.of(context).textTheme.bodyMedium,
                               ),
                             ),
@@ -160,23 +161,17 @@ class _HomePageState extends State<HomePage> {
                         ),
                       ),
                     ),
-                  if (_webUnsupported) const SizedBox(height: 16),
-                  if (_nameLoaded)
-                    TextField(
-                      controller: _playerNameController,
-                      textAlign: TextAlign.center,
-                      onChanged: (_) => setState(() {}),
-                      decoration: const InputDecoration(
-                        labelText: '你的玩家名称',
-                        hintText: '例如：阿宇',
-                        border: OutlineInputBorder(),
-                      ),
-                    )
-                  else
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 12),
-                      child: Center(child: CircularProgressIndicator()),
+                  if (_webCannotHost) const SizedBox(height: 16),
+                  TextField(
+                    controller: _playerNameController,
+                    textAlign: TextAlign.center,
+                    onChanged: (_) => setState(() {}),
+                    decoration: const InputDecoration(
+                      labelText: '你的玩家名称',
+                      hintText: '例如：阿宇',
+                      border: OutlineInputBorder(),
                     ),
+                  ),
                   const SizedBox(height: 24),
                   _ActionButton(
                     label: '新建房间',
@@ -185,6 +180,7 @@ class _HomePageState extends State<HomePage> {
                     onPressed: () => _handleRoomAction(
                       context,
                       CreateRoomPage(playerName: _getPlayerName()),
+                      isHost: true,
                     ),
                   ),
                   const SizedBox(height: 16),
