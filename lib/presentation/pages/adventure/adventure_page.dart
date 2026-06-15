@@ -150,6 +150,17 @@ class _AdventurePageState extends State<AdventurePage> {
               RoomSession.instance.playerPositionsNotifier.value = list;
             }
             break;
+          case 'character_update':
+            if (data['characters'] != null) {
+              _loadedCharacters = (data['characters'] as List<dynamic>)
+                  .map(
+                    (c) =>
+                        CharacterData.fromJson(c as Map<String, dynamic>),
+                  )
+                  .toList();
+              if (mounted) setState(() {});
+            }
+            break;
           case 'return_to_room':
           case 'host_disconnected':
             if (mounted) Navigator.of(context).pop();
@@ -300,6 +311,139 @@ class _AdventurePageState extends State<AdventurePage> {
     }
   }
 
+  void _onEditCharacterHp(String name) {
+    final idx = _loadedCharacters.indexWhere((c) => c.name == name);
+    if (idx == -1) return;
+    final c = _loadedCharacters[idx];
+    final hpCtrl = TextEditingController(text: c.hp.toString());
+    final maxHpCtrl = TextEditingController(text: c.maxHp.toString());
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('编辑血量 · $name'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: hpCtrl,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: '当前 HP'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: maxHpCtrl,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: '最大 HP'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('取消'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final hp = int.tryParse(hpCtrl.text) ?? c.hp;
+              final maxHp = int.tryParse(maxHpCtrl.text) ?? c.maxHp;
+              _loadedCharacters[idx] = c.copyWith(hp: hp, maxHp: maxHp);
+              setState(() {});
+              _saveCharacterChanges();
+              Navigator.pop(ctx);
+              // 广播 HP 更新
+              RoomSession.instance.broadcast({
+                'type': 'character_update',
+                'characters': _loadedCharacters
+                    .map((ch) => ch.toJson())
+                    .toList(),
+              });
+              _addChat(
+                '系统',
+                '$name HP: $hp/$maxHp',
+              );
+            },
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _onAddCharacterNote(String name) {
+    final idx = _loadedCharacters.indexWhere((c) => c.name == name);
+    if (idx == -1) return;
+    final c = _loadedCharacters[idx];
+    final noteCtrl = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('注释 · $name'),
+        content: TextField(
+          controller: noteCtrl,
+          maxLines: 4,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: '新注释',
+            hintText: '记录角色的状态变化、Buff、Debuff 等…',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('取消'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final text = noteCtrl.text.trim();
+              if (text.isEmpty) {
+                Navigator.pop(ctx);
+                return;
+              }
+              _loadedCharacters[idx] = c.copyWith(
+                notes: [...c.notes, text],
+              );
+              setState(() {});
+              _saveCharacterChanges();
+              Navigator.pop(ctx);
+              _addChat('系统', '$name 新增注释');
+            },
+            child: const Text('添加'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _onDeleteCharacterNote(String name, int noteIndex) {
+    final idx = _loadedCharacters.indexWhere((c) => c.name == name);
+    if (idx == -1) return;
+    final c = _loadedCharacters[idx];
+    if (noteIndex < 0 || noteIndex >= c.notes.length) return;
+    final updated = [...c.notes]..removeAt(noteIndex);
+    _loadedCharacters[idx] = c.copyWith(notes: updated);
+    setState(() {});
+    _saveCharacterChanges();
+    _addChat('系统', '$name 注释已删除');
+  }
+
+  Future<void> _saveCharacterChanges() async {
+    if (_saveFilePath == null) return;
+    try {
+      final save = await SaveData.fromZip(_saveFilePath!);
+      final updated = SaveData(
+        createdAt: DateTime.now().toIso8601String(),
+        characters: _loadedCharacters,
+        maps: save.maps,
+        rules: save.rules,
+        playerPositions: save.playerPositions,
+      );
+      await updated.packToZip(_saveFilePath!);
+    } catch (_) {}
+  }
+
   void _rollDice(int sides) {
     final roll = (DateTime.now().millisecondsSinceEpoch % sides) + 1;
     setState(() => _diceResult = 'd$sides = $roll');
@@ -406,6 +550,12 @@ class _AdventurePageState extends State<AdventurePage> {
                       onPositionChanged: _isGM
                           ? _onPlayerPositionChanged
                           : null,
+                      onEditHp:
+                          _isGM ? _onEditCharacterHp : null,
+                      onAddNote:
+                          _isGM ? _onAddCharacterNote : null,
+                      onDeleteNote:
+                          _isGM ? _onDeleteCharacterNote : null,
                     ),
                   ),
                   RightPanel(
@@ -433,6 +583,12 @@ class _AdventurePageState extends State<AdventurePage> {
                       onPositionChanged: _isGM
                           ? _onPlayerPositionChanged
                           : null,
+                      onEditHp:
+                          _isGM ? _onEditCharacterHp : null,
+                      onAddNote:
+                          _isGM ? _onAddCharacterNote : null,
+                      onDeleteNote:
+                          _isGM ? _onDeleteCharacterNote : null,
                     ),
                   ),
                   DicePanel(

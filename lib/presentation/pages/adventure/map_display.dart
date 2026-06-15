@@ -19,6 +19,9 @@ class MapDisplay extends StatefulWidget {
     this.character,
     this.characters = const [],
     this.onPositionChanged,
+    this.onEditHp,
+    this.onAddNote,
+    this.onDeleteNote,
     super.key,
   });
 
@@ -29,8 +32,14 @@ class MapDisplay extends StatefulWidget {
   final String playerName;
   final CharacterData? character;
   final List<CharacterData> characters;
-  /// GM 移动角色位置后的回调
+  /// GM 移动角色位置后调
   final void Function(int index, PlayerPosition newPos)? onPositionChanged;
+  /// GM 右键编辑角色血量
+  final void Function(String characterName)? onEditHp;
+  /// GM 右键添加角色注释
+  final void Function(String characterName)? onAddNote;
+  /// GM 删除角色注释
+  final void Function(String characterName, int noteIndex)? onDeleteNote;
 
   @override
   State<MapDisplay> createState() => _MapDisplayState();
@@ -287,16 +296,25 @@ class _MapDisplayState extends State<MapDisplay> {
   static const double _tokenHitRadius = 24; // 点击判定半径（像素）
 
   void _onPointerDown(PointerDownEvent e, BoxConstraints rc) {
-    // 右键：取消拖拽 (button 2 = secondary mouse button)
-    if (e.buttons == 2) {
-      _cancelDrag();
-      return;
-    }
-
-    // 左键：检测是否命中某个 player token
     final fx = e.localPosition.dx / rc.maxWidth;
     final fy = e.localPosition.dy / rc.maxHeight;
 
+    // 右键：检测命中玩家 token → 弹出菜单
+    if (e.buttons == 2) {
+      _cancelDrag();
+      for (int i = 0; i < widget.positions.length; i++) {
+        final pos = widget.positions[i];
+        final dx = (pos.x - fx) * rc.maxWidth;
+        final dy = (pos.y - fy) * rc.maxHeight;
+        if (dx * dx + dy * dy <= _tokenHitRadius * _tokenHitRadius) {
+          _showContextMenu(e.position, pos.name);
+          return;
+        }
+      }
+      return;
+    }
+
+    // 左键：检测是否命中某个 player token → 开始拖拽
     for (int i = 0; i < widget.positions.length; i++) {
       final pos = widget.positions[i];
       final dx = (pos.x - fx) * rc.maxWidth;
@@ -353,6 +371,44 @@ class _MapDisplayState extends State<MapDisplay> {
     });
   }
 
+  void _showContextMenu(Offset globalPosition, String characterName) {
+    final overlay =
+        Overlay.of(context, rootOverlay: true).context.findRenderObject();
+    if (overlay is! RenderBox) return;
+
+    showMenu<String>(
+      context: context,
+      position: RelativeRect.fromRect(
+        Rect.fromLTWH(globalPosition.dx, globalPosition.dy, 1, 1),
+        Offset.zero & overlay.size,
+      ),
+      items: [
+        const PopupMenuItem(
+          value: 'note',
+          child: ListTile(
+            leading: Icon(Icons.edit_note),
+            title: Text('注释'),
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'hp',
+          child: ListTile(
+            leading: Icon(Icons.favorite),
+            title: Text('编辑血量'),
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
+      ],
+    ).then((value) {
+      if (value == 'hp') {
+        widget.onEditHp?.call(characterName);
+      } else if (value == 'note') {
+        widget.onAddNote?.call(characterName);
+      }
+    });
+  }
+
   void _updateDistance(BoxConstraints rc) {
     if (_dragOriginal == null || _dragCurrentFraction == null) {
       _dragDistanceText = '';
@@ -405,6 +461,10 @@ class _MapDisplayState extends State<MapDisplay> {
       hp: char?.hp,
       maxHp: char?.maxHp,
       isDragged: isDragged,
+      notes: char?.notes ?? const [],
+      onDeleteNote: widget.isGM && (char?.notes.isNotEmpty == true)
+          ? (int i) => widget.onDeleteNote?.call(pos.name, i)
+          : null,
     );
   }
 

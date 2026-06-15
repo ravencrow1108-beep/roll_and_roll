@@ -22,6 +22,9 @@ class CharacterData {
   final int hp;
   final int maxHp;
 
+  /// GM 留下的注释（多条竖直叠加显示）
+  final List<String> notes;
+
   /// Character portrait image (base64 PNG, may be empty).
   final String portraitBase64;
 
@@ -43,6 +46,7 @@ class CharacterData {
     this.customStats = const {},
     this.hp = 1,
     this.maxHp = 1,
+    this.notes = const [],
     this.portraitBase64 = '',
   });
 
@@ -68,6 +72,7 @@ class CharacterData {
     if (customStats.isNotEmpty) 'customStats': customStats,
     'hp': hp,
     'maxHp': maxHp,
+    if (notes.isNotEmpty) 'notes': notes,
     if (portraitBase64.isNotEmpty) 'portraitBase64': portraitBase64,
   };
 
@@ -110,6 +115,10 @@ class CharacterData {
           : const {},
       hp: json['hp'] as int? ?? 1,
       maxHp: json['maxHp'] as int? ?? 1,
+      notes: (json['notes'] as List<dynamic>?)
+              ?.map((n) => n.toString())
+              .toList() ??
+          (json['note'] is String ? [json['note'] as String] : const []),
       portraitBase64: json['portraitBase64'] as String? ?? '',
     );
   }
@@ -133,6 +142,7 @@ class CharacterData {
     Map<String, int>? customStats,
     int? hp,
     int? maxHp,
+    List<String>? notes,
     String? portraitBase64,
   }) => CharacterData(
     name: name ?? this.name,
@@ -152,6 +162,7 @@ class CharacterData {
     customStats: customStats ?? this.customStats,
     hp: hp ?? this.hp,
     maxHp: maxHp ?? this.maxHp,
+    notes: notes ?? this.notes,
     portraitBase64: portraitBase64 ?? this.portraitBase64,
   );
 }
