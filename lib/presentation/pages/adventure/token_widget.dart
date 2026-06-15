@@ -1,9 +1,14 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import '../../../data/models/models.dart';
+import 'character_detail_popup.dart';
 
-/// 地图上的标记物（角色或敌人），角色显示头像/HP进度条、多条注释气泡
-class TokenWidget extends StatelessWidget {
+/// 地图上的标记物（角色或敌人），角色显示头像/HP进度条、多条注释气泡。
+///
+/// 当 `characterData` 不为空时，鼠标悬停 1 秒弹出角色详情浮窗。
+class TokenWidget extends StatefulWidget {
   const TokenWidget({
     required this.x,
     required this.y,
@@ -17,6 +22,7 @@ class TokenWidget extends StatelessWidget {
     this.isDragged = false,
     this.notes = const [],
     this.onDeleteNote,
+    this.characterData,
     super.key,
   });
 
@@ -33,69 +39,183 @@ class TokenWidget extends StatelessWidget {
   final List<String> notes;
   final void Function(int index)? onDeleteNote;
 
+  /// 完整角色数据，用于悬停浮窗。
+  /// 为 null 时不启用悬停（敌人 token 无此字段）。
+  final CharacterData? characterData;
+
+  @override
+  State<TokenWidget> createState() => _TokenWidgetState();
+}
+
+class _TokenWidgetState extends State<TokenWidget> {
+  // ── 悬停定时器 ──
+  Timer? _hoverTimer;
+  Timer? _dismissTimer;
+  OverlayEntry? _popupEntry;
+  bool _insertingOverlay = false;
+  final GlobalKey _avatarKey = GlobalKey();
+
+  static const Duration _hoverDelay = Duration(seconds: 1);
+
+  @override
+  void dispose() {
+    _hoverTimer?.cancel();
+    _dismissTimer?.cancel();
+    _dismissPopup();
+    super.dispose();
+  }
+
+  // ── 悬停逻辑 ──
+
+  void _onHoverEnter(PointerEvent event) {
+    if (widget.characterData == null) return;
+    _hoverTimer?.cancel();
+    _dismissTimer?.cancel();
+    _hoverTimer = Timer(_hoverDelay, _showPopup);
+  }
+
+  void _onHoverExit(PointerEvent event) {
+    _hoverTimer?.cancel();
+
+    // Overlay 插入会触发一次虚假的 onExit（浮窗盖住了头像）。
+    // 用 _insertingOverlay 标记跳过这次。
+    if (_insertingOverlay) {
+      _insertingOverlay = false;
+      return;
+    }
+
+    _dismissTimer?.cancel();
+    _dismissTimer = Timer(
+      const Duration(milliseconds: 300),
+      _dismissPopup,
+    );
+  }
+
+  void _showPopup() {
+    _dismissPopup();
+    if (widget.characterData == null) return;
+
+    final box =
+        _avatarKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize) return;
+    final center = box.localToGlobal(
+      box.size.center(Offset.zero),
+    );
+
+    _popupEntry = OverlayEntry(
+      builder: (_) => Stack(
+        children: [
+          CharacterDetailPopup(
+            character: widget.characterData!,
+            targetCenter: center,
+            onPopupEnter: () {
+              _dismissTimer?.cancel();
+            },
+            onPopupExit: () {
+              _dismissTimer?.cancel();
+              _dismissTimer = Timer(
+                const Duration(milliseconds: 300),
+                _dismissPopup,
+              );
+            },
+          ),
+        ],
+      ),
+    );
+
+    _insertingOverlay = true;
+    Overlay.of(context).insert(_popupEntry!);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _insertingOverlay = false;
+    });
+  }
+
+  void _dismissPopup() {
+    _dismissTimer?.cancel();
+    _popupEntry?.remove();
+    _popupEntry = null;
+    _insertingOverlay = false;
+  }
+
+  // ── 构建 ──
+
   @override
   Widget build(BuildContext context) {
-    final showHp = isPlayer && hp != null && maxHp != null && maxHp! > 0;
-    final tokenColor = isPlayer ? Colors.deepPurple : Colors.red;
-    final tokenSize = isDragged ? 38.0 : 32.0;
+    final showHp =
+        widget.isPlayer &&
+        widget.hp != null &&
+        widget.maxHp != null &&
+        widget.maxHp! > 0;
+    final tokenColor = widget.isPlayer ? Colors.deepPurple : Colors.red;
+    final tokenSize = widget.isDragged ? 38.0 : 32.0;
     final halfSize = tokenSize / 2;
-    final borderColor = isDragged ? Colors.amber : Colors.white;
-    final borderWidth = isDragged ? 3.0 : 2.0;
+    final borderColor = widget.isDragged ? Colors.amber : Colors.white;
+    final borderWidth = widget.isDragged ? 3.0 : 2.0;
     const double noteAreaWidth = 80.0;
     // 单条注释气泡高度 ≈ padding(4) + fontSize8.5*lineHeight1.25 + margin(2)
     const double noteBubbleH = 19.0;
 
     // 注释条数 → 需要把整个 Column 向上偏移的量
-    final notesShift = isPlayer ? notes.length * noteBubbleH : 0.0;
+    final notesShift =
+        widget.isPlayer ? widget.notes.length * noteBubbleH : 0.0;
 
     // 头像锚点 = (x,y)，因为注释在上方，Positioned(top) 需额外上移 notesShift，
     // 这样头像的绝对坐标始终 = y*maxHeight
     return Positioned(
-      left: x * constraints.maxWidth - halfSize,
-      top: y * constraints.maxHeight - halfSize - notesShift,
+      left: widget.x * widget.constraints.maxWidth - halfSize,
+      top: widget.y * widget.constraints.maxHeight - halfSize - notesShift,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           // ── 注释气泡（头像正上方竖直叠加） ──
-          if (isPlayer)
-            for (int i = 0; i < notes.length; i++)
+          if (widget.isPlayer)
+            for (int i = 0; i < widget.notes.length; i++)
               _NoteBubble(
-                note: notes[i],
+                note: widget.notes[i],
                 maxWidth: noteAreaWidth,
-                onDelete: onDeleteNote != null
-                    ? () => onDeleteNote!(i)
+                onDelete: widget.onDeleteNote != null
+                    ? () => widget.onDeleteNote!(i)
                     : null,
-                isLast: i == notes.length - 1,
+                isLast: i == widget.notes.length - 1,
               ),
-          // ── 头像圆 ──
-          Container(
-            width: tokenSize,
-            height: tokenSize,
-            decoration: BoxDecoration(
-              color: tokenColor,
-              shape: BoxShape.circle,
-              border: Border.all(color: borderColor, width: borderWidth),
-              boxShadow: isDragged
-                  ? [
-                      BoxShadow(
-                        color: Colors.amber.withValues(alpha: 0.5),
-                        blurRadius: 8,
-                        spreadRadius: 2,
-                      ),
-                    ]
-                  : null,
-            ),
-            child:
-                isPlayer && portraitBase64 != null && portraitBase64!.isNotEmpty
+          // ── 头像圆（带悬停检测） ──
+          MouseRegion(
+            onEnter: _onHoverEnter,
+            onExit: _onHoverExit,
+            child: Container(
+                key: _avatarKey,
+                width: tokenSize,
+                height: tokenSize,
+                decoration: BoxDecoration(
+                  color: tokenColor,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: borderColor,
+                    width: borderWidth,
+                  ),
+                  boxShadow: widget.isDragged
+                      ? [
+                          BoxShadow(
+                            color: Colors.amber.withValues(alpha: 0.5),
+                            blurRadius: 8,
+                            spreadRadius: 2,
+                          ),
+                        ]
+                      : null,
+                ),
+                child: widget.isPlayer &&
+                        widget.portraitBase64 != null &&
+                        widget.portraitBase64!.isNotEmpty
                     ? ClipOval(
                         child: Image.memory(
-                          base64Decode(portraitBase64!),
+                          base64Decode(widget.portraitBase64!),
                           fit: BoxFit.cover,
                           errorBuilder: (ctx, err, _) => _initialText(),
                         ),
                       )
                     : _initialText(),
-          ),
+              ),
+            ),
           const SizedBox(height: 2),
           // ── 名称标签 ──
           Container(
@@ -105,7 +225,7 @@ class TokenWidget extends StatelessWidget {
               borderRadius: BorderRadius.circular(3),
             ),
             child: Text(
-              label,
+              widget.label,
               style: const TextStyle(color: Colors.white, fontSize: 9),
             ),
           ),
@@ -120,17 +240,17 @@ class TokenWidget extends StatelessWidget {
                   ClipRRect(
                     borderRadius: BorderRadius.circular(2),
                     child: LinearProgressIndicator(
-                      value: hp! / maxHp!,
+                      value: widget.hp! / widget.maxHp!,
                       minHeight: 4,
                       backgroundColor: Colors.white.withValues(alpha: 0.3),
                       valueColor: AlwaysStoppedAnimation<Color>(
-                        _hpBarColor(hp!, maxHp!),
+                        _hpBarColor(widget.hp!, widget.maxHp!),
                       ),
                     ),
                   ),
                   const SizedBox(height: 1),
                   Text(
-                    '$hp/$maxHp',
+                    '${widget.hp}/${widget.maxHp}',
                     style: TextStyle(
                       color: Colors.white.withValues(alpha: 0.9),
                       fontSize: 8,
@@ -152,7 +272,7 @@ class TokenWidget extends StatelessWidget {
   Widget _initialText() {
     return Center(
       child: Text(
-        initial,
+        widget.initial,
         style: const TextStyle(
           color: Colors.white,
           fontWeight: FontWeight.bold,

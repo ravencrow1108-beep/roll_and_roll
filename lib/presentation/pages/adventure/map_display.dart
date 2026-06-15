@@ -462,6 +462,7 @@ class _MapDisplayState extends State<MapDisplay> {
       maxHp: char?.maxHp,
       isDragged: isDragged,
       notes: char?.notes ?? const [],
+      characterData: char,
       onDeleteNote: widget.isGM && (char?.notes.isNotEmpty == true)
           ? (int i) => widget.onDeleteNote?.call(pos.name, i)
           : null,
