@@ -79,6 +79,7 @@ class _AdventurePageState extends State<AdventurePage> {
     _msgSub = stream?.listen(_handleMessage);
     session.readyMembersNotifier.addListener(_onReadyChanged);
     session.mapNotifier.addListener(_onMapChanged);
+    session.playerPositionsNotifier.addListener(_onPositionsChanged);
   }
 
   void _onReadyChanged() {
@@ -92,6 +93,10 @@ class _AdventurePageState extends State<AdventurePage> {
         _displayedMap = RoomSession.instance.mapNotifier.value;
       });
     }
+  }
+
+  void _onPositionsChanged() {
+    if (mounted) setState(() {});
   }
 
   void _handleMessage(String message) {
@@ -118,15 +123,37 @@ class _AdventurePageState extends State<AdventurePage> {
                 data['map'] as Map<String, dynamic>,
               );
             }
+            if (data['positions'] != null) {
+              final list = (data['positions'] as List<dynamic>)
+                  .map(
+                    (p) =>
+                        PlayerPosition.fromJson(p as Map<String, dynamic>),
+                  )
+                  .toList();
+              RoomSession.instance.playerPositionsNotifier.value = list;
+            }
             if (mounted) {
               setState(() {
                 _adventureStarted = true;
                 _displayedMap = RoomSession.instance.mapNotifier.value;
               });
             }
+            break;
+          case 'position_update':
+            if (data['positions'] != null) {
+              final list = (data['positions'] as List<dynamic>)
+                  .map(
+                    (p) =>
+                        PlayerPosition.fromJson(p as Map<String, dynamic>),
+                  )
+                  .toList();
+              RoomSession.instance.playerPositionsNotifier.value = list;
+            }
+            break;
           case 'return_to_room':
           case 'host_disconnected':
             if (mounted) Navigator.of(context).pop();
+            break;
         }
       }
     } catch (_) {}
@@ -257,6 +284,22 @@ class _AdventurePageState extends State<AdventurePage> {
     }
   }
 
+  void _onPlayerPositionChanged(int index, PlayerPosition newPos) {
+    final session = RoomSession.instance;
+    final list = List<PlayerPosition>.from(
+      session.playerPositionsNotifier.value,
+    );
+    if (index >= 0 && index < list.length) {
+      list[index] = newPos;
+      session.playerPositionsNotifier.value = list;
+      // 广播新位置给所有客户端
+      session.broadcast({
+        'type': 'position_update',
+        'positions': list.map((p) => p.toJson()).toList(),
+      });
+    }
+  }
+
   void _rollDice(int sides) {
     final roll = (DateTime.now().millisecondsSinceEpoch % sides) + 1;
     setState(() => _diceResult = 'd$sides = $roll');
@@ -297,6 +340,8 @@ class _AdventurePageState extends State<AdventurePage> {
     _chatScrollCtrl.dispose();
     RoomSession.instance.readyMembersNotifier.removeListener(_onReadyChanged);
     RoomSession.instance.mapNotifier.removeListener(_onMapChanged);
+    RoomSession.instance.playerPositionsNotifier
+        .removeListener(_onPositionsChanged);
     super.dispose();
   }
 
@@ -358,6 +403,9 @@ class _AdventurePageState extends State<AdventurePage> {
                       playerName: widget.playerName,
                       character: _character,
                       characters: _loadedCharacters,
+                      onPositionChanged: _isGM
+                          ? _onPlayerPositionChanged
+                          : null,
                     ),
                   ),
                   RightPanel(
@@ -382,6 +430,9 @@ class _AdventurePageState extends State<AdventurePage> {
                       playerName: widget.playerName,
                       character: _character,
                       characters: _loadedCharacters,
+                      onPositionChanged: _isGM
+                          ? _onPlayerPositionChanged
+                          : null,
                     ),
                   ),
                   DicePanel(

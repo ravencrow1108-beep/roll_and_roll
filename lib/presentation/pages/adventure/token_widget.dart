@@ -14,6 +14,7 @@ class TokenWidget extends StatelessWidget {
     this.hp,
     this.maxHp,
     this.portraitBase64,
+    this.isDragged = false,
     super.key,
   });
 
@@ -26,26 +27,40 @@ class TokenWidget extends StatelessWidget {
   final int? hp;
   final int? maxHp;
   final String? portraitBase64;
+  final bool isDragged;
 
   @override
   Widget build(BuildContext context) {
     final showHp = isPlayer && hp != null && maxHp != null && maxHp! > 0;
     final tokenColor = isPlayer ? Colors.deepPurple : Colors.red;
+    final tokenSize = isDragged ? 38.0 : 32.0;
+    final halfSize = tokenSize / 2;
+    final borderColor = isDragged ? Colors.amber : Colors.white;
+    final borderWidth = isDragged ? 3.0 : 2.0;
 
     return Positioned(
-      left: x * constraints.maxWidth - 16,
-      top: y * constraints.maxHeight - 16,
+      left: x * constraints.maxWidth - halfSize,
+      top: y * constraints.maxHeight - halfSize,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           // ── 头像/标记圆 ──
           Container(
-            width: 32,
-            height: 32,
+            width: tokenSize,
+            height: tokenSize,
             decoration: BoxDecoration(
               color: tokenColor,
               shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 2),
+              border: Border.all(color: borderColor, width: borderWidth),
+              boxShadow: isDragged
+                  ? [
+                      BoxShadow(
+                        color: Colors.amber.withValues(alpha: 0.5),
+                        blurRadius: 8,
+                        spreadRadius: 2,
+                      ),
+                    ]
+                  : null,
             ),
             child:
                 isPlayer && portraitBase64 != null && portraitBase64!.isNotEmpty

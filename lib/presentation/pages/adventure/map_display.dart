@@ -18,6 +18,7 @@ class MapDisplay extends StatefulWidget {
     required this.playerName,
     this.character,
     this.characters = const [],
+    this.onPositionChanged,
     super.key,
   });
 
@@ -28,6 +29,8 @@ class MapDisplay extends StatefulWidget {
   final String playerName;
   final CharacterData? character;
   final List<CharacterData> characters;
+  /// GM 移动角色位置后的回调
+  final void Function(int index, PlayerPosition newPos)? onPositionChanged;
 
   @override
   State<MapDisplay> createState() => _MapDisplayState();
@@ -36,11 +39,16 @@ class MapDisplay extends StatefulWidget {
 class _MapDisplayState extends State<MapDisplay> {
   bool _showGrid = true;
   bool _showCoords = true;
-  bool _showMinorGrid = false;
+  final bool _showMinorGrid = false;
 
   /// 地图图片的原始宽高（像素），异步解码后缓存。
   Size? _imageNaturalSize;
-  bool _imageDecoded = false;
+
+  // ── GM 拖拽移动 ──
+  int? _draggedIndex;
+  PlayerPosition? _dragOriginal;
+  Offset? _dragCurrentFraction;
+  String _dragDistanceText = '';
 
   @override
   void initState() {
@@ -53,17 +61,13 @@ class _MapDisplayState extends State<MapDisplay> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.mapData.imageBase64 != widget.mapData.imageBase64) {
       _imageNaturalSize = null;
-      _imageDecoded = false;
       _decodeImageSize();
     }
   }
 
   Future<void> _decodeImageSize() async {
     final b64 = widget.mapData.imageBase64;
-    if (b64.isEmpty) {
-      _imageDecoded = true;
-      return;
-    }
+    if (b64.isEmpty) return;
     try {
       final bytes = base64Decode(b64);
       final codec = await ui.instantiateImageCodec(Uint8List.fromList(bytes));
@@ -74,11 +78,9 @@ class _MapDisplayState extends State<MapDisplay> {
       if (!mounted) return;
       setState(() {
         _imageNaturalSize = Size(w, h);
-        _imageDecoded = true;
       });
     } catch (_) {
       if (!mounted) return;
-      setState(() => _imageDecoded = true);
     }
   }
 
@@ -109,6 +111,7 @@ class _MapDisplayState extends State<MapDisplay> {
       child: Column(
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (widget.character != null) ...[
                 if (widget.character!.portraitBase64.isNotEmpty)
@@ -130,9 +133,31 @@ class _MapDisplayState extends State<MapDisplay> {
                 ),
               ] else
                 Expanded(
-                  child: Text(
-                    widget.isGM ? '主持模式' : widget.playerName,
-                    style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        widget.isGM ? '主持模式' : widget.playerName,
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 13,
+                        ),
+                      ),
+                      // ── GM 拖拽距离信息 ──
+                      if (_dragDistanceText.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(
+                            _dragDistanceText,
+                            style: TextStyle(
+                              color: Colors.deepPurple.shade700,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
               // ── 网格控制按钮 ──
@@ -177,43 +202,64 @@ class _MapDisplayState extends State<MapDisplay> {
                               top: renderRect.top,
                               width: renderRect.width,
                               height: renderRect.height,
-                              child: Stack(
-                                clipBehavior: Clip.none,
-                                children: [
-                                  // 坐标系网格（基于图片左上角）
-                                  if (_showGrid || _showCoords)
-                                    Positioned.fill(
-                                      child: CustomPaint(
-                                        painter: CoordinateGridPainter(
-                                          columns: m.width,
-                                          rows: m.height,
-                                          unit:
-                                              _showCoords ? m.unit : '',
-                                          showLabels: _showCoords,
-                                          showGrid: _showGrid,
-                                          showMinorGrid: _showMinorGrid,
+                              child: Listener(
+                                behavior: HitTestBehavior.translucent,
+                                onPointerDown: widget.isGM
+                                    ? (e) => _onPointerDown(
+                                          e,
+                                          renderConstraints,
+                                        )
+                                    : null,
+                                onPointerMove: widget.isGM
+                                    ? (e) => _onPointerMove(
+                                          e,
+                                          renderConstraints,
+                                        )
+                                    : null,
+                                onPointerUp: widget.isGM
+                                    ? (e) => _onPointerUp(e, renderConstraints)
+                                    : null,
+                                child: Stack(
+                                  clipBehavior: Clip.none,
+                                  children: [
+                                    // 坐标系网格（基于图片左上角）
+                                    if (_showGrid || _showCoords)
+                                      Positioned.fill(
+                                        child: CustomPaint(
+                                          painter: CoordinateGridPainter(
+                                            columns: m.width,
+                                            rows: m.height,
+                                            unit:
+                                                _showCoords ? m.unit : '',
+                                            showLabels: _showCoords,
+                                            showGrid: _showGrid,
+                                            showMinorGrid: _showMinorGrid,
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                  // 玩家 token
-                                  for (final pos in widget.positions)
-                                    _buildPlayerToken(
-                                      pos,
-                                      renderConstraints,
-                                    ),
-                                  // 敌人 token
-                                  for (final e in widget.enemies)
-                                    TokenWidget(
-                                      x: e.x,
-                                      y: e.y,
-                                      initial: e.name.isNotEmpty
-                                          ? e.name[0].toUpperCase()
-                                          : 'E',
-                                      label: '${e.name} HP${e.hp}',
-                                      isPlayer: false,
-                                      constraints: renderConstraints,
-                                    ),
-                                ],
+                                    // 玩家 token
+                                    for (int i = 0;
+                                        i < widget.positions.length;
+                                        i++)
+                                      _buildPlayerToken(
+                                        widget.positions[i],
+                                        renderConstraints,
+                                        i,
+                                      ),
+                                    // 敌人 token
+                                    for (final e in widget.enemies)
+                                      TokenWidget(
+                                        x: e.x,
+                                        y: e.y,
+                                        initial: e.name.isNotEmpty
+                                            ? e.name[0].toUpperCase()
+                                            : 'E',
+                                        label: '${e.name} HP${e.hp}',
+                                        isPlayer: false,
+                                        constraints: renderConstraints,
+                                      ),
+                                  ],
+                                ),
                               ),
                             ),
                           ],
@@ -236,11 +282,121 @@ class _MapDisplayState extends State<MapDisplay> {
     );
   }
 
-  Widget _buildPlayerToken(PlayerPosition pos, BoxConstraints constraints) {
+  // ──────────────────── 拖拽逻辑 ────────────────────
+
+  static const double _tokenHitRadius = 24; // 点击判定半径（像素）
+
+  void _onPointerDown(PointerDownEvent e, BoxConstraints rc) {
+    // 右键：取消拖拽 (button 2 = secondary mouse button)
+    if (e.buttons == 2) {
+      _cancelDrag();
+      return;
+    }
+
+    // 左键：检测是否命中某个 player token
+    final fx = e.localPosition.dx / rc.maxWidth;
+    final fy = e.localPosition.dy / rc.maxHeight;
+
+    for (int i = 0; i < widget.positions.length; i++) {
+      final pos = widget.positions[i];
+      final dx = (pos.x - fx) * rc.maxWidth;
+      final dy = (pos.y - fy) * rc.maxHeight;
+      if (dx * dx + dy * dy <= _tokenHitRadius * _tokenHitRadius) {
+        setState(() {
+          _draggedIndex = i;
+          _dragOriginal = pos;
+          _dragCurrentFraction = Offset(pos.x, pos.y);
+          _updateDistance(rc);
+        });
+        return;
+      }
+    }
+  }
+
+  void _onPointerMove(PointerMoveEvent e, BoxConstraints rc) {
+    if (_draggedIndex == null) return;
+    final fx = (e.localPosition.dx / rc.maxWidth).clamp(0.0, 1.0);
+    final fy = (e.localPosition.dy / rc.maxHeight).clamp(0.0, 1.0);
+    setState(() {
+      _dragCurrentFraction = Offset(fx, fy);
+      _updateDistance(rc);
+    });
+  }
+
+  void _onPointerUp(PointerUpEvent e, BoxConstraints rc) {
+    if (_draggedIndex == null) return;
+    _confirmPlacement();
+  }
+
+  void _confirmPlacement() {
+    if (_draggedIndex == null || _dragCurrentFraction == null) return;
+    final newPos = PlayerPosition(
+      name: widget.positions[_draggedIndex!].name,
+      x: _dragCurrentFraction!.dx,
+      y: _dragCurrentFraction!.dy,
+    );
+    widget.onPositionChanged?.call(_draggedIndex!, newPos);
+    setState(() {
+      _draggedIndex = null;
+      _dragOriginal = null;
+      _dragCurrentFraction = null;
+      _dragDistanceText = '';
+    });
+  }
+
+  void _cancelDrag() {
+    setState(() {
+      _draggedIndex = null;
+      _dragOriginal = null;
+      _dragCurrentFraction = null;
+      _dragDistanceText = '';
+    });
+  }
+
+  void _updateDistance(BoxConstraints rc) {
+    if (_dragOriginal == null || _dragCurrentFraction == null) {
+      _dragDistanceText = '';
+      return;
+    }
+    final m = widget.mapData;
+    final dxGrid =
+        (_dragCurrentFraction!.dx - _dragOriginal!.x) * m.width;
+    final dyGrid =
+        (_dragCurrentFraction!.dy - _dragOriginal!.y) * m.height;
+    final distVal = _sqrt(dxGrid * dxGrid + dyGrid * dyGrid);
+    _dragDistanceText =
+        '↕ ${distVal.toStringAsFixed(1)} ${m.unit}  '
+        '(ΔX: ${dxGrid.toStringAsFixed(1)}, ΔY: ${dyGrid.toStringAsFixed(1)})';
+  }
+
+  double _sqrt(double v) {
+    if (v <= 0) return 0;
+    double x = v;
+    for (int i = 0; i < 10; i++) {
+      x = (x + v / x) / 2;
+    }
+    return x;
+  }
+
+  // ──────────────────── Token 构建 ────────────────────
+
+  Widget _buildPlayerToken(
+    PlayerPosition pos,
+    BoxConstraints constraints,
+    int index,
+  ) {
     final char = _findCharacter(pos.name);
+    final isDragged = _draggedIndex == index;
+    final displayX = isDragged && _dragCurrentFraction != null
+        ? _dragCurrentFraction!.dx
+        : pos.x;
+    final displayY = isDragged && _dragCurrentFraction != null
+        ? _dragCurrentFraction!.dy
+        : pos.y;
+
     return TokenWidget(
-      x: pos.x,
-      y: pos.y,
+      x: displayX,
+      y: displayY,
       initial: pos.name[0].toUpperCase(),
       label: pos.name,
       isPlayer: true,
@@ -248,6 +404,7 @@ class _MapDisplayState extends State<MapDisplay> {
       portraitBase64: char?.portraitBase64,
       hp: char?.hp,
       maxHp: char?.maxHp,
+      isDragged: isDragged,
     );
   }
 
