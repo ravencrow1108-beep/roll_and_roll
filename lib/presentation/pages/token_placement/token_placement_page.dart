@@ -94,6 +94,8 @@ class _TokenPlacementPageState extends State<TokenPlacementPage> {
         )
         .toList();
 
+    session.startAdventureNotifier.value = true;
+
     session.broadcast({
       'type': 'adventure_started',
       'map': widget.map.toJson(),

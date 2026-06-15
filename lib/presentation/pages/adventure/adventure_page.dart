@@ -326,6 +326,10 @@ class _AdventurePageState extends State<AdventurePage> {
           TextButton.icon(
             onPressed: () {
               RoomSession.instance.broadcast({'type': 'return_to_room'});
+              RoomSession.instance.startAdventureNotifier.value = false;
+              RoomSession.instance.mapNotifier.value = null;
+              RoomSession.instance.playerPositionsNotifier.value = [];
+              RoomSession.instance.readyMembersNotifier.value = {};
               Navigator.of(context).pop();
             },
             icon: const Icon(Icons.exit_to_app),

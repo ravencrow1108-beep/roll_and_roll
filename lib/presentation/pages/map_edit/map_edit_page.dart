@@ -55,10 +55,22 @@ class _MapEditPageState extends State<MapEditPage> {
     }
 
     RoomSession.instance.readyMembersNotifier.addListener(_onReadyChanged);
+    RoomSession.instance.startAdventureNotifier.addListener(
+      _onAdventureEnded,
+    );
   }
 
   void _onReadyChanged() {
     if (mounted) setState(() {});
+  }
+
+  void _onAdventureEnded() {
+    if (!RoomSession.instance.startAdventureNotifier.value && mounted) {
+      setState(() {
+        _hasStarted = false;
+        _isReady = false;
+      });
+    }
   }
 
   void _handleMessage(String message) {
@@ -112,8 +124,8 @@ class _MapEditPageState extends State<MapEditPage> {
         ),
       ),
     );
-    // User came back without confirming — reset state so they can try again
-    if (mounted) {
+    // 仅当用户取消（未开始冒险）时才重置状态
+    if (mounted && !RoomSession.instance.startAdventureNotifier.value) {
       setState(() {
         _hasStarted = false;
         _isReady = false;
@@ -180,6 +192,8 @@ class _MapEditPageState extends State<MapEditPage> {
   void dispose() {
     _msgSub?.cancel();
     RoomSession.instance.readyMembersNotifier.removeListener(_onReadyChanged);
+    RoomSession.instance.startAdventureNotifier
+        .removeListener(_onAdventureEnded);
     super.dispose();
   }
 
