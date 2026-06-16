@@ -1,10 +1,13 @@
 import 'dart:convert';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
 import '../../providers/room_state.dart';
 import '../../../data/models/models.dart';
 import '../adventure/adventure_page.dart';
+import '../adventure/coordinate_grid.dart';
 
 /// 主持布置角色位置页面：在地图上点击放置各角色的初始标记
 class TokenPlacementPage extends StatefulWidget {
@@ -13,6 +16,8 @@ class TokenPlacementPage extends StatefulWidget {
     required this.role,
     required this.map,
     this.saveFilePath,
+    this.existingPositions = const [],
+    this.saveOnly = false,
     super.key,
   });
 
@@ -20,6 +25,12 @@ class TokenPlacementPage extends StatefulWidget {
   final String role;
   final MapData map;
   final String? saveFilePath;
+
+  /// 已有的角色位置，用于预填充
+  final List<PlayerPosition> existingPositions;
+
+  /// 为 true 时仅保存位置并返回，不开始冒险
+  final bool saveOnly;
 
   @override
   State<TokenPlacementPage> createState() => _TokenPlacementPageState();
@@ -33,12 +44,58 @@ class _TokenPlacementPageState extends State<TokenPlacementPage> {
   /// Characters loaded from the save file.
   List<CharacterData> _characters = [];
 
+  bool _showGrid = true;
+  bool _showCoords = true;
+
+  /// 地图图片的原始宽高（像素），异步解码后缓存。
+  Size? _imageNaturalSize;
+
   @override
   void initState() {
     super.initState();
-    // Broadcast host is setting up
-    RoomSession.instance.broadcast({'type': 'host_setting_up'});
+    if (!widget.saveOnly) {
+      RoomSession.instance.broadcast({'type': 'host_setting_up'});
+    }
+    // 预填充已有位置
+    for (final p in widget.existingPositions) {
+      _positions[p.name] = Offset(p.x, p.y);
+    }
     _loadCharacters();
+    _decodeImageSize();
+  }
+
+  Future<void> _decodeImageSize() async {
+    final b64 = widget.map.imageBase64;
+    if (b64.isEmpty) return;
+    try {
+      final bytes = base64Decode(b64);
+      final codec = await ui.instantiateImageCodec(Uint8List.fromList(bytes));
+      final frame = await codec.getNextFrame();
+      final w = frame.image.width.toDouble();
+      final h = frame.image.height.toDouble();
+      frame.image.dispose();
+      if (!mounted) return;
+      setState(() {
+        _imageNaturalSize = Size(w, h);
+      });
+    } catch (_) {}
+  }
+
+  /// 计算 BoxFit.contain 后图片在容器内的实际渲染区域。
+  Rect _imageRenderRect(BoxConstraints constraints) {
+    if (_imageNaturalSize == null) {
+      return Rect.fromLTWH(0, 0, constraints.maxWidth, constraints.maxHeight);
+    }
+    final imgW = _imageNaturalSize!.width;
+    final imgH = _imageNaturalSize!.height;
+    final scale = (constraints.maxWidth / imgW) < (constraints.maxHeight / imgH)
+        ? constraints.maxWidth / imgW
+        : constraints.maxHeight / imgH;
+    final renderW = imgW * scale;
+    final renderH = imgH * scale;
+    final offsetX = (constraints.maxWidth - renderW) / 2;
+    final offsetY = (constraints.maxHeight - renderH) / 2;
+    return Rect.fromLTWH(offsetX, offsetY, renderW, renderH);
   }
 
   Future<void> _loadCharacters() async {
@@ -67,39 +124,46 @@ class _TokenPlacementPageState extends State<TokenPlacementPage> {
   }
 
   void _cancelPlacement() {
+    if (widget.saveOnly) {
+      Navigator.of(context).pop();
+      return;
+    }
     RoomSession.instance.broadcast({'type': 'return_to_room'});
-    // Reset adventure state so the host can re-enter from the room
     RoomSession.instance.startAdventureNotifier.value = false;
     RoomSession.instance.mapNotifier.value = null;
     Navigator.of(context).pop();
   }
 
-  void _confirmAndStart() {
-    final session = RoomSession.instance;
-    final placements = <Map<String, dynamic>>[];
-
+  /// 保存模式：仅返回位置列表
+  List<PlayerPosition> _buildPositions() {
+    final placements = <PlayerPosition>[];
     for (final name in _characterNames) {
       final pos = _positions[name];
-      placements.add({'name': name, 'x': pos?.dx ?? 0.5, 'y': pos?.dy ?? 0.5});
+      placements.add(
+        PlayerPosition(name: name, x: pos?.dx ?? 0.5, y: pos?.dy ?? 0.5),
+      );
     }
+    return placements;
+  }
+
+  void _savePositions() {
+    final placements = _buildPositions();
+    Navigator.pop(context, placements);
+  }
+
+  void _confirmAndStart() {
+    final session = RoomSession.instance;
+    final placements = _buildPositions();
 
     session.mapNotifier.value = widget.map;
-    session.playerPositionsNotifier.value = placements
-        .map(
-          (p) => PlayerPosition(
-            name: p['name'] as String,
-            x: (p['x'] as num).toDouble(),
-            y: (p['y'] as num).toDouble(),
-          ),
-        )
-        .toList();
+    session.playerPositionsNotifier.value = placements;
 
     session.startAdventureNotifier.value = true;
 
     session.broadcast({
       'type': 'adventure_started',
       'map': widget.map.toJson(),
-      'positions': placements,
+      'positions': placements.map((p) => p.toJson()).toList(),
     });
 
     Navigator.pushReplacement(
@@ -135,9 +199,14 @@ class _TokenPlacementPageState extends State<TokenPlacementPage> {
           ),
           actions: [
             TextButton.icon(
-              onPressed: _confirmAndStart,
-              icon: const Icon(Icons.rocket_launch_outlined),
-              label: const Text('开始冒险', style: TextStyle(fontSize: 16)),
+              onPressed: widget.saveOnly ? _savePositions : _confirmAndStart,
+              icon: Icon(
+                widget.saveOnly ? Icons.save : Icons.rocket_launch_outlined,
+              ),
+              label: Text(
+                widget.saveOnly ? '保存' : '开始冒险',
+                style: const TextStyle(fontSize: 16),
+              ),
             ),
           ],
         ),
@@ -148,153 +217,243 @@ class _TokenPlacementPageState extends State<TokenPlacementPage> {
               flex: 3,
               child: Padding(
                 padding: const EdgeInsets.all(12),
-                child: LayoutBuilder(
-                  builder: (ctx, constraints) {
-                    return GestureDetector(
-                      onTapUp: (details) {
-                        if (_selectedCharacter == null) return;
-                        final fx =
-                            details.localPosition.dx / constraints.maxWidth;
-                        final fy =
-                            details.localPosition.dy / constraints.maxHeight;
-                        _placeCharacter(
-                          _selectedCharacter!,
-                          Offset(fx.clamp(0, 1), fy.clamp(0, 1)),
-                        );
-                        _selectedCharacter = null;
-                      },
-                      child: Stack(
-                        children: [
-                          // Map image
-                          if (widget.map.imageBase64.isNotEmpty)
-                            Positioned.fill(
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
-                                child: Image.memory(
-                                  base64Decode(widget.map.imageBase64),
-                                  fit: BoxFit.contain,
-                                ),
-                              ),
-                            )
-                          else
-                            Positioned.fill(
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.green.shade100,
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(
-                                    color: Colors.green.shade300,
+                child: widget.map.imageBase64.isNotEmpty
+                    ? LayoutBuilder(
+                        builder: (ctx, constraints) {
+                          final renderRect = _imageRenderRect(constraints);
+                          final renderConstraints = BoxConstraints.tight(
+                            Size(renderRect.width, renderRect.height),
+                          );
+
+                          return Column(
+                            children: [
+                              // 网格/坐标切换按钮
+                              Row(
+                                children: [
+                                  _GridToggle(
+                                    icon: Icons.grid_on,
+                                    tooltip: _showGrid ? '关闭网格' : '显示网格',
+                                    active: _showGrid,
+                                    onTap: () =>
+                                        setState(() => _showGrid = !_showGrid),
                                   ),
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    widget.map.name,
+                                  const SizedBox(width: 4),
+                                  _GridToggle(
+                                    icon: Icons.pin_drop_outlined,
+                                    tooltip: _showCoords ? '隐藏坐标' : '显示坐标',
+                                    active: _showCoords,
+                                    onTap: () => setState(
+                                      () => _showCoords = !_showCoords,
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  Text(
+                                    '已放置 ${_positions.length}/${_characterNames.length}',
                                     style: TextStyle(
-                                      color: Colors.green.shade800,
-                                      fontSize: 20,
+                                      color: Colors.grey.shade600,
+                                      fontSize: 12,
                                     ),
                                   ),
-                                ),
+                                ],
                               ),
-                            ),
-                          // Grid overlay
-                          Positioned.fill(
-                            child: CustomPaint(
-                              painter: _GridPainter(
-                                color: Colors.black.withValues(alpha: 0.15),
-                              ),
-                            ),
-                          ),
-                          // Placed tokens
-                          for (final entry in _positions.entries)
-                            Positioned(
-                              left: entry.value.dx * constraints.maxWidth - 16,
-                              top: entry.value.dy * constraints.maxHeight - 16,
-                              child: GestureDetector(
-                                onTap: () => _removeCharacter(entry.key),
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Container(
-                                      width: 32,
-                                      height: 32,
-                                      decoration: BoxDecoration(
-                                        color: Colors.deepPurple,
-                                        shape: BoxShape.circle,
-                                        border: Border.all(
-                                          color: Colors.white,
-                                          width: 2,
-                                        ),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.black.withValues(
-                                              alpha: 0.3,
-                                            ),
-                                            blurRadius: 4,
-                                          ),
-                                        ],
-                                      ),
-                                      child: Center(
-                                        child: Text(
-                                          entry.key[0].toUpperCase(),
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 14,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 4,
-                                        vertical: 1,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: Colors.black.withValues(
-                                          alpha: 0.6,
-                                        ),
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                      child: Text(
-                                        entry.key,
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 10,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          // Hint text
-                          if (_selectedCharacter != null)
-                            Positioned(
-                              bottom: 12,
-                              left: 12,
-                              right: 12,
-                              child: Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: Colors.deepPurple.withValues(
-                                    alpha: 0.85,
-                                  ),
+                              const SizedBox(height: 6),
+                              Expanded(
+                                child: ClipRRect(
                                   borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  '点击地图放置「$_selectedCharacter」的位置',
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(color: Colors.white),
+                                  child: Stack(
+                                    children: [
+                                      // 背景图片（BoxFit.contain）
+                                      Positioned.fill(
+                                        child: Image.memory(
+                                          base64Decode(widget.map.imageBase64),
+                                          fit: BoxFit.contain,
+                                        ),
+                                      ),
+                                      // 网格、坐标与角色标记（对齐图片左上角）
+                                      Positioned(
+                                        left: renderRect.left,
+                                        top: renderRect.top,
+                                        width: renderRect.width,
+                                        height: renderRect.height,
+                                        child: GestureDetector(
+                                          onTapUp: (details) {
+                                            if (_selectedCharacter == null)
+                                              return;
+                                            final fx =
+                                                details.localPosition.dx /
+                                                renderConstraints.maxWidth;
+                                            final fy =
+                                                details.localPosition.dy /
+                                                renderConstraints.maxHeight;
+                                            _placeCharacter(
+                                              _selectedCharacter!,
+                                              Offset(
+                                                fx.clamp(0, 1),
+                                                fy.clamp(0, 1),
+                                              ),
+                                            );
+                                            _selectedCharacter = null;
+                                          },
+                                          child: Stack(
+                                            clipBehavior: Clip.none,
+                                            children: [
+                                              // 坐标系网格（基于图片左上角）
+                                              if (_showGrid || _showCoords)
+                                                Positioned.fill(
+                                                  child: CustomPaint(
+                                                    painter:
+                                                        CoordinateGridPainter(
+                                                          columns:
+                                                              widget.map.width,
+                                                          rows:
+                                                              widget.map.height,
+                                                          unit: _showCoords
+                                                              ? widget.map.unit
+                                                              : '',
+                                                          showLabels:
+                                                              _showCoords,
+                                                          showGrid: _showGrid,
+                                                        ),
+                                                  ),
+                                                ),
+                                              // 已放置的角色标记
+                                              for (final entry
+                                                  in _positions.entries)
+                                                Positioned(
+                                                  left:
+                                                      entry.value.dx *
+                                                          renderConstraints
+                                                              .maxWidth -
+                                                      16,
+                                                  top:
+                                                      entry.value.dy *
+                                                          renderConstraints
+                                                              .maxHeight -
+                                                      16,
+                                                  child: GestureDetector(
+                                                    onTap: () =>
+                                                        _removeCharacter(
+                                                          entry.key,
+                                                        ),
+                                                    child: Column(
+                                                      mainAxisSize:
+                                                          MainAxisSize.min,
+                                                      children: [
+                                                        Container(
+                                                          width: 32,
+                                                          height: 32,
+                                                          decoration: BoxDecoration(
+                                                            color: Colors
+                                                                .deepPurple,
+                                                            shape:
+                                                                BoxShape.circle,
+                                                            border: Border.all(
+                                                              color:
+                                                                  Colors.white,
+                                                              width: 2,
+                                                            ),
+                                                            boxShadow: [
+                                                              BoxShadow(
+                                                                color: Colors
+                                                                    .black
+                                                                    .withValues(
+                                                                      alpha:
+                                                                          0.3,
+                                                                    ),
+                                                                blurRadius: 4,
+                                                              ),
+                                                            ],
+                                                          ),
+                                                          child: Center(
+                                                            child: Text(
+                                                              entry.key[0]
+                                                                  .toUpperCase(),
+                                                              style: const TextStyle(
+                                                                color: Colors
+                                                                    .white,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .bold,
+                                                                fontSize: 14,
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        ),
+                                                        const SizedBox(
+                                                          height: 2,
+                                                        ),
+                                                        Container(
+                                                          padding:
+                                                              const EdgeInsets.symmetric(
+                                                                horizontal: 4,
+                                                                vertical: 1,
+                                                              ),
+                                                          decoration: BoxDecoration(
+                                                            color: Colors.black
+                                                                .withValues(
+                                                                  alpha: 0.6,
+                                                                ),
+                                                            borderRadius:
+                                                                BorderRadius.circular(
+                                                                  4,
+                                                                ),
+                                                          ),
+                                                          child: Text(
+                                                            entry.key,
+                                                            style:
+                                                                const TextStyle(
+                                                                  color: Colors
+                                                                      .white,
+                                                                  fontSize: 10,
+                                                                ),
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ),
+                                              // 提示文字
+                                              if (_selectedCharacter != null)
+                                                Positioned(
+                                                  bottom: 12,
+                                                  left: 12,
+                                                  right: 12,
+                                                  child: Container(
+                                                    padding:
+                                                        const EdgeInsets.all(8),
+                                                    decoration: BoxDecoration(
+                                                      color: Colors.deepPurple
+                                                          .withValues(
+                                                            alpha: 0.85,
+                                                          ),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            8,
+                                                          ),
+                                                    ),
+                                                    child: Text(
+                                                      '点击地图放置「$_selectedCharacter」的位置',
+                                                      textAlign:
+                                                          TextAlign.center,
+                                                      style: const TextStyle(
+                                                        color: Colors.white,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
-                            ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
+                            ],
+                          );
+                        },
+                      )
+                    : Center(child: Text(widget.map.name)),
               ),
             ),
 
@@ -474,25 +633,39 @@ class _PortraitCircle extends StatelessWidget {
 }
 
 /// Draws a light grid on top of the map for placement reference.
-class _GridPainter extends CustomPainter {
-  _GridPainter({required this.color});
-  final Color color;
+class _GridToggle extends StatelessWidget {
+  const _GridToggle({
+    required this.icon,
+    required this.tooltip,
+    required this.active,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final bool active;
+  final VoidCallback onTap;
 
   @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..strokeWidth = 0.5;
-
-    const cells = 5;
-    for (int i = 1; i < cells; i++) {
-      final x = size.width * i / cells;
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
-      final y = size.height * i / cells;
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
-    }
+  Widget build(BuildContext context) {
+    return Material(
+      color: active ? Colors.deepPurple.shade50 : Colors.transparent,
+      borderRadius: BorderRadius.circular(6),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(6),
+        onTap: onTap,
+        child: Tooltip(
+          message: tooltip,
+          child: Padding(
+            padding: const EdgeInsets.all(4),
+            child: Icon(
+              icon,
+              size: 20,
+              color: active ? Colors.deepPurple : Colors.grey,
+            ),
+          ),
+        ),
+      ),
+    );
   }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

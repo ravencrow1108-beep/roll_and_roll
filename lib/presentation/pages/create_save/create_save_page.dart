@@ -340,12 +340,25 @@ class _CreateSavePageState extends State<CreateSavePage>
 
   Future<void> _editMapInList(int index) async {
     final map = _maps[index];
+
+    // 从存档加载已有角色位置
+    List<PlayerPosition> positions = [];
+    if (widget.isEditMode && widget._filePath != null) {
+      try {
+        final save = await SaveData.fromZip(widget._filePath!);
+        positions = save.playerPositions;
+      } catch (_) {}
+    }
+
+    if (!mounted) return;
     await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => MapEditorPage(
           mapData: map,
           onSave: (updated) => setState(() => _maps[index] = updated),
+          saveFilePath: widget.isEditMode ? widget._filePath : null,
+          initialPositions: positions,
         ),
       ),
     );

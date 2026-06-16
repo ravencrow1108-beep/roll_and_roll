@@ -7,7 +7,7 @@ import 'package:flutter/material.dart';
 import '../../providers/room_state.dart';
 import '../../../data/models/models.dart';
 import '../create_save/create_save_page.dart';
-import '../token_placement/token_placement_page.dart';
+import '../adventure/adventure_page.dart';
 
 /// 主持地图编辑页面：选择地图、查看详情并等待所有玩家准备后开始布置
 class MapEditPage extends StatefulWidget {
@@ -55,9 +55,7 @@ class _MapEditPageState extends State<MapEditPage> {
     }
 
     RoomSession.instance.readyMembersNotifier.addListener(_onReadyChanged);
-    RoomSession.instance.startAdventureNotifier.addListener(
-      _onAdventureEnded,
-    );
+    RoomSession.instance.startAdventureNotifier.addListener(_onAdventureEnded);
   }
 
   void _onReadyChanged() {
@@ -86,7 +84,7 @@ class _MapEditPageState extends State<MapEditPage> {
     } catch (_) {}
   }
 
-  /// Check if all non-host members are ready, and if so, start token placement.
+  /// Check if all non-host members are ready, and if so, start adventure directly.
   void _checkAllReady() {
     final session = RoomSession.instance;
     final allMembers = session.membersNotifier.value;
@@ -96,43 +94,52 @@ class _MapEditPageState extends State<MapEditPage> {
         .where((m) => m != session.hostNameNotifier.value)
         .toList();
     if (nonHost.isEmpty && _selectedMap != null && !_hasStarted) {
-      // 仅房主一人，直接进入布置阶段
+      // 仅房主一人，直接开始冒险
       _hasStarted = true;
-      session.mapNotifier.value = _selectedMap;
-      _navigateToTokenPlacement();
+      _startAdventureDirectly();
       return;
     }
 
     final allReady = nonHost.every((m) => readyMembers.contains(m));
     if (allReady && _selectedMap != null && !_hasStarted) {
       _hasStarted = true;
-      session.mapNotifier.value = _selectedMap;
-      _navigateToTokenPlacement();
+      _startAdventureDirectly();
     }
   }
 
-  Future<void> _navigateToTokenPlacement() async {
+  /// 直接从存档读取角色位置并开始冒险
+  Future<void> _startAdventureDirectly() async {
+    final session = RoomSession.instance;
+    session.mapNotifier.value = _selectedMap;
+    session.startAdventureNotifier.value = true;
+
+    // 从存档加载玩家位置
+    List<PlayerPosition> positions = [];
+    if (_saveFilePath != null) {
+      try {
+        final save = await SaveData.fromZip(_saveFilePath!);
+        positions = save.playerPositions;
+      } catch (_) {}
+    }
+    session.playerPositionsNotifier.value = positions;
+
+    session.broadcast({
+      'type': 'adventure_started',
+      'map': _selectedMap!.toJson(),
+      'positions': positions.map((p) => p.toJson()).toList(),
+    });
+
     if (!mounted) return;
-    await Navigator.push(
+    Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => TokenPlacementPage(
+        builder: (_) => AdventurePage(
           playerName: widget.playerName,
           role: widget.role,
-          map: _selectedMap!,
           saveFilePath: _saveFilePath,
         ),
       ),
     );
-    // 仅当用户取消（未开始冒险）时才重置状态
-    if (mounted && !RoomSession.instance.startAdventureNotifier.value) {
-      setState(() {
-        _hasStarted = false;
-        _isReady = false;
-      });
-      RoomSession.instance.mapNotifier.value = null;
-      RoomSession.instance.readyMembersNotifier.value = {};
-    }
   }
 
   Future<void> _loadSaveData() async {
@@ -192,8 +199,9 @@ class _MapEditPageState extends State<MapEditPage> {
   void dispose() {
     _msgSub?.cancel();
     RoomSession.instance.readyMembersNotifier.removeListener(_onReadyChanged);
-    RoomSession.instance.startAdventureNotifier
-        .removeListener(_onAdventureEnded);
+    RoomSession.instance.startAdventureNotifier.removeListener(
+      _onAdventureEnded,
+    );
     super.dispose();
   }
 
