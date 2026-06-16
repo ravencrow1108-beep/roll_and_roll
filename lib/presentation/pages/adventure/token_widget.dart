@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import '../../../data/models/models.dart';
@@ -55,7 +56,33 @@ class _TokenWidgetState extends State<TokenWidget> {
   bool _insertingOverlay = false;
   final GlobalKey _avatarKey = GlobalKey();
 
+  /// 缓存解码后的头像字节，避免每次 build 重新 base64Decode 导致闪烁。
+  Uint8List? _cachedPortraitBytes;
+
   static const Duration _hoverDelay = Duration(seconds: 1);
+
+  @override
+  void initState() {
+    super.initState();
+    _updatePortraitCache();
+  }
+
+  @override
+  void didUpdateWidget(covariant TokenWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.portraitBase64 != widget.portraitBase64) {
+      _updatePortraitCache();
+    }
+  }
+
+  void _updatePortraitCache() {
+    final b64 = widget.portraitBase64;
+    if (b64 != null && b64.isNotEmpty) {
+      _cachedPortraitBytes = Uint8List.fromList(base64Decode(b64));
+    } else {
+      _cachedPortraitBytes = null;
+    }
+  }
 
   @override
   void dispose() {
@@ -204,12 +231,12 @@ class _TokenWidgetState extends State<TokenWidget> {
                       : null,
                 ),
                 child: widget.isPlayer &&
-                        widget.portraitBase64 != null &&
-                        widget.portraitBase64!.isNotEmpty
+                        _cachedPortraitBytes != null
                     ? ClipOval(
                         child: Image.memory(
-                          base64Decode(widget.portraitBase64!),
+                          _cachedPortraitBytes!,
                           fit: BoxFit.cover,
+                          gaplessPlayback: true,
                           errorBuilder: (ctx, err, _) => _initialText(),
                         ),
                       )

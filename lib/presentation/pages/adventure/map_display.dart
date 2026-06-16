@@ -53,6 +53,9 @@ class _MapDisplayState extends State<MapDisplay> {
   /// 地图图片的原始宽高（像素），异步解码后缓存。
   Size? _imageNaturalSize;
 
+  /// 缓存解码后的地图图片字节，避免每次 build 重新 base64Decode 导致闪烁。
+  Uint8List? _cachedImageBytes;
+
   // ── GM 拖拽移动 ──
   int? _draggedIndex;
   PlayerPosition? _dragOriginal;
@@ -70,6 +73,7 @@ class _MapDisplayState extends State<MapDisplay> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.mapData.imageBase64 != widget.mapData.imageBase64) {
       _imageNaturalSize = null;
+      _cachedImageBytes = null;
       _decodeImageSize();
     }
   }
@@ -78,8 +82,9 @@ class _MapDisplayState extends State<MapDisplay> {
     final b64 = widget.mapData.imageBase64;
     if (b64.isEmpty) return;
     try {
-      final bytes = base64Decode(b64);
-      final codec = await ui.instantiateImageCodec(Uint8List.fromList(bytes));
+      final bytes = Uint8List.fromList(base64Decode(b64));
+      _cachedImageBytes = bytes;
+      final codec = await ui.instantiateImageCodec(bytes);
       final frame = await codec.getNextFrame();
       final w = frame.image.width.toDouble();
       final h = frame.image.height.toDouble();
@@ -199,19 +204,26 @@ class _MapDisplayState extends State<MapDisplay> {
                         child: Stack(
                           children: [
                             // 背景图片（BoxFit.contain）
-                            Positioned.fill(
-                              child: Image.memory(
-                                base64Decode(m.imageBase64),
-                                fit: BoxFit.contain,
+                            // 使用缓存的字节避免每次 build 重新解码；
+                            // RepaintBoundary 隔离背景层，网格/token 更新时不会触发背景重绘。
+                            if (_cachedImageBytes != null)
+                              Positioned.fill(
+                                child: RepaintBoundary(
+                                  child: Image.memory(
+                                    _cachedImageBytes!,
+                                    fit: BoxFit.contain,
+                                    gaplessPlayback: true,
+                                  ),
+                                ),
                               ),
-                            ),
                             // ── 图片实际渲染区域内的网格与 token ──
                             Positioned(
                               left: renderRect.left,
                               top: renderRect.top,
                               width: renderRect.width,
                               height: renderRect.height,
-                              child: Listener(
+                              child: RepaintBoundary(
+                                child: Listener(
                                 behavior: HitTestBehavior.translucent,
                                 onPointerDown: widget.isGM
                                     ? (e) => _onPointerDown(
@@ -269,6 +281,7 @@ class _MapDisplayState extends State<MapDisplay> {
                                       ),
                                   ],
                                 ),
+                              ),
                               ),
                             ),
                           ],
@@ -451,6 +464,7 @@ class _MapDisplayState extends State<MapDisplay> {
         : pos.y;
 
     return TokenWidget(
+      key: ValueKey(pos.name),
       x: displayX,
       y: displayY,
       initial: pos.name[0].toUpperCase(),
