@@ -10,3 +10,4 @@ void main() async {
   await SharedPreferences.getInstance();
   runApp(const MyApp());
 }
+//TODO:地图频繁渲染闪屏 局内添加角色 攻击便捷扣血 聊天框悬浮 局内背包 地图缩放拖动 主持和玩家权限区分 保存确认提醒 地图缩放的网格自适应以及比例尺 视野和光源 大地图局内小地图入口 局内主持和玩家头像 局内语音聊天功能 投掷动画

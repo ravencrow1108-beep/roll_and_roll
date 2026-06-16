@@ -189,16 +189,9 @@ class CharacterTab extends StatelessWidget {
                 child: DropdownButtonFormField<String>(
                   initialValue: raceCustom
                       ? '__custom__'
-                      : ([
-                            '人类',
-                            '精灵',
-                            '矮人',
-                            '半身人',
-                            '龙裔',
-                            '兽人',
-                          ].contains(race)
-                              ? race
-                              : '__custom__'),
+                      : (['人类', '精灵', '矮人', '半身人', '龙裔', '兽人'].contains(race)
+                            ? race
+                            : '__custom__'),
                   items: const [
                     DropdownMenuItem(value: '人类', child: Text('人类')),
                     DropdownMenuItem(value: '精灵', child: Text('精灵')),
@@ -237,7 +230,13 @@ class CharacterTab extends StatelessWidget {
                 onPressed: level > 1 ? () => onLevelChanged(level - 1) : null,
                 icon: const Icon(Icons.remove_circle_outline),
               ),
-              Text(' Lv$level ', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              Text(
+                ' Lv$level ',
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               IconButton(
                 onPressed: () => onLevelChanged(level + 1),
                 icon: const Icon(Icons.add_circle_outline),
@@ -582,7 +581,7 @@ class CharacterTab extends StatelessWidget {
   }
 }
 
-class _StatLine extends StatelessWidget {
+class _StatLine extends StatefulWidget {
   const _StatLine(
     this.label,
     this.value,
@@ -604,28 +603,57 @@ class _StatLine extends StatelessWidget {
   final VoidCallback? onDelete;
 
   @override
+  State<_StatLine> createState() => _StatLineState();
+}
+
+class _StatLineState extends State<_StatLine> {
+  late TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: '${widget.value}');
+  }
+
+  @override
+  void didUpdateWidget(covariant _StatLine oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.value != oldWidget.value) {
+      _controller.text = '${widget.value}';
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: Row(
           children: [
-            Icon(icon, color: Colors.deepPurple),
+            Icon(widget.icon, color: Colors.deepPurple),
             const SizedBox(width: 12),
             SizedBox(
               width: 48,
-              child: Text(label, style: const TextStyle(fontSize: 16)),
+              child: Text(widget.label, style: const TextStyle(fontSize: 16)),
             ),
             const Spacer(),
             IconButton(
               icon: const Icon(Icons.remove_circle_outline),
-              onPressed: value > 0 ? () => onAdjust(label, -1) : null,
+              onPressed: widget.value > 0
+                  ? () => widget.onAdjust(widget.label, -1)
+                  : null,
               tooltip: '减少',
             ),
             SizedBox(
               width: 48,
               child: TextFormField(
-                initialValue: '$value',
+                controller: _controller,
                 textAlign: TextAlign.center,
                 keyboardType: TextInputType.number,
                 style: const TextStyle(
@@ -643,24 +671,26 @@ class _StatLine extends StatelessWidget {
                 onFieldSubmitted: (v) {
                   final n = int.tryParse(v);
                   if (n != null && n >= 0 && n <= 99) {
-                    onValueSet?.call(label, n);
+                    widget.onValueSet?.call(widget.label, n);
                   }
                 },
               ),
             ),
             IconButton(
               icon: const Icon(Icons.add_circle_outline),
-              onPressed: canIncrement ? () => onAdjust(label, 1) : null,
+              onPressed: widget.canIncrement
+                  ? () => widget.onAdjust(widget.label, 1)
+                  : null,
               tooltip: '增加',
             ),
-            if (canDelete && onDelete != null)
+            if (widget.canDelete && widget.onDelete != null)
               IconButton(
                 icon: const Icon(
                   Icons.delete_outline,
                   color: Colors.red,
                   size: 22,
                 ),
-                onPressed: onDelete,
+                onPressed: widget.onDelete,
                 tooltip: '删除属性',
               ),
           ],
