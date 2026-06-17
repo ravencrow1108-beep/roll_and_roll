@@ -20,8 +20,10 @@ class RulesTab extends StatelessWidget {
     required this.onBackpackSlotMaxChanged,
     required this.onAddItemTemplate,
     required this.onRemoveItemTemplate,
+    required this.onEditItemTemplate,
     required this.onAddEquipmentTemplate,
     required this.onRemoveEquipmentTemplate,
+    required this.onEditEquipmentTemplate,
     required this.onAddEquipmentSlot,
     required this.onRemoveEquipmentSlot,
     required this.onAddTurn,
@@ -41,8 +43,10 @@ class RulesTab extends StatelessWidget {
   final ValueChanged<int> onBackpackSlotMaxChanged;
   final ValueChanged<ItemData> onAddItemTemplate;
   final ValueChanged<int> onRemoveItemTemplate;
+  final void Function(int index, ItemData updated) onEditItemTemplate;
   final ValueChanged<EquipmentData> onAddEquipmentTemplate;
   final ValueChanged<int> onRemoveEquipmentTemplate;
+  final void Function(int index, EquipmentData updated) onEditEquipmentTemplate;
   final ValueChanged<String> onAddEquipmentSlot;
   final ValueChanged<int> onRemoveEquipmentSlot;
   final VoidCallback onAddTurn;
@@ -184,6 +188,11 @@ class RulesTab extends StatelessWidget {
                           ),
                         ),
                         IconButton(
+                          onPressed: () => _showAddItemDialog(context, editIndex: i, editItem: item),
+                          icon: const Icon(Icons.edit, size: 22),
+                          tooltip: '编辑',
+                        ),
+                        IconButton(
                           onPressed: () => onRemoveItemTemplate(i),
                           icon: const Icon(
                               Icons.remove_circle_outline,
@@ -318,6 +327,11 @@ class RulesTab extends StatelessWidget {
                           ),
                         ),
                         IconButton(
+                          onPressed: () => _showAddEquipmentDialog(context, editIndex: i, editEq: eq),
+                          icon: const Icon(Icons.edit, size: 22),
+                          tooltip: '编辑',
+                        ),
+                        IconButton(
                           onPressed: () => onRemoveEquipmentTemplate(i),
                           icon: const Icon(Icons.remove_circle_outline,
                               color: Colors.red, size: 20),
@@ -447,20 +461,21 @@ class RulesTab extends StatelessWidget {
     );
   }
 
-  void _showAddItemDialog(BuildContext context) {
-    final nameCtrl = TextEditingController();
-    final typeCtrl = TextEditingController(text: '杂物');
-    final effectCtrl = TextEditingController();
-    final descCtrl = TextEditingController();
-    final valueCtrl = TextEditingController(text: '0');
-    final weightCtrl = TextEditingController(text: '0');
-    String imageBase64 = '';
+  void _showAddItemDialog(BuildContext context, {int? editIndex, ItemData? editItem}) {
+    final isEdit = editIndex != null;
+    final nameCtrl = TextEditingController(text: editItem?.name ?? '');
+    final typeCtrl = TextEditingController(text: editItem?.type ?? '杂物');
+    final effectCtrl = TextEditingController(text: editItem?.effect ?? '');
+    final descCtrl = TextEditingController(text: editItem?.description ?? '');
+    final valueCtrl = TextEditingController(text: '${editItem?.value ?? 0}');
+    final weightCtrl = TextEditingController(text: '${editItem?.weight ?? 0}');
+    String imageBase64 = editItem?.imageBase64 ?? '';
 
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDlg) => AlertDialog(
-          title: const Text('添加物品模板'),
+          title: Text(isEdit ? '编辑物品模板' : '添加物品模板'),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -572,8 +587,12 @@ class RulesTab extends StatelessWidget {
                   value: int.tryParse(valueCtrl.text.trim()) ?? 0,
                   weight: int.tryParse(weightCtrl.text.trim()) ?? 0,
                 );
+              if (isEdit) {
+                onEditItemTemplate(editIndex, item);
+              } else {
                 onAddItemTemplate(item);
-                Navigator.pop(ctx);
+              }
+              Navigator.pop(ctx);
               },
               child: const Text('添加'),
             ),
@@ -617,21 +636,22 @@ class RulesTab extends StatelessWidget {
     );
   }
 
-  void _showAddEquipmentDialog(BuildContext context) {
-    final nameCtrl = TextEditingController();
-    final typeCtrl = TextEditingController(text: '防具');
-    final effectCtrl = TextEditingController();
-    final descCtrl = TextEditingController();
-    final valueCtrl = TextEditingController(text: '0');
-    final weightCtrl = TextEditingController(text: '0');
-    String selectedSlot = equipmentSlots.isNotEmpty ? equipmentSlots.first : '饰品';
-    String imageBase64 = '';
+  void _showAddEquipmentDialog(BuildContext context, {int? editIndex, EquipmentData? editEq}) {
+    final isEdit = editIndex != null;
+    final nameCtrl = TextEditingController(text: editEq?.name ?? '');
+    final typeCtrl = TextEditingController(text: editEq?.type ?? '防具');
+    final effectCtrl = TextEditingController(text: editEq?.effect ?? '');
+    final descCtrl = TextEditingController(text: editEq?.description ?? '');
+    final valueCtrl = TextEditingController(text: '${editEq?.value ?? 0}');
+    final weightCtrl = TextEditingController(text: '${editEq?.weight ?? 0}');
+    String selectedSlot = editEq?.slot ?? (equipmentSlots.isNotEmpty ? equipmentSlots.first : '饰品');
+    String imageBase64 = editEq?.imageBase64 ?? '';
 
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDlg) => AlertDialog(
-          title: const Text('添加装备模板'),
+          title: Text(isEdit ? '编辑装备模板' : '添加装备模板'),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -761,8 +781,12 @@ class RulesTab extends StatelessWidget {
                   weight: int.tryParse(weightCtrl.text.trim()) ?? 0,
                   slot: selectedSlot,
                 );
+              if (isEdit) {
+                onEditEquipmentTemplate(editIndex, eq);
+              } else {
                 onAddEquipmentTemplate(eq);
-                Navigator.pop(ctx);
+              }
+              Navigator.pop(ctx);
               },
               child: const Text('添加'),
             ),

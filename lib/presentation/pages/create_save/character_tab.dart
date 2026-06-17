@@ -313,6 +313,7 @@ class CharacterTab extends StatelessWidget {
                       SizedBox(
                         width: 52,
                         child: TextFormField(
+                          key: ValueKey('hp_$hp'),
                           initialValue: '$hp',
                           textAlign: TextAlign.center,
                           keyboardType: TextInputType.number,
@@ -358,6 +359,7 @@ class CharacterTab extends StatelessWidget {
                       SizedBox(
                         width: 52,
                         child: TextFormField(
+                          key: ValueKey('maxHp_$maxHp'),
                           initialValue: '$maxHp',
                           textAlign: TextAlign.center,
                           keyboardType: TextInputType.number,

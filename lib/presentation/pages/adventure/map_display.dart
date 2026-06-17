@@ -20,7 +20,7 @@ class MapDisplay extends StatefulWidget {
     this.character,
     this.characters = const [],
     this.backpackItems = const [],
-    this.backpackSlotMax = 20,
+    this.backpackSlotMax = 40,
     this.onPositionChanged,
     this.onEditHp,
     this.onAddNote,

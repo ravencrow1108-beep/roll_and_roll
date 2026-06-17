@@ -9,7 +9,7 @@ class RuleData {
   /// 环节设置 (默认：先攻、战斗)
   final List<String> phaseSettings;
 
-  /// 背包物品栏格子上限 (默认 20)
+  /// 背包物品栏格子上限 (默认 40)
   final int backpackSlotMax;
 
   /// 物品模板库 (主持在此定义可用物品，角色从中选择)
@@ -24,7 +24,7 @@ class RuleData {
   const RuleData({
     this.turnSettings = const [],
     this.phaseSettings = const ['先攻', '战斗'],
-    this.backpackSlotMax = 20,
+    this.backpackSlotMax = 40,
     this.itemTemplates = const [],
     this.equipmentSlots = const ['头盔', '身甲', '手甲', '腿甲', '饰品'],
     this.equipmentTemplates = const [],
@@ -53,7 +53,7 @@ class RuleData {
             ?.map((e) => e as String)
             .toList() ??
         const ['先攻', '战斗'],
-    backpackSlotMax: json['backpackSlotMax'] as int? ?? 20,
+    backpackSlotMax: json['backpackSlotMax'] as int? ?? 40,
     itemTemplates:
         (json['itemTemplates'] as List<dynamic>?)
             ?.map((i) => ItemData.fromJson(i as Map<String, dynamic>))

@@ -65,7 +65,7 @@ class _CreateSavePageState extends State<CreateSavePage>
   final List<MapData> _maps = [];
   final List<String> _turnSettings = [];
   final List<String> _phaseSettings = ['先攻', '战斗'];
-  int _backpackSlotMax = 20;
+  int _backpackSlotMax = 40;
   final List<ItemData> _itemTemplates = [];
   final List<String> _equipmentSlots = ['头盔', '身甲', '手甲', '腿甲', '饰品'];
   final List<EquipmentData> _equipmentTemplates = [];
@@ -706,11 +706,17 @@ class _CreateSavePageState extends State<CreateSavePage>
                     onRemoveItemTemplate: (i) {
                       setState(() => _itemTemplates.removeAt(i));
                     },
+                    onEditItemTemplate: (i, item) {
+                      setState(() => _itemTemplates[i] = item);
+                    },
                     onAddEquipmentTemplate: (eq) {
                       setState(() => _equipmentTemplates.add(eq));
                     },
                     onRemoveEquipmentTemplate: (i) {
                       setState(() => _equipmentTemplates.removeAt(i));
+                    },
+                    onEditEquipmentTemplate: (i, eq) {
+                      setState(() => _equipmentTemplates[i] = eq);
                     },
                     onAddEquipmentSlot: (name) {
                       if (name.isEmpty) return;
