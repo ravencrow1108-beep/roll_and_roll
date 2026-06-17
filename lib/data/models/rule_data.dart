@@ -28,6 +28,12 @@ class RuleData {
   /// 伤害类型池 (主持在此定义，技能模板从中选择伤害类型)
   final List<String> damageTypes;
 
+  /// 负重上限表达式 (留空则默认 "力量*15")
+  final String maxWeightExpression;
+
+  /// 当前负重表达式 (留空则默认物品 weight 求和)
+  final String currentWeightExpression;
+
   const RuleData({
     this.turnSettings = const [],
     this.phaseSettings = const ['先攻', '战斗'],
@@ -50,6 +56,8 @@ class RuleData {
       '挥砍',
       '钝击',
     ],
+    this.maxWeightExpression = '',
+    this.currentWeightExpression = '',
   });
 
   Map<String, dynamic> toJson() => {
@@ -64,6 +72,10 @@ class RuleData {
     if (skillTemplates.isNotEmpty)
       'skillTemplates': skillTemplates.map((s) => s.toJson()).toList(),
     if (damageTypes.isNotEmpty) 'damageTypes': damageTypes,
+    if (maxWeightExpression.isNotEmpty)
+      'maxWeightExpression': maxWeightExpression,
+    if (currentWeightExpression.isNotEmpty)
+      'currentWeightExpression': currentWeightExpression,
   };
 
   factory RuleData.fromJson(Map<String, dynamic> json) => RuleData(
@@ -116,5 +128,7 @@ class RuleData {
           '挥砍',
           '钝击',
         ],
+    maxWeightExpression: json['maxWeightExpression'] as String? ?? '',
+    currentWeightExpression: json['currentWeightExpression'] as String? ?? '',
   );
 }

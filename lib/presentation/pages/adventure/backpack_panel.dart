@@ -9,11 +9,13 @@ class BackpackPanel extends StatefulWidget {
   const BackpackPanel({
     required this.backpack,
     required this.slotMax,
+    this.maxWeight = 0,
     super.key,
   });
 
   final List<ItemData> backpack;
   final int slotMax;
+  final int maxWeight;
 
   @override
   State<BackpackPanel> createState() => _BackpackPanelState();
@@ -41,6 +43,23 @@ class _BackpackPanelState extends State<BackpackPanel> {
     _popupEntry?.remove();
     _popupEntry = null;
     _insertingOverlay = false;
+  }
+
+  int get _totalWeight =>
+      widget.backpack.fold<int>(0, (sum, item) => sum + item.weight);
+
+  Widget _buildWeightDisplay() {
+    final current = _totalWeight;
+    final max = widget.maxWeight;
+    final overWeight = current > max;
+    return Text(
+      '⚖️ $current / $max',
+      style: TextStyle(
+        fontSize: 10,
+        color: overWeight ? Colors.red.shade400 : Colors.grey.shade500,
+        fontWeight: overWeight ? FontWeight.bold : FontWeight.normal,
+      ),
+    );
   }
 
   @override
@@ -85,11 +104,17 @@ class _BackpackPanelState extends State<BackpackPanel> {
             );
           }),
         ),
-        // ── 计数 ──
+        // ── 计数 & 负重 ──
         const SizedBox(height: 4),
-        Text(
-          '背包 $count / $max',
-          style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              '背包 $count / $max',
+              style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
+            ),
+            if (widget.maxWeight > 0) _buildWeightDisplay(),
+          ],
         ),
       ],
     );

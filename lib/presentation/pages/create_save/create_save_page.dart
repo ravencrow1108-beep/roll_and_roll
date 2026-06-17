@@ -66,6 +66,8 @@ class _CreateSavePageState extends State<CreateSavePage>
   final List<String> _turnSettings = [];
   final List<String> _phaseSettings = ['先攻', '战斗'];
   int _backpackSlotMax = 40;
+  String _maxWeightExpression = '';
+  String _currentWeightExpression = '';
   final List<ItemData> _itemTemplates = [];
   final List<String> _equipmentSlots = ['头盔', '身甲', '手甲', '腿甲', '饰品'];
   final List<EquipmentData> _equipmentTemplates = [];
@@ -106,6 +108,8 @@ class _CreateSavePageState extends State<CreateSavePage>
           ..clear()
           ..addAll(r.phaseSettings);
         _backpackSlotMax = r.backpackSlotMax;
+        _maxWeightExpression = r.maxWeightExpression;
+        _currentWeightExpression = r.currentWeightExpression;
         _itemTemplates.addAll(r.itemTemplates);
         _equipmentSlots
           ..clear()
@@ -491,6 +495,83 @@ class _CreateSavePageState extends State<CreateSavePage>
     );
   }
 
+  Future<void> _exportRulebook() async {
+    final rule = RuleData(
+      turnSettings: List<String>.from(_turnSettings),
+      phaseSettings: List<String>.from(_phaseSettings),
+      backpackSlotMax: _backpackSlotMax,
+      maxWeightExpression: _maxWeightExpression,
+      currentWeightExpression: _currentWeightExpression,
+      itemTemplates: List<ItemData>.from(_itemTemplates),
+      equipmentSlots: List<String>.from(_equipmentSlots),
+      equipmentTemplates: List<EquipmentData>.from(_equipmentTemplates),
+      skillTemplates: List<SkillData>.from(_skillTemplates),
+      damageTypes: List<String>.from(_damageTypes),
+    );
+    final json = const JsonEncoder.withIndent('  ').convert(rule.toJson());
+    final outputPath = await FilePicker.saveFile(
+      dialogTitle: '另存为规则书',
+      fileName: 'rulebook.json',
+      type: FileType.any,
+    );
+    if (outputPath == null) return;
+    final path = outputPath.endsWith('.json') ? outputPath : '$outputPath.json';
+    await File(path).writeAsString(json);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('规则书已导出'), backgroundColor: Colors.green),
+    );
+  }
+
+  Future<void> _importRulebook() async {
+    final result = await FilePicker.pickFiles(
+      dialogTitle: '导入规则书',
+      type: FileType.any,
+    );
+    if (result == null || result.files.single.path == null) return;
+    final path = result.files.single.path!;
+    try {
+      final content = await File(path).readAsString();
+      final json = jsonDecode(content) as Map<String, dynamic>;
+      final rule = RuleData.fromJson(json);
+      if (!mounted) return;
+      setState(() {
+        _turnSettings
+          ..clear()
+          ..addAll(rule.turnSettings);
+        _phaseSettings
+          ..clear()
+          ..addAll(rule.phaseSettings);
+        _backpackSlotMax = rule.backpackSlotMax;
+        _maxWeightExpression = rule.maxWeightExpression;
+        _currentWeightExpression = rule.currentWeightExpression;
+        _itemTemplates
+          ..clear()
+          ..addAll(rule.itemTemplates);
+        _equipmentSlots
+          ..clear()
+          ..addAll(rule.equipmentSlots);
+        _equipmentTemplates
+          ..clear()
+          ..addAll(rule.equipmentTemplates);
+        _skillTemplates
+          ..clear()
+          ..addAll(rule.skillTemplates);
+        _damageTypes
+          ..clear()
+          ..addAll(rule.damageTypes);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('规则书已导入'), backgroundColor: Colors.green),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('导入失败: $e'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
   void _removeMap(int index) {
     setState(() => _maps.removeAt(index));
   }
@@ -589,6 +670,8 @@ class _CreateSavePageState extends State<CreateSavePage>
           turnSettings: List<String>.from(_turnSettings),
           phaseSettings: List<String>.from(_phaseSettings),
           backpackSlotMax: _backpackSlotMax,
+          maxWeightExpression: _maxWeightExpression,
+          currentWeightExpression: _currentWeightExpression,
           itemTemplates: List<ItemData>.from(_itemTemplates),
           equipmentSlots: List<String>.from(_equipmentSlots),
           equipmentTemplates: List<EquipmentData>.from(_equipmentTemplates),
@@ -653,6 +736,8 @@ class _CreateSavePageState extends State<CreateSavePage>
           turnSettings: List<String>.from(_turnSettings),
           phaseSettings: List<String>.from(_phaseSettings),
           backpackSlotMax: _backpackSlotMax,
+          maxWeightExpression: _maxWeightExpression,
+          currentWeightExpression: _currentWeightExpression,
           itemTemplates: List<ItemData>.from(_itemTemplates),
           equipmentSlots: List<String>.from(_equipmentSlots),
           equipmentTemplates: List<EquipmentData>.from(_equipmentTemplates),
@@ -834,6 +919,8 @@ class _CreateSavePageState extends State<CreateSavePage>
                           portraitBase64: _cur.portraitBase64,
                           portraitBytes: _cur.portraitBytes,
                           onPickPortrait: _pickPortrait,
+                          backpackSlotMax: _backpackSlotMax,
+                          maxWeightExpression: _maxWeightExpression,
                         ),
                       ),
                     ],
@@ -849,6 +936,8 @@ class _CreateSavePageState extends State<CreateSavePage>
                     turnSettings: _turnSettings,
                     phaseSettings: _phaseSettings,
                     backpackSlotMax: _backpackSlotMax,
+                    maxWeightExpression: _maxWeightExpression,
+                    currentWeightExpression: _currentWeightExpression,
                     itemTemplates: _itemTemplates,
                     equipmentSlots: _equipmentSlots,
                     equipmentTemplates: _equipmentTemplates,
@@ -909,6 +998,12 @@ class _CreateSavePageState extends State<CreateSavePage>
                     onBackpackSlotMaxChanged: (v) {
                       setState(() => _backpackSlotMax = v);
                     },
+                    onMaxWeightExpressionChanged: (v) {
+                      setState(() => _maxWeightExpression = v);
+                    },
+                    onCurrentWeightExpressionChanged: (v) {
+                      setState(() => _currentWeightExpression = v);
+                    },
                     onAddTurn: () {
                       setState(() => _turnSettings.add(''));
                     },
@@ -927,6 +1022,8 @@ class _CreateSavePageState extends State<CreateSavePage>
                     onPhaseChanged: (i, v) {
                       setState(() => _phaseSettings[i] = v);
                     },
+                    onExportRulebook: _exportRulebook,
+                    onImportRulebook: _importRulebook,
                   ),
                 ],
               ),

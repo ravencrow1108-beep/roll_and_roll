@@ -1342,6 +1342,8 @@ class _AddCharacterPageState extends State<_AddCharacterPage> {
               portraitBase64: _char.portraitBase64,
               portraitBytes: _char.portraitBytes,
               onPickPortrait: _pickPortrait,
+              backpackSlotMax: 40,
+              maxWeightExpression: '',
             ),
           ),
           Padding(

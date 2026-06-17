@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
+import '../../../core/expressions/expression_engine.dart';
 import '../../../data/models/models.dart';
 import 'char_edit_models.dart';
 
@@ -51,6 +52,8 @@ class CharacterTab extends StatelessWidget {
     required this.onEquipItem,
     required this.onUnequipItem,
     required this.onPickPortrait,
+    required this.backpackSlotMax,
+    required this.maxWeightExpression,
   });
 
   final TextEditingController nameCtrl;
@@ -95,6 +98,8 @@ class CharacterTab extends StatelessWidget {
   final String portraitBase64;
   final Uint8List? portraitBytes;
   final VoidCallback onPickPortrait;
+  final int backpackSlotMax;
+  final String maxWeightExpression;
 
   @override
   Widget build(BuildContext context) {
@@ -120,41 +125,73 @@ class CharacterTab extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          // ── 角色头像 ──
-          InkWell(
-            onTap: onPickPortrait,
-            borderRadius: BorderRadius.circular(12),
-            child: Container(
-              width: 120,
-              height: 120,
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey.shade300),
+          // ── 角色头像 + 速度 ──
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              InkWell(
+                onTap: onPickPortrait,
                 borderRadius: BorderRadius.circular(12),
-              ),
-              child: portraitBytes != null
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(11),
-                      child: Image.memory(portraitBytes!, fit: BoxFit.cover),
-                    )
-                  : Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.add_a_photo,
-                          size: 36,
-                          color: Colors.grey.shade500,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '选择头像',
-                          style: TextStyle(
-                            color: Colors.grey.shade600,
-                            fontSize: 12,
+                child: Container(
+                  width: 120,
+                  height: 120,
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: portraitBytes != null
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(11),
+                          child: Image.memory(
+                            portraitBytes!,
+                            fit: BoxFit.cover,
                           ),
+                        )
+                      : Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.add_a_photo,
+                              size: 36,
+                              color: Colors.grey.shade500,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '选择头像',
+                              style: TextStyle(
+                                color: Colors.grey.shade600,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
+                ),
+              ),
+              const SizedBox(width: 20),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '速度',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey.shade600,
+                      ),
                     ),
-            ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${_calcSpeed()} 米/回合',
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.deepPurple,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 12),
           // ── 职业 ──
@@ -542,6 +579,15 @@ class CharacterTab extends StatelessWidget {
               fontWeight: FontWeight.bold,
             ),
           ),
+          Row(
+            children: [
+              const Spacer(),
+              Text(
+                '负重 ${_calcCurrentWeight()} / ${_calcMaxWeight()}',
+                style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+              ),
+            ],
+          ),
           const SizedBox(height: 8),
           // ── 装备栏 ──
           Row(
@@ -691,6 +737,40 @@ class CharacterTab extends StatelessWidget {
       if (eq != null) sum += eq.ac;
     }
     return sum;
+  }
+
+  /// 速度 = 6 + floor((敏捷 - 10) / 2)，最低 1 米/回合
+  int _calcSpeed() {
+    final dex = baseStats['敏捷'] ?? 10;
+    final speed = 6 + ((dex - 10) / 2).floor();
+    return speed < 1 ? 1 : speed;
+  }
+
+  /// 当前负重 = 所有背包物品 weight × quantity 之和
+  int _calcCurrentWeight() {
+    int w = 0;
+    for (final item in backpack) {
+      w += item.weight * item.quantity;
+    }
+    return w;
+  }
+
+  /// 负重上限 通过表达式引擎求值
+  int _calcMaxWeight() {
+    final expr = maxWeightExpression;
+    if (expr.isEmpty) {
+      return (baseStats['力量'] ?? 10) * 15;
+    }
+    final engine = const ExpressionEngine();
+    final stats = <String, int>{
+      for (final e in baseStats.entries) e.key: e.value,
+      for (final e in customStats.entries) e.key: e.value,
+    };
+    try {
+      return engine.eval(expr, EvalContext(stats: stats));
+    } catch (_) {
+      return (baseStats['力量'] ?? 10) * 15;
+    }
   }
 
   void _showTemplatePicker(BuildContext context) {

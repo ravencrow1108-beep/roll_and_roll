@@ -15,10 +15,14 @@ class RulesTab extends StatelessWidget {
     required this.turnSettings,
     required this.phaseSettings,
     required this.backpackSlotMax,
+    required this.maxWeightExpression,
+    required this.currentWeightExpression,
     required this.itemTemplates,
     required this.equipmentSlots,
     required this.equipmentTemplates,
     required this.onBackpackSlotMaxChanged,
+    required this.onMaxWeightExpressionChanged,
+    required this.onCurrentWeightExpressionChanged,
     required this.onAddItemTemplate,
     required this.onRemoveItemTemplate,
     required this.onEditItemTemplate,
@@ -40,16 +44,22 @@ class RulesTab extends StatelessWidget {
     required this.onAddPhase,
     required this.onRemovePhase,
     required this.onPhaseChanged,
+    required this.onExportRulebook,
+    required this.onImportRulebook,
   });
 
   final List<String> turnSettings;
   final List<String> phaseSettings;
   final int backpackSlotMax;
+  final String maxWeightExpression;
+  final String currentWeightExpression;
   final List<ItemData> itemTemplates;
   final List<String> equipmentSlots;
   final List<EquipmentData> equipmentTemplates;
   final List<SkillData> skillTemplates;
   final ValueChanged<int> onBackpackSlotMaxChanged;
+  final ValueChanged<String> onMaxWeightExpressionChanged;
+  final ValueChanged<String> onCurrentWeightExpressionChanged;
   final ValueChanged<ItemData> onAddItemTemplate;
   final ValueChanged<int> onRemoveItemTemplate;
   final void Function(int index, ItemData updated) onEditItemTemplate;
@@ -70,6 +80,8 @@ class RulesTab extends StatelessWidget {
   final VoidCallback onAddPhase;
   final void Function(int) onRemovePhase;
   final void Function(int, String) onPhaseChanged;
+  final VoidCallback onExportRulebook;
+  final VoidCallback onImportRulebook;
 
   @override
   Widget build(BuildContext context) {
@@ -79,6 +91,27 @@ class RulesTab extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // ── 规则书导入/导出 ──
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: onImportRulebook,
+                  icon: const Icon(Icons.file_open, size: 18),
+                  label: const Text('导入规则书', style: TextStyle(fontSize: 14)),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: onExportRulebook,
+                  icon: const Icon(Icons.save_alt, size: 18),
+                  label: const Text('另存为规则书', style: TextStyle(fontSize: 14)),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
           // ── 背包设置 ──
           Text(
             '背包设置',
@@ -134,6 +167,36 @@ class RulesTab extends StatelessWidget {
           Text(
             '每个角色的背包最多存放 $backpackSlotMax 件物品',
             style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey),
+          ),
+          const SizedBox(height: 20),
+
+          // ── 负重表达式 ──
+          _buildExpressionField(
+            context,
+            label: '负重上限表达式',
+            hint: '力量*15',
+            value: maxWeightExpression,
+            icon: Icons.monitor_weight_outlined,
+            onChanged: onMaxWeightExpressionChanged,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '留空则默认：力量 × 15',
+            style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey),
+          ),
+          const SizedBox(height: 14),
+          _buildExpressionField(
+            context,
+            label: '当前负重表达式',
+            hint: '留空则累加物品重量',
+            value: currentWeightExpression,
+            icon: Icons.scale_outlined,
+            onChanged: onCurrentWeightExpressionChanged,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '留空则默认：所有物品 weight 字段之和',
+            style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey),
           ),
           const SizedBox(height: 32),
 
@@ -725,6 +788,44 @@ class RulesTab extends StatelessWidget {
           }),
         ],
       ),
+    );
+  }
+
+  static Widget _buildExpressionField(
+    BuildContext context, {
+    required String label,
+    required String hint,
+    required String value,
+    required IconData icon,
+    required ValueChanged<String> onChanged,
+  }) {
+    final ctrl = TextEditingController(text: value);
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: Colors.deepPurple.shade300),
+        const SizedBox(width: 8),
+        Text(label, style: const TextStyle(fontSize: 14)),
+        const SizedBox(width: 12),
+        Expanded(
+          child: TextField(
+            controller: ctrl,
+            decoration: InputDecoration(
+              hintText: hint,
+              hintStyle: TextStyle(fontSize: 12, color: Colors.grey.shade400),
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: 8,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            style: const TextStyle(fontSize: 13),
+            onChanged: onChanged,
+          ),
+        ),
+      ],
     );
   }
 

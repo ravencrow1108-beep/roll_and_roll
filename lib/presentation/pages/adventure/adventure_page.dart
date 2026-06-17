@@ -685,6 +685,7 @@ class _AdventurePageState extends State<AdventurePage> {
         characters: _loadedCharacters,
         backpackItems: _character?.backpack ?? const [],
         backpackSlotMax: _loadedRules.backpackSlotMax,
+        maxWeightExpression: _loadedRules.maxWeightExpression,
         onPositionChanged: _isGM ? _onPlayerPositionChanged : null,
         onEditHp: _isGM ? _onEditCharacterHp : null,
         onAddNote: _isGM ? _onAddCharacterNote : null,

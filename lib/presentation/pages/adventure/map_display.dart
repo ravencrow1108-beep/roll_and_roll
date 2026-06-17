@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import '../../../core/expressions/expression_engine.dart';
 import '../../../data/models/models.dart';
 import 'backpack_panel.dart';
 import 'coordinate_grid.dart';
@@ -21,6 +22,7 @@ class MapDisplay extends StatefulWidget {
     this.characters = const [],
     this.backpackItems = const [],
     this.backpackSlotMax = 40,
+    this.maxWeightExpression = '',
     this.onPositionChanged,
     this.onEditHp,
     this.onAddNote,
@@ -38,6 +40,7 @@ class MapDisplay extends StatefulWidget {
   final List<CharacterData> characters;
   final List<ItemData> backpackItems;
   final int backpackSlotMax;
+  final String maxWeightExpression;
 
   /// GM 移动角色位置后调
   final void Function(int index, PlayerPosition newPos)? onPositionChanged;
@@ -153,6 +156,35 @@ class _MapDisplayState extends State<MapDisplay> {
     return (mag / 5).ceil() * 50;
   }
 
+  /// 根据规则中的负重表达式计算出负重上限
+  int _computeMaxWeight() {
+    final c = widget.character;
+    if (c == null) return 0;
+
+    final expr = widget.maxWeightExpression;
+    if (expr.isEmpty) {
+      // 默认：力量 × 15
+      return c.strength * 15;
+    }
+
+    final engine = const ExpressionEngine();
+    final stats = <String, int>{
+      '力量': c.strength,
+      '敏捷': c.dexterity,
+      '体质': c.constitution,
+      '智力': c.intelligence,
+      '感知': c.wisdom,
+      '魅力': c.charisma,
+      ...c.customStats,
+    };
+    try {
+      return engine.eval(expr, EvalContext(stats: stats));
+    } catch (_) {
+      // 表达式求值失败，回退到默认
+      return c.strength * 15;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -160,263 +192,287 @@ class _MapDisplayState extends State<MapDisplay> {
 
     return Padding(
       padding: const EdgeInsets.all(10),
-      child: Column(
+      child: Stack(
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          Column(
             children: [
-              if (widget.character != null) ...[
-                if (widget.character!.portraitBase64.isNotEmpty)
-                  ClipOval(
-                    child: Image.memory(
-                      base64Decode(widget.character!.portraitBase64),
-                      width: 28,
-                      height: 28,
-                      fit: BoxFit.cover,
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (widget.character != null) ...[
+                    if (widget.character!.portraitBase64.isNotEmpty)
+                      ClipOval(
+                        child: Image.memory(
+                          base64Decode(widget.character!.portraitBase64),
+                          width: 28,
+                          height: 28,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        widget.character!.name,
+                        style: theme.textTheme.titleSmall,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                  ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    widget.character!.name,
-                    style: theme.textTheme.titleSmall,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ] else
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
+                  ] else
+                    Expanded(
+                      child: Text(
                         widget.isGM ? '主持模式' : widget.playerName,
                         style: TextStyle(
                           color: Colors.grey.shade600,
                           fontSize: 13,
                         ),
                       ),
-                      // ── GM 拖拽距离信息 ──
-                      if (_dragDistanceText.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 2),
-                          child: Text(
-                            _dragDistanceText,
-                            style: TextStyle(
-                              color: Colors.deepPurple.shade700,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                    ],
+                    ),
+                  // ── 网格控制按钮 ──
+                  _GridToggle(
+                    icon: Icons.grid_on,
+                    tooltip: _showGrid ? '关闭网格' : '显示网格',
+                    active: _showGrid,
+                    onTap: () => setState(() => _showGrid = !_showGrid),
+                  ),
+                  _GridToggle(
+                    icon: Icons.pin_drop_outlined,
+                    tooltip: _showCoords ? '隐藏坐标' : '显示坐标',
+                    active: _showCoords,
+                    onTap: () => setState(() => _showCoords = !_showCoords),
+                  ),
+                  const SizedBox(width: 2),
+                  _GridToggle(
+                    icon: Icons.backpack_outlined,
+                    tooltip: _showBackpack ? '关闭背包' : '显示背包',
+                    active: _showBackpack,
+                    onTap: () => setState(() => _showBackpack = !_showBackpack),
+                  ),
+                ],
+              ),
+              // ── 背包物品栏（限制最大高度，避免挤压地图） ──
+              if (_showBackpack && widget.backpackItems.isNotEmpty)
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 80),
+                  child: SingleChildScrollView(
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: BackpackPanel(
+                        backpack: widget.backpackItems,
+                        slotMax: widget.backpackSlotMax,
+                        maxWeight: _computeMaxWeight(),
+                      ),
+                    ),
                   ),
                 ),
-              // ── 网格控制按钮 ──
-              _GridToggle(
-                icon: Icons.grid_on,
-                tooltip: _showGrid ? '关闭网格' : '显示网格',
-                active: _showGrid,
-                onTap: () => setState(() => _showGrid = !_showGrid),
-              ),
-              _GridToggle(
-                icon: Icons.pin_drop_outlined,
-                tooltip: _showCoords ? '隐藏坐标' : '显示坐标',
-                active: _showCoords,
-                onTap: () => setState(() => _showCoords = !_showCoords),
-              ),
-              const SizedBox(width: 2),
-              _GridToggle(
-                icon: Icons.backpack_outlined,
-                tooltip: _showBackpack ? '关闭背包' : '显示背包',
-                active: _showBackpack,
-                onTap: () => setState(() => _showBackpack = !_showBackpack),
+              const SizedBox(height: 6),
+              Expanded(
+                child: m.imageBase64.isNotEmpty && _imageNaturalSize != null
+                    ? LayoutBuilder(
+                        builder: (ctx, constraints) {
+                          final imgW = _imageNaturalSize!.width;
+                          final imgH = _imageNaturalSize!.height;
+                          final gridStep = _calcGridStep(
+                            constraints.maxWidth,
+                            m.width,
+                          );
+                          final renderConstraints = BoxConstraints.tight(
+                            Size(imgW, imgH),
+                          );
+
+                          return ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                InteractiveViewer(
+                                  transformationController: _transformCtrl,
+                                  minScale: 0.1,
+                                  maxScale: 8.0,
+                                  child: FittedBox(
+                                    fit: BoxFit.contain,
+                                    alignment: Alignment.center,
+                                    child: SizedBox(
+                                      width: imgW,
+                                      height: imgH,
+                                      child: Stack(
+                                        children: [
+                                          // 图片像素与网格 1:1 对齐
+                                          Image.memory(
+                                            _cachedImageBytes!,
+                                            width: imgW,
+                                            height: imgH,
+                                            fit: BoxFit.fill,
+                                            gaplessPlayback: true,
+                                          ),
+                                          Positioned.fill(
+                                            child: RepaintBoundary(
+                                              child: Listener(
+                                                behavior:
+                                                    HitTestBehavior.translucent,
+                                                onPointerDown: widget.isGM
+                                                    ? (e) => _onPointerDown(
+                                                        e,
+                                                        renderConstraints,
+                                                      )
+                                                    : null,
+                                                onPointerMove: widget.isGM
+                                                    ? (e) => _onPointerMove(
+                                                        e,
+                                                        renderConstraints,
+                                                      )
+                                                    : null,
+                                                onPointerUp: widget.isGM
+                                                    ? (e) => _onPointerUp(
+                                                        e,
+                                                        renderConstraints,
+                                                      )
+                                                    : null,
+                                                child: Stack(
+                                                  clipBehavior: Clip.none,
+                                                  children: [
+                                                    if (_showGrid ||
+                                                        _showCoords)
+                                                      Positioned.fill(
+                                                        child: CustomPaint(
+                                                          painter:
+                                                              CoordinateGridPainter(
+                                                                columns:
+                                                                    m.width,
+                                                                rows: m.height,
+                                                                unit:
+                                                                    _showCoords
+                                                                    ? m.unit
+                                                                    : '',
+                                                                showLabels:
+                                                                    _showCoords,
+                                                                showGrid:
+                                                                    _showGrid,
+                                                                showMinorGrid:
+                                                                    _showMinorGrid,
+                                                                step: gridStep,
+                                                              ),
+                                                        ),
+                                                      ),
+                                                    for (
+                                                      int i = 0;
+                                                      i <
+                                                          widget
+                                                              .positions
+                                                              .length;
+                                                      i++
+                                                    )
+                                                      _buildPlayerToken(
+                                                        widget.positions[i],
+                                                        renderConstraints,
+                                                        i,
+                                                      ),
+                                                    for (final e
+                                                        in widget.enemies)
+                                                      TokenWidget(
+                                                        x: e.x,
+                                                        y: e.y,
+                                                        initial:
+                                                            e.name.isNotEmpty
+                                                            ? e.name[0]
+                                                                  .toUpperCase()
+                                                            : 'E',
+                                                        label:
+                                                            '${e.name} HP${e.hp}',
+                                                        isPlayer: false,
+                                                        constraints:
+                                                            renderConstraints,
+                                                      ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                // ── 比例尺 ──
+                                Positioned(
+                                  left: 10,
+                                  bottom: 10,
+                                  child: _ScaleBar(
+                                    step: gridStep,
+                                    unit: m.unit,
+                                    cellWidth:
+                                        (constraints.maxWidth.clamp(1, imgW) /
+                                        (m.width > 0 ? m.width : 1)),
+                                    currentScale: _currentScale,
+                                  ),
+                                ),
+                                // ── 缩放百分比 ──
+                                Positioned(
+                                  right: 10,
+                                  bottom: 10,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 3,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black.withValues(
+                                        alpha: 0.55,
+                                      ),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Text(
+                                      '${(_currentScale * 100).round()}%',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      )
+                    : Center(
+                        child: Text(
+                          m.name,
+                          style: TextStyle(
+                            color: Colors.grey.shade600,
+                            fontSize: 18,
+                          ),
+                        ),
+                      ),
               ),
             ],
           ),
-          // ── 背包物品栏（限制最大高度，避免挤压地图） ──
-          if (_showBackpack && widget.backpackItems.isNotEmpty)
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 80),
-              child: SingleChildScrollView(
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: BackpackPanel(
-                    backpack: widget.backpackItems,
-                    slotMax: widget.backpackSlotMax,
+          // ── 浮动拖拽距离指示器 ──
+          if (_dragDistanceText.isNotEmpty)
+            Positioned(
+              top: 44,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.72),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Text(
+                    _dragDistanceText,
+                    style: const TextStyle(
+                      color: Color(0xFFBB86FC),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ),
             ),
-          const SizedBox(height: 6),
-          Expanded(
-            child: m.imageBase64.isNotEmpty && _imageNaturalSize != null
-                ? LayoutBuilder(
-                    builder: (ctx, constraints) {
-                      final imgW = _imageNaturalSize!.width;
-                      final imgH = _imageNaturalSize!.height;
-                      final gridStep = _calcGridStep(
-                        constraints.maxWidth,
-                        m.width,
-                      );
-                      final renderConstraints = BoxConstraints.tight(
-                        Size(imgW, imgH),
-                      );
-
-                      return ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            InteractiveViewer(
-                              transformationController: _transformCtrl,
-                              minScale: 0.1,
-                              maxScale: 8.0,
-                              child: FittedBox(
-                                fit: BoxFit.contain,
-                                alignment: Alignment.center,
-                                child: SizedBox(
-                                  width: imgW,
-                                  height: imgH,
-                                  child: Stack(
-                                    children: [
-                                      // 图片像素与网格 1:1 对齐
-                                      Image.memory(
-                                        _cachedImageBytes!,
-                                        width: imgW,
-                                        height: imgH,
-                                        fit: BoxFit.fill,
-                                        gaplessPlayback: true,
-                                      ),
-                                      Positioned.fill(
-                                        child: RepaintBoundary(
-                                          child: Listener(
-                                            behavior:
-                                                HitTestBehavior.translucent,
-                                            onPointerDown: widget.isGM
-                                                ? (e) => _onPointerDown(
-                                                    e,
-                                                    renderConstraints,
-                                                  )
-                                                : null,
-                                            onPointerMove: widget.isGM
-                                                ? (e) => _onPointerMove(
-                                                    e,
-                                                    renderConstraints,
-                                                  )
-                                                : null,
-                                            onPointerUp: widget.isGM
-                                                ? (e) => _onPointerUp(
-                                                    e,
-                                                    renderConstraints,
-                                                  )
-                                                : null,
-                                            child: Stack(
-                                              clipBehavior: Clip.none,
-                                              children: [
-                                                if (_showGrid || _showCoords)
-                                                  Positioned.fill(
-                                                    child: CustomPaint(
-                                                      painter:
-                                                          CoordinateGridPainter(
-                                                            columns: m.width,
-                                                            rows: m.height,
-                                                            unit: _showCoords
-                                                                ? m.unit
-                                                                : '',
-                                                            showLabels:
-                                                                _showCoords,
-                                                            showGrid: _showGrid,
-                                                            showMinorGrid:
-                                                                _showMinorGrid,
-                                                            step: gridStep,
-                                                          ),
-                                                    ),
-                                                  ),
-                                                for (
-                                                  int i = 0;
-                                                  i < widget.positions.length;
-                                                  i++
-                                                )
-                                                  _buildPlayerToken(
-                                                    widget.positions[i],
-                                                    renderConstraints,
-                                                    i,
-                                                  ),
-                                                for (final e in widget.enemies)
-                                                  TokenWidget(
-                                                    x: e.x,
-                                                    y: e.y,
-                                                    initial: e.name.isNotEmpty
-                                                        ? e.name[0]
-                                                              .toUpperCase()
-                                                        : 'E',
-                                                    label:
-                                                        '${e.name} HP${e.hp}',
-                                                    isPlayer: false,
-                                                    constraints:
-                                                        renderConstraints,
-                                                  ),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                            // ── 比例尺 ──
-                            Positioned(
-                              left: 10,
-                              bottom: 10,
-                              child: _ScaleBar(
-                                step: gridStep,
-                                unit: m.unit,
-                                cellWidth:
-                                    (constraints.maxWidth.clamp(1, imgW) /
-                                    (m.width > 0 ? m.width : 1)),
-                                currentScale: _currentScale,
-                              ),
-                            ),
-                            // ── 缩放百分比 ──
-                            Positioned(
-                              right: 10,
-                              bottom: 10,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 3,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.black.withValues(alpha: 0.55),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Text(
-                                  '${(_currentScale * 100).round()}%',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 11,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  )
-                : Center(
-                    child: Text(
-                      m.name,
-                      style: TextStyle(
-                        color: Colors.grey.shade600,
-                        fontSize: 18,
-                      ),
-                    ),
-                  ),
-          ),
         ],
       ),
     );
@@ -565,8 +621,7 @@ class _MapDisplayState extends State<MapDisplay> {
     final dyGrid = (_dragCurrentFraction!.dy - _dragOriginal!.y) * m.height;
     final distVal = _sqrt(dxGrid * dxGrid + dyGrid * dyGrid);
     _dragDistanceText =
-        '↕ ${distVal.toStringAsFixed(1)} ${m.unit}  '
-        '(ΔX: ${dxGrid.toStringAsFixed(1)}, ΔY: ${dyGrid.toStringAsFixed(1)})';
+        '↕ ${distVal.toStringAsFixed(1)} ${m.unit} (ΔX: ${dxGrid.toStringAsFixed(1)}, ΔY: ${dyGrid.toStringAsFixed(1)})';
   }
 
   double _sqrt(double v) {

@@ -83,6 +83,18 @@ class _ChatPanelBody extends StatefulWidget {
 
 class _ChatPanelBodyState extends State<_ChatPanelBody> {
   bool _diceExpanded = false;
+  final FocusNode _chatFocusNode = FocusNode();
+
+  @override
+  void dispose() {
+    _chatFocusNode.dispose();
+    super.dispose();
+  }
+
+  void _handleSend() {
+    widget.onSend();
+    _chatFocusNode.requestFocus();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -172,6 +184,7 @@ class _ChatPanelBodyState extends State<_ChatPanelBody> {
                   ),
                   child: TextField(
                     controller: widget.chatCtrl,
+                    focusNode: _chatFocusNode,
                     textInputAction: TextInputAction.send,
                     decoration: InputDecoration(
                       hintText: '输入消息…',
@@ -203,7 +216,7 @@ class _ChatPanelBodyState extends State<_ChatPanelBody> {
                       ),
                     ),
                     style: const TextStyle(fontSize: 13),
-                    onSubmitted: (_) => widget.onSend(),
+                    onSubmitted: (_) => _handleSend(),
                   ),
                 ),
               ),
@@ -215,7 +228,7 @@ class _ChatPanelBodyState extends State<_ChatPanelBody> {
                   shape: BoxShape.circle,
                 ),
                 child: IconButton(
-                  onPressed: widget.onSend,
+                  onPressed: _handleSend,
                   icon: const Icon(Icons.send_rounded, size: 18),
                   color: Colors.white,
                   tooltip: '发送',
