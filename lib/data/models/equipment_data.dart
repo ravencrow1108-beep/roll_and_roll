@@ -11,6 +11,9 @@ class EquipmentData {
   final int weight;
   final int value;
 
+  /// 装备提供的护甲值 (Armor Class)
+  final int ac;
+
   /// 装备位置（如 头盔、手甲、身甲、腿甲、饰品）
   final String slot;
 
@@ -22,10 +25,11 @@ class EquipmentData {
     this.description = '',
     this.weight = 0,
     this.value = 0,
+    this.ac = 0,
     this.slot = '饰品',
   });
 
-  /// 转换为纯物品（丢掉 slot 信息）
+  /// 转换为纯物品（丢掉 slot / ac 信息）
   ItemData toItem() => ItemData(
         name: name,
         imageBase64: imageBase64,
@@ -44,6 +48,7 @@ class EquipmentData {
         if (description.isNotEmpty) 'description': description,
         'weight': weight,
         'value': value,
+        if (ac > 0) 'ac': ac,
         'slot': slot,
       };
 
@@ -56,6 +61,7 @@ class EquipmentData {
       description: json['description'] as String? ?? '',
       weight: json['weight'] as int? ?? 0,
       value: json['value'] as int? ?? 0,
+      ac: json['ac'] as int? ?? 0,
       slot: json['slot'] as String? ?? '饰品',
     );
   }

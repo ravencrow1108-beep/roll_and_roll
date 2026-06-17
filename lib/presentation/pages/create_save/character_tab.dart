@@ -545,11 +545,27 @@ class CharacterTab extends StatelessWidget {
             }),
           ),
           const SizedBox(height: 24),
-          Text(
-            '属性分配',
-            style: theme.textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+          Row(
+            children: [
+              Text(
+                '属性分配',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const Spacer(),
+              const Icon(Icons.shield_outlined,
+                  size: 20, color: Colors.deepPurple),
+              const SizedBox(width: 4),
+              Text(
+                'AC $_totalAc',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.deepPurple,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 12),
           ...baseStats.entries.map((e) {
@@ -597,6 +613,14 @@ class CharacterTab extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  int get _totalAc {
+    int sum = 0;
+    for (final eq in equipment.values) {
+      if (eq != null) sum += eq.ac;
+    }
+    return sum;
   }
 
   void _showTemplatePicker(BuildContext context) {
@@ -885,6 +909,7 @@ class _EquipmentGridTile extends StatelessWidget {
               title: Text(eq.name),
               subtitle: Text(
                   '${eq.type}  '
+                  '${eq.ac > 0 ? '🛡AC${eq.ac}  ' : ''}'
                   '${eq.value > 0 ? '💰${eq.value}  ' : ''}'
                   '${eq.weight > 0 ? '⚖${eq.weight}' : ''}'),
               trailing: TextButton(

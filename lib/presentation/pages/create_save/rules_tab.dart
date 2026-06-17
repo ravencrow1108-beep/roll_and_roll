@@ -321,6 +321,13 @@ class RulesTab extends StatelessWidget {
                                     Text('${eq.value}',
                                         style: const TextStyle(fontSize: 11)),
                                   ],
+                                  if (eq.ac > 0) ...[
+                                    const SizedBox(width: 8),
+                                    const Icon(Icons.shield_outlined,
+                                        size: 11, color: Colors.blue),
+                                    Text('AC${eq.ac}',
+                                        style: const TextStyle(fontSize: 11)),
+                                  ],
                                 ],
                               ),
                             ],
@@ -644,6 +651,7 @@ class RulesTab extends StatelessWidget {
     final descCtrl = TextEditingController(text: editEq?.description ?? '');
     final valueCtrl = TextEditingController(text: '${editEq?.value ?? 0}');
     final weightCtrl = TextEditingController(text: '${editEq?.weight ?? 0}');
+    final acCtrl = TextEditingController(text: '${editEq?.ac ?? 0}');
     String selectedSlot = editEq?.slot ?? (equipmentSlots.isNotEmpty ? equipmentSlots.first : '饰品');
     String imageBase64 = editEq?.imageBase64 ?? '';
 
@@ -736,6 +744,19 @@ class RulesTab extends StatelessWidget {
                         ),
                       ),
                     ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: TextField(
+                        controller: acCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'AC',
+                          prefixIcon: Icon(Icons.shield_outlined, size: 18),
+                          border: OutlineInputBorder(),
+                          isDense: true,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 10),
@@ -779,6 +800,7 @@ class RulesTab extends StatelessWidget {
                   description: descCtrl.text.trim(),
                   value: int.tryParse(valueCtrl.text.trim()) ?? 0,
                   weight: int.tryParse(weightCtrl.text.trim()) ?? 0,
+                  ac: int.tryParse(acCtrl.text.trim()) ?? 0,
                   slot: selectedSlot,
                 );
               if (isEdit) {
