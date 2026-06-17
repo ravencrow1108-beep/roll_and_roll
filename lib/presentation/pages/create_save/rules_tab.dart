@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 
 import '../../../data/models/equipment_data.dart';
 import '../../../data/models/item_data.dart';
+import '../../../data/models/skill_data.dart';
 
 /// 规则 Tab — 含背包格子上限编辑、物品/装备模板、装备栏编辑
 class RulesTab extends StatelessWidget {
@@ -24,6 +25,13 @@ class RulesTab extends StatelessWidget {
     required this.onAddEquipmentTemplate,
     required this.onRemoveEquipmentTemplate,
     required this.onEditEquipmentTemplate,
+    required this.skillTemplates,
+    required this.onAddSkillTemplate,
+    required this.onRemoveSkillTemplate,
+    required this.onEditSkillTemplate,
+    required this.damageTypes,
+    required this.onAddDamageType,
+    required this.onRemoveDamageType,
     required this.onAddEquipmentSlot,
     required this.onRemoveEquipmentSlot,
     required this.onAddTurn,
@@ -40,6 +48,7 @@ class RulesTab extends StatelessWidget {
   final List<ItemData> itemTemplates;
   final List<String> equipmentSlots;
   final List<EquipmentData> equipmentTemplates;
+  final List<SkillData> skillTemplates;
   final ValueChanged<int> onBackpackSlotMaxChanged;
   final ValueChanged<ItemData> onAddItemTemplate;
   final ValueChanged<int> onRemoveItemTemplate;
@@ -47,6 +56,12 @@ class RulesTab extends StatelessWidget {
   final ValueChanged<EquipmentData> onAddEquipmentTemplate;
   final ValueChanged<int> onRemoveEquipmentTemplate;
   final void Function(int index, EquipmentData updated) onEditEquipmentTemplate;
+  final ValueChanged<SkillData> onAddSkillTemplate;
+  final ValueChanged<int> onRemoveSkillTemplate;
+  final void Function(int index, SkillData updated) onEditSkillTemplate;
+  final List<String> damageTypes;
+  final ValueChanged<String> onAddDamageType;
+  final ValueChanged<int> onRemoveDamageType;
   final ValueChanged<String> onAddEquipmentSlot;
   final ValueChanged<int> onRemoveEquipmentSlot;
   final VoidCallback onAddTurn;
@@ -351,6 +366,139 @@ class RulesTab extends StatelessWidget {
               );
             }),
           ],
+          const SizedBox(height: 32),
+
+          // ── 技能模板 ──
+          Text(
+            '技能模板 (${skillTemplates.length})',
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '自定义技能模板，角色页面可从中选择添加到角色技能列表',
+            style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => _showAddSkillDialog(context),
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('添加技能模板', style: TextStyle(fontSize: 16)),
+            ),
+          ),
+          if (skillTemplates.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            ...List.generate(skillTemplates.length, (i) {
+              final s = skillTemplates[i];
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Card(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.auto_fix_high, size: 20, color: Colors.teal),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(s.name,
+                                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                              if (s.damages.isNotEmpty) ...[
+                                const SizedBox(height: 4),
+                                ...s.damages.map((d) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 2),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                        decoration: BoxDecoration(
+                                          color: Colors.teal.withValues(alpha: 0.2),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Text(d.expression ?? '',
+                                            style: TextStyle(fontSize: 10, color: Colors.teal.shade800)),
+                                      ),
+                                      if (d.damageType != null) ...[
+                                        const SizedBox(width: 4),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                          decoration: BoxDecoration(
+                                            color: Colors.red.withValues(alpha: 0.15),
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: Text(d.damageType!,
+                                              style: TextStyle(fontSize: 10, color: Colors.red.shade700)),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                )),
+                              ],
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => _showAddSkillDialog(context, editIndex: i, editSkill: s),
+                          icon: const Icon(Icons.edit, size: 22),
+                          tooltip: '编辑',
+                        ),
+                        IconButton(
+                          onPressed: () => onRemoveSkillTemplate(i),
+                          icon: const Icon(Icons.remove_circle_outline, color: Colors.red, size: 20),
+                          tooltip: '删除模板',
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ],
+          const SizedBox(height: 32),
+
+          // ── 伤害类型 ──
+          Text(
+            '伤害类型 (${damageTypes.length})',
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '定义游戏中的伤害类型，技能模板可从中选择',
+            style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey),
+          ),
+          const SizedBox(height: 12),
+          if (damageTypes.isNotEmpty) ...[
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: List.generate(damageTypes.length, (i) {
+                final t = damageTypes[i];
+                return Chip(
+                  label: Text(t, style: const TextStyle(fontSize: 13)),
+                  deleteIcon: const Icon(Icons.close, size: 16),
+                  onDeleted: () => onRemoveDamageType(i),
+                  backgroundColor: Colors.red.withValues(alpha: 0.1),
+                  side: BorderSide.none,
+                );
+              }),
+            ),
+            const SizedBox(height: 8),
+          ],
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => _showAddDamageTypeDialog(context),
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('添加伤害类型', style: TextStyle(fontSize: 16)),
+            ),
+          ),
           const SizedBox(height: 32),
 
           // ── 回合设置 ──
@@ -817,4 +965,195 @@ class RulesTab extends StatelessWidget {
       ),
     );
   }
+
+  void _showAddSkillDialog(BuildContext context, {int? editIndex, SkillData? editSkill}) {
+    final isEdit = editIndex != null && editSkill != null;
+    final nameCtrl = TextEditingController(text: isEdit ? editSkill.name : '');
+    final descCtrl = TextEditingController(text: isEdit ? editSkill.description : '');
+    String imageBase64 = isEdit ? (editSkill.imageBase64 ?? '') : '';
+    final damages = <_SkillDamageRow>[
+      if (isEdit)
+        for (final d in editSkill.damages)
+          _SkillDamageRow(
+            exprCtrl: TextEditingController(text: d.expression ?? ''),
+            dmgType: d.damageType,
+          ),
+    ];
+    if (damages.isEmpty) damages.add(_SkillDamageRow(exprCtrl: TextEditingController()));
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: Text(isEdit ? '编辑技能模板' : '添加技能模板'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameCtrl,
+                  decoration: const InputDecoration(
+                    labelText: '技能名称',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    final result = await FilePicker.pickFiles(
+                      dialogTitle: '选择技能图标',
+                      type: FileType.image,
+                    );
+                    if (result != null && result.files.single.path != null) {
+                      final bytes = await File(result.files.single.path!).readAsBytes();
+                      setDialogState(() => imageBase64 = base64Encode(bytes));
+                    }
+                  },
+                  icon: const Icon(Icons.image, size: 18),
+                  label: Text(imageBase64.isEmpty ? '上传图标' : '已选择图标'),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    const Text('技能伤害', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                    const Spacer(),
+                    TextButton.icon(
+                      onPressed: () => setDialogState(() =>
+                          damages.add(_SkillDamageRow(exprCtrl: TextEditingController()))),
+                      icon: const Icon(Icons.add, size: 16),
+                      label: const Text('添加', style: TextStyle(fontSize: 13)),
+                    ),
+                  ],
+                ),
+                ...List.generate(damages.length, (i) => Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        flex: 2,
+                        child: TextField(
+                          controller: damages[i].exprCtrl,
+                          decoration: const InputDecoration(
+                            labelText: '表达式',
+                            hintText: '1d6+3',
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        flex: 2,
+                        child: DropdownButtonFormField<String?>(
+                          initialValue: damageTypes.contains(damages[i].dmgType) ? damages[i].dmgType : null,
+                          decoration: const InputDecoration(
+                            labelText: '伤害类型',
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                          ),
+                          items: [
+                            const DropdownMenuItem(value: null, child: Text('无', style: TextStyle(fontSize: 13))),
+                            ...damageTypes.map((t) =>
+                              DropdownMenuItem(value: t, child: Text(t, style: const TextStyle(fontSize: 13)))),
+                          ],
+                          onChanged: (v) => setDialogState(() => damages[i].dmgType = v),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.remove_circle_outline, size: 18, color: Colors.red),
+                        tooltip: '删除',
+                        onPressed: damages.length <= 1
+                            ? null
+                            : () => setDialogState(() => damages.removeAt(i)),
+                      ),
+                    ],
+                  ),
+                )),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: descCtrl,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    labelText: '技能描述',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('取消'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final name = nameCtrl.text.trim();
+                if (name.isEmpty) return;
+                final s = SkillData(
+                  name: name,
+                  description: descCtrl.text.trim().isEmpty ? null : descCtrl.text.trim(),
+                  imageBase64: imageBase64.isEmpty ? null : imageBase64,
+                  damages: damages
+                      .where((r) => r.exprCtrl.text.trim().isNotEmpty)
+                      .map((r) => SkillDamage(
+                            expression: r.exprCtrl.text.trim(),
+                            damageType: r.dmgType,
+                          ))
+                      .toList(),
+                );
+                if (isEdit) {
+                  onEditSkillTemplate(editIndex, s);
+                } else {
+                  onAddSkillTemplate(s);
+                }
+                Navigator.pop(ctx);
+              },
+              child: const Text('添加'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showAddDamageTypeDialog(BuildContext context) {
+    final ctrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('添加伤害类型'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: '伤害类型名称',
+            hintText: '例如: 火焰、寒冷、雷电',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('取消'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final name = ctrl.text.trim();
+              if (name.isEmpty) return;
+              onAddDamageType(name);
+              Navigator.pop(ctx);
+            },
+            child: const Text('添加'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SkillDamageRow {
+  final TextEditingController exprCtrl;
+  String? dmgType;
+  _SkillDamageRow({required this.exprCtrl, this.dmgType});
 }

@@ -8,6 +8,7 @@ import '../../providers/room_state.dart';
 import '../../../data/models/models.dart';
 import '../create_save/create_save_page.dart';
 import '../adventure/adventure_page.dart';
+import '../map_editor/map_editor_page.dart';
 
 /// 主持地图编辑页面：选择地图、查看详情并等待所有玩家准备后开始布置
 class MapEditPage extends StatefulWidget {
@@ -170,6 +171,46 @@ class _MapEditPageState extends State<MapEditPage> {
 
   void _selectMap(MapData m) {
     setState(() => _selectedMap = m);
+  }
+
+  Future<void> _editMap(MapData m, int index) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MapEditorPage(
+          mapData: m,
+          onSave: (updated) {
+            setState(() {
+              _loadedMaps[index] = updated;
+              if (_selectedMap?.name == m.name) {
+                _selectedMap = updated;
+              }
+            });
+            _saveMapUpdate(updated, index);
+          },
+          saveFilePath: _saveFilePath,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _saveMapUpdate(MapData updated, int index) async {
+    if (_saveFilePath == null) return;
+    final save = await SaveData.fromZip(_saveFilePath!);
+    final newMaps = List<MapData>.from(save.maps);
+    if (index < newMaps.length) {
+      newMaps[index] = updated;
+    }
+    final newSave = SaveData(
+      createdAt: save.createdAt,
+      characters: save.characters,
+      maps: newMaps,
+      items: save.items,
+      rules: save.rules,
+      playerPositions: save.playerPositions,
+    );
+    await newSave.packToZip(_saveFilePath!);
+    _loadSaveData();
   }
 
   Future<void> _navigateToCreateSave() async {
@@ -399,9 +440,16 @@ class _MapEditPageState extends State<MapEditPage> {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
-                            trailing: const Icon(
-                              Icons.arrow_forward_ios,
-                              size: 16,
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.edit, size: 20),
+                                  tooltip: '编辑地图',
+                                  onPressed: () => _editMap(m, i),
+                                ),
+                                const Icon(Icons.arrow_forward_ios, size: 16),
+                              ],
                             ),
                             onTap: () => _selectMap(m),
                           ),

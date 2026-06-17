@@ -25,7 +25,10 @@ class CharacterTab extends StatelessWidget {
     required this.onHpChanged,
     required this.onMaxHpChanged,
     required this.skills,
-    required this.onAddSkill,
+    required this.onRemoveSkill,
+    required this.onEditSkill,
+    required this.skillTemplates,
+    required this.onAddSkillFromTemplate,
     required this.backpack,
     required this.itemTemplates,
     required this.onAddBackpackItem,
@@ -65,7 +68,10 @@ class CharacterTab extends StatelessWidget {
   final ValueChanged<int> onHpChanged;
   final ValueChanged<int> onMaxHpChanged;
   final List<SkillData> skills;
-  final VoidCallback onAddSkill;
+  final void Function(int index) onRemoveSkill;
+  final void Function(int index, SkillData old) onEditSkill;
+  final List<SkillData> skillTemplates;
+  final ValueChanged<SkillData> onAddSkillFromTemplate;
   final List<ItemData> backpack;
   final List<ItemData> itemTemplates;
   final ValueChanged<ItemData> onAddBackpackItem;
@@ -399,17 +405,22 @@ class CharacterTab extends StatelessWidget {
                 style: const TextStyle(fontSize: 16),
               ),
               const Spacer(),
-              TextButton.icon(
-                onPressed: onAddSkill,
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text('添加技能'),
-              ),
+              if (skillTemplates.isNotEmpty)
+                PopupMenuButton<SkillData>(
+                  tooltip: '从模板添加技能',
+                  icon: const Icon(Icons.add_circle_outline, size: 20),
+                  onSelected: onAddSkillFromTemplate,
+                  itemBuilder: (_) => skillTemplates.map((s) =>
+                    PopupMenuItem(value: s, child: Text(s.name)),
+                  ).toList(),
+                ),
             ],
           ),
           if (skills.isNotEmpty) ...[
             const SizedBox(height: 4),
-            ...skills.map(
-              (s) => Padding(
+            ...List.generate(skills.length, (i) {
+              final s = skills[i];
+              return Padding(
                 padding: const EdgeInsets.only(bottom: 6),
                 child: Card(
                   child: Padding(
@@ -437,6 +448,19 @@ class CharacterTab extends StatelessWidget {
                                 ),
                               ),
                             ),
+                            IconButton(
+                              icon: const Icon(Icons.edit, size: 18),
+                              tooltip: '编辑',
+                              visualDensity: VisualDensity.compact,
+                              onPressed: () => onEditSkill(i, s),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline,
+                                  size: 18, color: Colors.red),
+                              tooltip: '删除',
+                              visualDensity: VisualDensity.compact,
+                              onPressed: () => onRemoveSkill(i),
+                            ),
                           ],
                         ),
                         if (s.description != null &&
@@ -450,23 +474,43 @@ class CharacterTab extends StatelessWidget {
                             ),
                           ),
                         ],
-                        if (s.diceType != null) ...[
+                        if (s.damages.isNotEmpty) ...[
                           const SizedBox(height: 4),
-                          Text(
-                            '🎲 ${s.diceType}',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey.shade500,
-                              fontFamily: 'monospace',
+                          ...s.damages.map((d) => Padding(
+                            padding: const EdgeInsets.only(bottom: 2),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                  decoration: BoxDecoration(
+                                    color: Colors.teal.withValues(alpha: 0.2),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(d.expression ?? '',
+                                      style: TextStyle(fontSize: 10, color: Colors.teal.shade800)),
+                                ),
+                                if (d.damageType != null) ...[
+                                  const SizedBox(width: 4),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                    decoration: BoxDecoration(
+                                      color: Colors.red.withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(d.damageType!,
+                                        style: TextStyle(fontSize: 10, color: Colors.red.shade700)),
+                                  ),
+                                ],
+                              ],
                             ),
-                          ),
+                          )),
                         ],
                       ],
                     ),
                   ),
                 ),
-              ),
-            ),
+              );
+            }),
           ],
           const SizedBox(height: 24),
           Text(
