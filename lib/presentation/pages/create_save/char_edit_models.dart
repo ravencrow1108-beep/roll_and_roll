@@ -42,6 +42,8 @@ class CharEdit {
   List<SkillData> skills = [];
   List<PersonalityEdit> personalities = [];
   List<ItemData> backpack = [];
+  /// 装备栏: slot name → equipped item
+  final Map<String, EquipmentData?> equipment = {};
   int hp = 1;
   int maxHp = 1;
   String portraitBase64 = '';
@@ -89,6 +91,7 @@ class CharEdit {
         )
         .toList(),
     backpack: backpack,
+    equipment: Map<String, EquipmentData?>.from(equipment),
     strength: baseStats['力量'] ?? 0,
     dexterity: baseStats['敏捷'] ?? 0,
     constitution: baseStats['体质'] ?? 0,

@@ -1,3 +1,4 @@
+import 'equipment_data.dart';
 import 'item_data.dart';
 import 'personality_data.dart';
 import 'skill_data.dart';
@@ -12,6 +13,9 @@ class CharacterData {
   final List<SkillData> skills;
   final List<PersonalityData> personalities;
   final List<ItemData> backpack;
+
+  /// 装备栏: slot name → equipped item (null = 空位)
+  final Map<String, EquipmentData?> equipment;
   final int strength;
   final int dexterity;
   final int constitution;
@@ -37,6 +41,7 @@ class CharacterData {
     this.skills = const [],
     this.personalities = const [],
     this.backpack = const [],
+    this.equipment = const {},
     this.strength = 10,
     this.dexterity = 10,
     this.constitution = 10,
@@ -61,6 +66,8 @@ class CharacterData {
       'personalities': personalities.map((p) => p.toJson()).toList(),
     if (backpack.isNotEmpty)
       'backpack': backpack.map((i) => i.toJson()).toList(),
+    if (equipment.isNotEmpty)
+      'equipment': equipment.map((k, v) => MapEntry(k, v?.toJson())),
     'stats': {
       'strength': strength,
       'dexterity': dexterity,
@@ -104,6 +111,14 @@ class CharacterData {
               ?.map((i) => ItemData.fromJson(i as Map<String, dynamic>))
               .toList() ??
           [],
+      equipment:
+          (json['equipment'] as Map<String, dynamic>?)
+                  ?.map((k, v) => MapEntry(
+                      k,
+                      v != null
+                          ? EquipmentData.fromJson(v as Map<String, dynamic>)
+                          : null)) ??
+              {},
       strength: stats['strength'] as int? ?? 10,
       dexterity: stats['dexterity'] as int? ?? 10,
       constitution: stats['constitution'] as int? ?? 10,
@@ -133,6 +148,7 @@ class CharacterData {
     List<SkillData>? skills,
     List<PersonalityData>? personalities,
     List<ItemData>? backpack,
+    Map<String, EquipmentData?>? equipment,
     int? strength,
     int? dexterity,
     int? constitution,
@@ -153,6 +169,7 @@ class CharacterData {
     skills: skills ?? this.skills,
     personalities: personalities ?? this.personalities,
     backpack: backpack ?? this.backpack,
+    equipment: equipment ?? this.equipment,
     strength: strength ?? this.strength,
     dexterity: dexterity ?? this.dexterity,
     constitution: constitution ?? this.constitution,

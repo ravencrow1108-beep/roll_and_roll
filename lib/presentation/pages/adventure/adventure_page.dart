@@ -40,6 +40,7 @@ class _AdventurePageState extends State<AdventurePage> {
   String _saveFileName = '未选择';
   List<CharacterData> _loadedCharacters = [];
   List<MapData> _loadedMaps = [];
+  RuleData _loadedRules = const RuleData();
 
   bool _isReady = false;
   bool _adventureStarted = false;
@@ -272,6 +273,7 @@ class _AdventurePageState extends State<AdventurePage> {
       final save = await SaveData.fromZip(_saveFilePath!);
       _loadedCharacters = save.characters;
       _loadedMaps = save.maps;
+      _loadedRules = save.rules;
     } catch (_) {
       _loadedCharacters = [];
       _loadedMaps = [];
@@ -673,6 +675,8 @@ class _AdventurePageState extends State<AdventurePage> {
         playerName: widget.playerName,
         character: _character,
         characters: _loadedCharacters,
+        backpackItems: _character?.backpack ?? const [],
+        backpackSlotMax: _loadedRules.backpackSlotMax,
         onPositionChanged:
             _isGM ? _onPlayerPositionChanged : null,
         onEditHp: _isGM ? _onEditCharacterHp : null,

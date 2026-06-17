@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -26,6 +27,7 @@ class CharacterTab extends StatelessWidget {
     required this.skills,
     required this.onAddSkill,
     required this.backpack,
+    required this.itemTemplates,
     required this.onAddBackpackItem,
     required this.onRemoveBackpackItem,
     required this.personalities,
@@ -40,6 +42,11 @@ class CharacterTab extends StatelessWidget {
     required this.onStatChanged,
     required this.portraitBase64,
     required this.portraitBytes,
+    required this.equipment,
+    required this.equipmentSlots,
+    required this.equipmentTemplates,
+    required this.onEquipItem,
+    required this.onUnequipItem,
     required this.onPickPortrait,
   });
 
@@ -60,10 +67,17 @@ class CharacterTab extends StatelessWidget {
   final List<SkillData> skills;
   final VoidCallback onAddSkill;
   final List<ItemData> backpack;
-  final VoidCallback onAddBackpackItem;
+  final List<ItemData> itemTemplates;
+  final ValueChanged<ItemData> onAddBackpackItem;
   final void Function(int index) onRemoveBackpackItem;
   final List<PersonalityEdit> personalities;
   final VoidCallback onAddPersonality;
+  final Map<String, EquipmentData?> equipment;
+  final List<String> equipmentSlots;
+  final List<EquipmentData> equipmentTemplates;
+  final void Function(String slot, EquipmentData eq) onEquipItem;
+  final ValueChanged<String> onUnequipItem;
+
   final void Function(int index) onRemovePersonality;
   final Map<String, int> baseStats;
   final Map<String, int> customStats;
@@ -453,75 +467,73 @@ class CharacterTab extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 24),
+          Text(
+            '背包',
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
           Row(
             children: [
               Text(
-                '背包与装备 (${backpack.length})',
-                style: const TextStyle(fontSize: 16),
+                '物品栏',
+                style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey),
               ),
               const Spacer(),
-              TextButton.icon(
-                onPressed: onAddBackpackItem,
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text('添加物品'),
-              ),
+              if (itemTemplates.isNotEmpty)
+                TextButton.icon(
+                  onPressed: () => _showTemplatePicker(context),
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('选择物品'),
+                ),
             ],
           ),
-          if (backpack.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            ...List.generate(backpack.length, (i) {
+          if (itemTemplates.isEmpty && backpack.isEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              '请先在规则页面添加物品模板',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+            ),
+          ],
+          const SizedBox(height: 8),
+          // ── 物品方格 ──
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: List.generate(backpack.length, (i) {
               final item = backpack[i];
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Card(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.backpack_outlined,
-                          size: 20,
-                          color: Colors.deepPurple,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                item.name,
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              if (item.description.isNotEmpty)
-                                Text(
-                                  item.description,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey.shade600,
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: () => onRemoveBackpackItem(i),
-                          icon: const Icon(
-                            Icons.remove_circle_outline,
-                            color: Colors.red,
-                            size: 20,
-                          ),
-                          tooltip: '移出背包',
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+              return _ItemGridTile(
+                item: item,
+                onRemove: () => onRemoveBackpackItem(i),
+              );
+            }),
+          ),
+          const SizedBox(height: 24),
+
+          // ── 装备栏 ──
+          Text(
+            '装备',
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          if (equipmentSlots.isEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              '请在规则页面添加装备栏',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+            ),
+          ] else ...[
+            const SizedBox(height: 8),
+            ...equipmentSlots.map((slot) {
+              final eq = equipment[slot];
+              return _EquipmentSlotRow(
+                slotName: slot,
+                equipped: eq,
+                templates: equipmentTemplates,
+                onEquip: (e) => onEquipItem(slot, e),
+                onUnequip: () => onUnequipItem(slot),
               );
             }),
           ],
@@ -575,6 +587,271 @@ class CharacterTab extends StatelessWidget {
               label: const Text('添加属性'),
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  void _showTemplatePicker(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => ListView(
+        children: [
+          const Padding(
+            padding: EdgeInsets.all(16),
+            child: Text('选择物品',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          ),
+          for (int i = 0; i < itemTemplates.length; i++)
+            ListTile(
+              leading: const Icon(Icons.backpack_outlined),
+              title: Text(itemTemplates[i].name),
+              subtitle: Text(itemTemplates[i].type),
+              trailing: TextButton(
+                onPressed: () {
+                  onAddBackpackItem(itemTemplates[i]);
+                  Navigator.pop(ctx);
+                },
+                child: const Text('添加'),
+              ),
+            ),
+          if (itemTemplates.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(24),
+              child: Text('暂无物品模板，请先在规则页面添加',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.grey)),
+            ),
+          const SizedBox(height: 80),
+        ],
+      ),
+    );
+  }
+}
+
+// ──────────────────────────────────────────────
+// 物品方格
+// ──────────────────────────────────────────────
+
+class _ItemGridTile extends StatelessWidget {
+  const _ItemGridTile({required this.item, required this.onRemove});
+
+  final ItemData item;
+  final VoidCallback onRemove;
+
+  static const double _size = 72.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      width: _size,
+      height: _size,
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: theme.colorScheme.outline.withValues(alpha: 0.15),
+        ),
+      ),
+      child: Stack(
+        children: [
+          // 物品图片或首字母
+          Center(
+            child: item.imageBase64.isNotEmpty
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: Image.memory(
+                      base64Decode(item.imageBase64),
+                      width: _size - 8,
+                      height: _size - 8,
+                      fit: BoxFit.cover,
+                      gaplessPlayback: true,
+                    ),
+                  )
+                : Text(
+                    item.name.isNotEmpty ? item.name[0].toUpperCase() : '?',
+                    style: TextStyle(
+                      color: theme.colorScheme.primary.withValues(alpha: 0.45),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 24,
+                    ),
+                  ),
+          ),
+          // 移除按钮（右上角）
+          Positioned(
+            top: -2,
+            right: -2,
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: onRemove,
+                borderRadius: BorderRadius.circular(10),
+                child: const Icon(Icons.cancel, size: 18, color: Colors.red),
+              ),
+            ),
+          ),
+          // 物品名称（底部）
+          Positioned(
+            bottom: 2,
+            left: 2,
+            right: 2,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.55),
+                borderRadius: BorderRadius.circular(3),
+              ),
+              child: Text(
+                item.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 9,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ──────────────────────────────────────────────
+// 装备栏行
+// ──────────────────────────────────────────────
+
+class _EquipmentSlotRow extends StatelessWidget {
+  const _EquipmentSlotRow({
+    required this.slotName,
+    required this.equipped,
+    required this.templates,
+    required this.onEquip,
+    required this.onUnequip,
+  });
+
+  final String slotName;
+  final EquipmentData? equipped;
+  final List<EquipmentData> templates;
+  final ValueChanged<EquipmentData> onEquip;
+  final VoidCallback onUnequip;
+
+  List<EquipmentData> get _matching =>
+      templates.where((e) => e.slot == slotName).toList();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: [
+          const Icon(Icons.shield_outlined,
+              size: 18, color: Colors.deepPurple),
+          const SizedBox(width: 8),
+          SizedBox(
+            width: 48,
+            child: Text(slotName,
+                style: const TextStyle(
+                    fontSize: 13, fontWeight: FontWeight.w600)),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Container(
+              height: 36,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest
+                    .withValues(alpha: 0.4),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: equipped != null
+                  ? Row(
+                      children: [
+                        const SizedBox(width: 8),
+                        if (equipped!.imageBase64.isNotEmpty)
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: Image.memory(
+                              base64Decode(equipped!.imageBase64),
+                              width: 24,
+                              height: 24,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(equipped!.name,
+                              style: const TextStyle(fontSize: 13)),
+                        ),
+                        IconButton(
+                          onPressed: onUnequip,
+                          icon: const Icon(Icons.close, size: 16),
+                          tooltip: '卸下',
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(
+                              minWidth: 28, minHeight: 28),
+                        ),
+                      ],
+                    )
+                  : GestureDetector(
+                      onTap: _matching.isNotEmpty
+                          ? () => _showPicker(context)
+                          : null,
+                      child: Row(
+                        children: [
+                          const SizedBox(width: 8),
+                          Text(
+                            _matching.isNotEmpty ? '点击选择' : '无可用装备',
+                            style: TextStyle(
+                                fontSize: 12, color: Colors.grey.shade500),
+                          ),
+                        ],
+                      ),
+                    ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showPicker(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => ListView(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Text('选择 $slotName',
+                style: const TextStyle(
+                    fontSize: 18, fontWeight: FontWeight.bold)),
+          ),
+          for (final eq in _matching)
+            ListTile(
+              leading: eq.imageBase64.isNotEmpty
+                  ? ClipOval(
+                      child: Image.memory(base64Decode(eq.imageBase64),
+                          width: 32, height: 32, fit: BoxFit.cover),
+                    )
+                  : const Icon(Icons.shield_outlined),
+              title: Text(eq.name),
+              subtitle: Text(
+                  '${eq.type}  '
+                  '${eq.value > 0 ? '💰${eq.value}  ' : ''}'
+                  '${eq.weight > 0 ? '⚖${eq.weight}' : ''}'),
+              trailing: TextButton(
+                onPressed: () {
+                  onEquip(eq);
+                  Navigator.pop(ctx);
+                },
+                child: const Text('装备'),
+              ),
+            ),
+          const SizedBox(height: 80),
         ],
       ),
     );

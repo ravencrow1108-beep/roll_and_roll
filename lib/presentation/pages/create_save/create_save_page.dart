@@ -65,6 +65,10 @@ class _CreateSavePageState extends State<CreateSavePage>
   final List<MapData> _maps = [];
   final List<String> _turnSettings = [];
   final List<String> _phaseSettings = ['先攻', '战斗'];
+  int _backpackSlotMax = 20;
+  final List<ItemData> _itemTemplates = [];
+  final List<String> _equipmentSlots = ['头盔', '身甲', '手甲', '腿甲', '饰品'];
+  final List<EquipmentData> _equipmentTemplates = [];
 
   @override
   void initState() {
@@ -86,6 +90,19 @@ class _CreateSavePageState extends State<CreateSavePage>
         _phaseSettings
           ..clear()
           ..addAll(r.phaseSettings);
+        _backpackSlotMax = r.backpackSlotMax;
+        _itemTemplates.addAll(r.itemTemplates);
+        _equipmentSlots
+          ..clear()
+          ..addAll(r.equipmentSlots);
+        _equipmentTemplates.addAll(r.equipmentTemplates);
+      }
+      // init equipment map for each char
+      for (final ce in _chars) {
+        ce.equipment.clear();
+        for (final slot in _equipmentSlots) {
+          ce.equipment[slot] = null;
+        }
       }
     }
   }
@@ -108,6 +125,10 @@ class _CreateSavePageState extends State<CreateSavePage>
         )
         .toList();
     ce.backpack = c.backpack.toList();
+    ce.equipment.addAll(Map<String, EquipmentData?>.from(c.equipment));
+    for (final slot in _equipmentSlots) {
+      ce.equipment.putIfAbsent(slot, () => null);
+    }
     ce.baseStats['力量'] = c.strength;
     ce.baseStats['敏捷'] = c.dexterity;
     ce.baseStats['体质'] = c.constitution;
@@ -364,64 +385,18 @@ class _CreateSavePageState extends State<CreateSavePage>
     );
   }
 
-  void _addBackpackItem() {
-    final nameCtrl = TextEditingController();
-    final descCtrl = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('添加背包物品'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameCtrl,
-                decoration: const InputDecoration(
-                  labelText: '物品名称',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: descCtrl,
-                decoration: const InputDecoration(
-                  labelText: '描述（可选）',
-                  border: OutlineInputBorder(),
-                ),
-                maxLines: 2,
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('取消'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final s = nameCtrl.text.trim();
-              if (s.isEmpty) return;
-              final item = ItemData(
-                name: s,
-                type: '背包物品',
-                description: descCtrl.text.trim(),
-              );
-              setState(() {
-                _cur.backpack.add(item);
-              });
-              Navigator.pop(ctx);
-            },
-            child: const Text('添加'),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _removeBackpackItem(int index) {
     setState(() => _cur.backpack.removeAt(index));
+  }
+
+  void _addItemFromTemplate(ItemData template) {
+    if (_cur.backpack.length >= _backpackSlotMax) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('背包已满'), duration: Duration(seconds: 1)),
+      );
+      return;
+    }
+    setState(() => _cur.backpack.add(template));
   }
 
   Future<void> _pickPortrait() async {
@@ -477,6 +452,11 @@ class _CreateSavePageState extends State<CreateSavePage>
         rules: RuleData(
           turnSettings: List<String>.from(_turnSettings),
           phaseSettings: List<String>.from(_phaseSettings),
+          backpackSlotMax: _backpackSlotMax,
+          itemTemplates: List<ItemData>.from(_itemTemplates),
+          equipmentSlots: List<String>.from(_equipmentSlots),
+          equipmentTemplates:
+              List<EquipmentData>.from(_equipmentTemplates),
         ),
       );
 
@@ -535,6 +515,11 @@ class _CreateSavePageState extends State<CreateSavePage>
         rules: RuleData(
           turnSettings: List<String>.from(_turnSettings),
           phaseSettings: List<String>.from(_phaseSettings),
+          backpackSlotMax: _backpackSlotMax,
+          itemTemplates: List<ItemData>.from(_itemTemplates),
+          equipmentSlots: List<String>.from(_equipmentSlots),
+          equipmentTemplates:
+              List<EquipmentData>.from(_equipmentTemplates),
         ),
       );
 
@@ -672,8 +657,18 @@ class _CreateSavePageState extends State<CreateSavePage>
                           skills: _cur.skills,
                           onAddSkill: _addSkill,
                           backpack: _cur.backpack,
-                          onAddBackpackItem: _addBackpackItem,
+                          itemTemplates: _itemTemplates,
+                          onAddBackpackItem: _addItemFromTemplate,
                           onRemoveBackpackItem: _removeBackpackItem,
+                          equipment: _cur.equipment,
+                          equipmentSlots: _equipmentSlots,
+                          equipmentTemplates: _equipmentTemplates,
+                          onEquipItem: (slot, eq) {
+                            setState(() => _cur.equipment[slot] = eq);
+                          },
+                          onUnequipItem: (slot) {
+                            setState(() => _cur.equipment[slot] = null);
+                          },
                           personalities: _cur.personalities,
                           onAddPersonality: _addPersonality,
                           onRemovePersonality: _removePersonality,
@@ -701,6 +696,43 @@ class _CreateSavePageState extends State<CreateSavePage>
                   RulesTab(
                     turnSettings: _turnSettings,
                     phaseSettings: _phaseSettings,
+                    backpackSlotMax: _backpackSlotMax,
+                    itemTemplates: _itemTemplates,
+                    equipmentSlots: _equipmentSlots,
+                    equipmentTemplates: _equipmentTemplates,
+                    onAddItemTemplate: (item) {
+                      setState(() => _itemTemplates.add(item));
+                    },
+                    onRemoveItemTemplate: (i) {
+                      setState(() => _itemTemplates.removeAt(i));
+                    },
+                    onAddEquipmentTemplate: (eq) {
+                      setState(() => _equipmentTemplates.add(eq));
+                    },
+                    onRemoveEquipmentTemplate: (i) {
+                      setState(() => _equipmentTemplates.removeAt(i));
+                    },
+                    onAddEquipmentSlot: (name) {
+                      if (name.isEmpty) return;
+                      setState(() {
+                        _equipmentSlots.add(name);
+                        for (final ce in _chars) {
+                          ce.equipment[name] = null;
+                        }
+                      });
+                    },
+                    onRemoveEquipmentSlot: (i) {
+                      final slot = _equipmentSlots[i];
+                      setState(() {
+                        _equipmentSlots.removeAt(i);
+                        for (final ce in _chars) {
+                          ce.equipment.remove(slot);
+                        }
+                      });
+                    },
+                    onBackpackSlotMaxChanged: (v) {
+                      setState(() => _backpackSlotMax = v);
+                    },
                     onAddTurn: () {
                       setState(() => _turnSettings.add(''));
                     },

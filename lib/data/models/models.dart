@@ -3,6 +3,7 @@ export 'character_data.dart';
 export 'chat_message.dart';
 export 'dice_expression.dart';
 export 'enemy_data.dart';
+export 'equipment_data.dart';
 export 'item_data.dart';
 export 'map_data.dart';
 export 'map_tile.dart';

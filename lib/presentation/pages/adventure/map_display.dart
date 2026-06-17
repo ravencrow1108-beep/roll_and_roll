@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import '../../../data/models/models.dart';
+import 'backpack_panel.dart';
 import 'coordinate_grid.dart';
 import 'token_widget.dart';
 
@@ -18,6 +19,8 @@ class MapDisplay extends StatefulWidget {
     required this.playerName,
     this.character,
     this.characters = const [],
+    this.backpackItems = const [],
+    this.backpackSlotMax = 20,
     this.onPositionChanged,
     this.onEditHp,
     this.onAddNote,
@@ -32,6 +35,8 @@ class MapDisplay extends StatefulWidget {
   final String playerName;
   final CharacterData? character;
   final List<CharacterData> characters;
+  final List<ItemData> backpackItems;
+  final int backpackSlotMax;
   /// GM 移动角色位置后调
   final void Function(int index, PlayerPosition newPos)? onPositionChanged;
   /// GM 右键编辑角色血量
@@ -48,6 +53,7 @@ class MapDisplay extends StatefulWidget {
 class _MapDisplayState extends State<MapDisplay> {
   bool _showGrid = true;
   bool _showCoords = true;
+  bool _showBackpack = false;
   final bool _showMinorGrid = false;
 
   /// 地图图片的原始宽高（像素），异步解码后缓存。
@@ -187,8 +193,24 @@ class _MapDisplayState extends State<MapDisplay> {
                 active: _showCoords,
                 onTap: () => setState(() => _showCoords = !_showCoords),
               ),
+              const SizedBox(width: 2),
+              _GridToggle(
+                icon: Icons.backpack_outlined,
+                tooltip: _showBackpack ? '关闭背包' : '显示背包',
+                active: _showBackpack,
+                onTap: () => setState(() => _showBackpack = !_showBackpack),
+              ),
             ],
           ),
+          // ── 背包物品栏 ──
+          if (_showBackpack && widget.backpackItems.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: BackpackPanel(
+                backpack: widget.backpackItems,
+                slotMax: widget.backpackSlotMax,
+              ),
+            ),
           const SizedBox(height: 6),
           Expanded(
             child: m.imageBase64.isNotEmpty

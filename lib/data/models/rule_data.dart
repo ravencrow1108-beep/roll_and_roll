@@ -1,4 +1,7 @@
-/// 规则数据模型 — 回合设置、环节设置
+import 'equipment_data.dart';
+import 'item_data.dart';
+
+/// 规则数据模型 — 回合设置、环节设置、背包格子上限、物品/装备模板
 class RuleData {
   /// 回合设置 (暂时留空)
   final List<String> turnSettings;
@@ -6,14 +9,37 @@ class RuleData {
   /// 环节设置 (默认：先攻、战斗)
   final List<String> phaseSettings;
 
+  /// 背包物品栏格子上限 (默认 20)
+  final int backpackSlotMax;
+
+  /// 物品模板库 (主持在此定义可用物品，角色从中选择)
+  final List<ItemData> itemTemplates;
+
+  /// 装备栏位置名称列表 (如 头盔、身甲、手甲、腿甲、饰品)
+  final List<String> equipmentSlots;
+
+  /// 装备模板库
+  final List<EquipmentData> equipmentTemplates;
+
   const RuleData({
     this.turnSettings = const [],
     this.phaseSettings = const ['先攻', '战斗'],
+    this.backpackSlotMax = 20,
+    this.itemTemplates = const [],
+    this.equipmentSlots = const ['头盔', '身甲', '手甲', '腿甲', '饰品'],
+    this.equipmentTemplates = const [],
   });
 
   Map<String, dynamic> toJson() => {
     if (turnSettings.isNotEmpty) 'turnSettings': turnSettings,
     'phaseSettings': phaseSettings,
+    'backpackSlotMax': backpackSlotMax,
+    if (itemTemplates.isNotEmpty)
+      'itemTemplates': itemTemplates.map((i) => i.toJson()).toList(),
+    if (equipmentSlots.isNotEmpty) 'equipmentSlots': equipmentSlots,
+    if (equipmentTemplates.isNotEmpty)
+      'equipmentTemplates':
+          equipmentTemplates.map((e) => e.toJson()).toList(),
   };
 
   factory RuleData.fromJson(Map<String, dynamic> json) => RuleData(
@@ -27,5 +53,22 @@ class RuleData {
             ?.map((e) => e as String)
             .toList() ??
         const ['先攻', '战斗'],
+    backpackSlotMax: json['backpackSlotMax'] as int? ?? 20,
+    itemTemplates:
+        (json['itemTemplates'] as List<dynamic>?)
+            ?.map((i) => ItemData.fromJson(i as Map<String, dynamic>))
+            .toList() ??
+        const [],
+    equipmentSlots:
+        (json['equipmentSlots'] as List<dynamic>?)
+            ?.map((e) => e as String)
+            .toList() ??
+        const ['头盔', '身甲', '手甲', '腿甲', '饰品'],
+    equipmentTemplates:
+        (json['equipmentTemplates'] as List<dynamic>?)
+            ?.map(
+                (e) => EquipmentData.fromJson(e as Map<String, dynamic>))
+            .toList() ??
+        const [],
   );
 }

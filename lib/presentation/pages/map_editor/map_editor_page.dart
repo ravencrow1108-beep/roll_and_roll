@@ -121,7 +121,6 @@ class _MapEditorPageState extends State<MapEditorPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final m = widget.mapData;
 
     return Scaffold(

@@ -277,8 +277,9 @@ class _TokenPlacementPageState extends State<TokenPlacementPage> {
                                         height: renderRect.height,
                                         child: GestureDetector(
                                           onTapUp: (details) {
-                                            if (_selectedCharacter == null)
+                                            if (_selectedCharacter == null) {
                                               return;
+                                            }
                                             final fx =
                                                 details.localPosition.dx /
                                                 renderConstraints.maxWidth;

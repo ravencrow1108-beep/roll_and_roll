@@ -932,64 +932,17 @@ class _AddCharacterPageState extends State<_AddCharacterPage> {
                 );
               },
               backpack: _char.backpack,
-              onAddBackpackItem: () {
-                final nameCtrl = TextEditingController();
-                final descCtrl = TextEditingController();
-                showDialog(
-                  context: context,
-                  builder: (ctx) => AlertDialog(
-                    title: const Text('添加背包物品'),
-                    content: SingleChildScrollView(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          TextField(
-                            controller: nameCtrl,
-                            decoration: const InputDecoration(
-                              labelText: '物品名称',
-                              border: OutlineInputBorder(),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          TextField(
-                            controller: descCtrl,
-                            decoration: const InputDecoration(
-                              labelText: '描述（可选）',
-                              border: OutlineInputBorder(),
-                            ),
-                            maxLines: 2,
-                          ),
-                        ],
-                      ),
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(ctx),
-                        child: const Text('取消'),
-                      ),
-                      ElevatedButton(
-                        onPressed: () {
-                          final s = nameCtrl.text.trim();
-                          if (s.isEmpty) return;
-                          setState(() {
-                            _char.backpack.add(
-                              ItemData(
-                                name: s,
-                                type: '背包物品',
-                                description: descCtrl.text.trim(),
-                              ),
-                            );
-                          });
-                          Navigator.pop(ctx);
-                        },
-                        child: const Text('添加'),
-                      ),
-                    ],
-                  ),
-                );
-              },
+              itemTemplates: const [],
+              onAddBackpackItem: (_) {},
               onRemoveBackpackItem: (i) =>
                   setState(() => _char.backpack.removeAt(i)),
+              equipment: const {},
+              equipmentSlots: const [],
+              equipmentTemplates: const [],
+              onEquipItem: (slot, eq) =>
+                  setState(() => _char.equipment[slot] = eq),
+              onUnequipItem: (slot) =>
+                  setState(() => _char.equipment[slot] = null),
               personalities: _char.personalities,
               onAddPersonality: () =>
                   setState(() => _char.personalities.add(PersonalityEdit())),
