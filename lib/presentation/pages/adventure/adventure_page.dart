@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import '../../providers/room_state.dart';
 import '../../../data/models/models.dart';
 import '../../../data/services/socket_support.dart';
+import '../../../data/services/voice_service.dart';
 import '../create_save/create_save_page.dart';
 import 'character_views.dart';
 import 'map_display.dart';
@@ -61,6 +62,9 @@ class _AdventurePageState extends State<AdventurePage> {
   // --- Left panel: selected player detail ---
   String? _selectedPlayerName;
 
+  // --- Voice ---
+  final VoiceService _voice = VoiceService.instance;
+
   StreamSubscription<String>? _msgSub;
 
   bool get _isGM => widget.role == '主持';
@@ -87,6 +91,29 @@ class _AdventurePageState extends State<AdventurePage> {
     session.readyMembersNotifier.addListener(_onReadyChanged);
     session.mapNotifier.addListener(_onMapChanged);
     session.playerPositionsNotifier.addListener(_onPositionsChanged);
+
+    // 语音：录音数据通过 socket 发送
+    _voice.onAudioCaptured = (pcm) {
+      final b64 = base64Encode(pcm);
+      final msg = {
+        'type': 'voice_data',
+        'from': widget.playerName,
+        'data': b64,
+      };
+      if (_isGM) {
+        RoomSession.instance.broadcast(msg);
+      } else {
+        RoomSession.instance.clientHandle?.send(socketEncode(msg));
+      }
+    };
+
+    // 语音 UI 状态刷新
+    _voice.isInChannel.addListener(_onVoiceStateChanged);
+    _voice.isMuted.addListener(_onVoiceStateChanged);
+  }
+
+  void _onVoiceStateChanged() {
+    if (mounted) setState(() {});
   }
 
   void _onReadyChanged() {
@@ -114,6 +141,24 @@ class _AdventurePageState extends State<AdventurePage> {
       if (type == 'chat_message') {
         _addChat(data['from'] as String? ?? '', data['text'] as String? ?? '');
         if (_isGM) RoomSession.instance.broadcast(data);
+        return;
+      }
+
+      if (type == 'voice_data') {
+        _voice.playVoiceData(
+          data['from'] as String? ?? '',
+          data['data'] as String? ?? '',
+        );
+        return;
+      }
+
+      if (type == 'voice_join') {
+        if (mounted) setState(() {});
+        return;
+      }
+
+      if (type == 'voice_leave') {
+        if (mounted) setState(() {});
         return;
       }
 
@@ -635,6 +680,10 @@ class _AdventurePageState extends State<AdventurePage> {
 
   @override
   void dispose() {
+    _voice.leaveChannel();
+    _voice.onAudioCaptured = null;
+    _voice.isInChannel.removeListener(_onVoiceStateChanged);
+    _voice.isMuted.removeListener(_onVoiceStateChanged);
     _msgSub?.cancel();
     _diceInputCtrl.dispose();
     _chatCtrl.dispose();
@@ -645,6 +694,15 @@ class _AdventurePageState extends State<AdventurePage> {
       _onPositionsChanged,
     );
     super.dispose();
+  }
+
+  void _broadcastVoiceState(String type) {
+    final msg = {'type': type, 'from': widget.playerName};
+    if (_isGM) {
+      RoomSession.instance.broadcast(msg);
+    } else {
+      RoomSession.instance.clientHandle?.send(socketEncode(msg));
+    }
   }
 
   /// 根据冒险状态与角色切换显示冒险视图、角色详情或选择界面
@@ -709,6 +767,34 @@ class _AdventurePageState extends State<AdventurePage> {
           },
         ),
         actions: [
+          ValueListenableBuilder<bool>(
+            valueListenable: _voice.isInChannel,
+            builder: (_, inChannel, _) => IconButton(
+              icon: Icon(
+                inChannel ? Icons.mic : Icons.mic_none,
+                color: inChannel ? Colors.green : null,
+              ),
+              tooltip: inChannel ? '退出语音频道' : '加入语音频道',
+              onPressed: () async {
+                try {
+                  if (inChannel) {
+                    await _voice.leaveChannel();
+                    _broadcastVoiceState('voice_leave');
+                  } else {
+                    await _voice.joinChannel();
+                    _broadcastVoiceState('voice_join');
+                  }
+                  if (mounted) setState(() {});
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(SnackBar(content: Text('$e')));
+                  }
+                }
+              },
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.save_outlined),
             tooltip: '保存进度',
@@ -768,16 +854,50 @@ class _AdventurePageState extends State<AdventurePage> {
           _buildChatPanelSlide(theme, members, roles),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => setState(() => _isChatOpen = !_isChatOpen),
-        tooltip: _isChatOpen ? '关闭聊天' : '打开聊天',
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 200),
-          child: Icon(
-            _isChatOpen ? Icons.close : Icons.chat,
-            key: ValueKey(_isChatOpen),
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ValueListenableBuilder<bool>(
+            valueListenable: _voice.isInChannel,
+            builder: (_, inChannel, _) {
+              if (!inChannel) return const SizedBox.shrink();
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: ValueListenableBuilder<bool>(
+                  valueListenable: _voice.isMuted,
+                  builder: (_, muted, _) => FloatingActionButton(
+                    heroTag: 'voice_mute',
+                    mini: true,
+                    backgroundColor: muted
+                        ? Colors.red.shade400
+                        : Colors.green.shade400,
+                    onPressed: () async {
+                      await _voice.toggleMute();
+                      if (mounted) setState(() {});
+                    },
+                    tooltip: muted ? '打开麦克风' : '关闭麦克风',
+                    child: Icon(
+                      muted ? Icons.mic_off : Icons.mic,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              );
+            },
           ),
-        ),
+          FloatingActionButton(
+            heroTag: 'chat_toggle',
+            onPressed: () => setState(() => _isChatOpen = !_isChatOpen),
+            tooltip: _isChatOpen ? '关闭聊天' : '打开聊天',
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 200),
+              child: Icon(
+                _isChatOpen ? Icons.close : Icons.chat,
+                key: ValueKey(_isChatOpen),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
