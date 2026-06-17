@@ -42,6 +42,7 @@ class CharEdit {
   List<SkillData> skills = [];
   List<PersonalityEdit> personalities = [];
   List<ItemData> backpack = [];
+
   /// 装备栏: slot name → equipped item
   final Map<String, EquipmentData?> equipment = {};
   int hp = 1;

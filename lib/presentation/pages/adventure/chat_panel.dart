@@ -99,10 +99,7 @@ class _ChatPanelBodyState extends State<_ChatPanelBody> {
             itemBuilder: (_, i) {
               final msg = widget.chatMessages[i];
               final isMe = msg.from == widget.playerName;
-              return _ChatMessageItem(
-                message: msg,
-                isMe: isMe,
-              );
+              return _ChatMessageItem(message: msg, isMe: isMe);
             },
           ),
         ),
@@ -147,9 +144,7 @@ class _ChatPanelBodyState extends State<_ChatPanelBody> {
                     icon: AnimatedSwitcher(
                       duration: const Duration(milliseconds: 200),
                       child: Icon(
-                        _diceExpanded
-                            ? Icons.casino
-                            : Icons.casino_outlined,
+                        _diceExpanded ? Icons.casino : Icons.casino_outlined,
                         key: ValueKey(_diceExpanded),
                         size: 22,
                       ),
@@ -170,8 +165,9 @@ class _ChatPanelBodyState extends State<_ChatPanelBody> {
               Expanded(
                 child: Container(
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest
-                        .withValues(alpha: 0.6),
+                    color: theme.colorScheme.surfaceContainerHighest.withValues(
+                      alpha: 0.6,
+                    ),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: TextField(
@@ -194,7 +190,9 @@ class _ChatPanelBodyState extends State<_ChatPanelBody> {
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(20),
                         borderSide: BorderSide(
-                          color: theme.colorScheme.primary.withValues(alpha: 0.4),
+                          color: theme.colorScheme.primary.withValues(
+                            alpha: 0.4,
+                          ),
                           width: 1.5,
                         ),
                       ),
@@ -276,30 +274,37 @@ class _DiceBar extends StatelessWidget {
             spacing: 6,
             runSpacing: 6,
             children: _dice
-                .map((d) => SizedBox(
-                      width: 46,
-                      height: 30,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          padding: EdgeInsets.zero,
-                          elevation: 0,
-                          backgroundColor: d == 100
-                              ? Colors.red.shade50
-                              : theme.colorScheme.primaryContainer
-                                  .withValues(alpha: 0.5),
-                          foregroundColor: d == 100
-                              ? Colors.red.shade700
-                              : theme.colorScheme.onPrimaryContainer,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
+                .map(
+                  (d) => SizedBox(
+                    width: 46,
+                    height: 30,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        elevation: 0,
+                        backgroundColor: d == 100
+                            ? Colors.red.shade50
+                            : theme.colorScheme.primaryContainer.withValues(
+                                alpha: 0.5,
+                              ),
+                        foregroundColor: d == 100
+                            ? Colors.red.shade700
+                            : theme.colorScheme.onPrimaryContainer,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
                         ),
-                        onPressed: () => onRollDice(d),
-                        child: Text('d$d',
-                            style: const TextStyle(
-                                fontWeight: FontWeight.w700, fontSize: 12)),
                       ),
-                    ))
+                      onPressed: () => onRollDice(d),
+                      child: Text(
+                        'd$d',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ),
+                )
                 .toList(),
           ),
           const SizedBox(height: 6),
@@ -309,8 +314,9 @@ class _DiceBar extends StatelessWidget {
               Expanded(
                 child: Container(
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest
-                        .withValues(alpha: 0.5),
+                    color: theme.colorScheme.surfaceContainerHighest.withValues(
+                      alpha: 0.5,
+                    ),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: TextField(
@@ -332,12 +338,16 @@ class _DiceBar extends StatelessWidget {
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                         borderSide: BorderSide(
-                          color: theme.colorScheme.primary.withValues(alpha: 0.4),
+                          color: theme.colorScheme.primary.withValues(
+                            alpha: 0.4,
+                          ),
                         ),
                       ),
                       isDense: true,
                       contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 8),
+                        horizontal: 10,
+                        vertical: 8,
+                      ),
                     ),
                     style: const TextStyle(fontSize: 13),
                     onSubmitted: (_) => onRollCustom(),
@@ -400,10 +410,7 @@ class _DiceBar extends StatelessWidget {
 // ──────────────────────────────────────────────
 
 class _ChatMessageItem extends StatelessWidget {
-  const _ChatMessageItem({
-    required this.message,
-    required this.isMe,
-  });
+  const _ChatMessageItem({required this.message, required this.isMe});
 
   final ChatMessage message;
   final bool isMe;
@@ -413,8 +420,8 @@ class _ChatMessageItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final hasAvatar = message.portraitBase64 != null &&
-        message.portraitBase64!.isNotEmpty;
+    final hasAvatar =
+        message.portraitBase64 != null && message.portraitBase64!.isNotEmpty;
 
     // 骰子消息用特殊样式
     if (message.isDice) {
@@ -486,8 +493,9 @@ class _ChatMessageItem extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Row(
-        mainAxisAlignment:
-            isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment: isMe
+            ? MainAxisAlignment.end
+            : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           // 对方头像（左侧）
@@ -501,8 +509,9 @@ class _ChatMessageItem extends StatelessWidget {
           // 消息气泡
           Flexible(
             child: Column(
-              crossAxisAlignment:
-                  isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+              crossAxisAlignment: isMe
+                  ? CrossAxisAlignment.end
+                  : CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
                 // 名字标签
@@ -525,10 +534,12 @@ class _ChatMessageItem extends StatelessWidget {
                   ),
                   decoration: BoxDecoration(
                     color: isMe
-                        ? theme.colorScheme.primaryContainer
-                            .withValues(alpha: 0.4)
-                        : theme.colorScheme.surfaceContainerHighest
-                            .withValues(alpha: 0.5),
+                        ? theme.colorScheme.primaryContainer.withValues(
+                            alpha: 0.4,
+                          )
+                        : theme.colorScheme.surfaceContainerHighest.withValues(
+                            alpha: 0.5,
+                          ),
                     borderRadius: BorderRadius.only(
                       topLeft: const Radius.circular(12),
                       topRight: const Radius.circular(12),
@@ -578,8 +589,7 @@ class _MiniAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final hasImage =
-        portraitBase64 != null && portraitBase64!.isNotEmpty;
+    final hasImage = portraitBase64 != null && portraitBase64!.isNotEmpty;
 
     return SizedBox(
       width: size,

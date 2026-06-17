@@ -36,7 +36,20 @@ class RuleData {
     this.equipmentSlots = const ['头盔', '身甲', '手甲', '腿甲', '饰品'],
     this.equipmentTemplates = const [],
     this.skillTemplates = const [],
-    this.damageTypes = const ['火焰', '寒冷', '雷电', '毒素', '暗蚀', '光耀', '力场', '精神', '坏死', '穿刺', '挥砍', '钝击'],
+    this.damageTypes = const [
+      '火焰',
+      '寒冷',
+      '雷电',
+      '毒素',
+      '暗蚀',
+      '光耀',
+      '力场',
+      '精神',
+      '坏死',
+      '穿刺',
+      '挥砍',
+      '钝击',
+    ],
   });
 
   Map<String, dynamic> toJson() => {
@@ -47,8 +60,7 @@ class RuleData {
       'itemTemplates': itemTemplates.map((i) => i.toJson()).toList(),
     if (equipmentSlots.isNotEmpty) 'equipmentSlots': equipmentSlots,
     if (equipmentTemplates.isNotEmpty)
-      'equipmentTemplates':
-          equipmentTemplates.map((e) => e.toJson()).toList(),
+      'equipmentTemplates': equipmentTemplates.map((e) => e.toJson()).toList(),
     if (skillTemplates.isNotEmpty)
       'skillTemplates': skillTemplates.map((s) => s.toJson()).toList(),
     if (damageTypes.isNotEmpty) 'damageTypes': damageTypes,
@@ -78,20 +90,31 @@ class RuleData {
         const ['头盔', '身甲', '手甲', '腿甲', '饰品'],
     equipmentTemplates:
         (json['equipmentTemplates'] as List<dynamic>?)
-            ?.map(
-                (e) => EquipmentData.fromJson(e as Map<String, dynamic>))
+            ?.map((e) => EquipmentData.fromJson(e as Map<String, dynamic>))
             .toList() ??
         const [],
     skillTemplates:
         (json['skillTemplates'] as List<dynamic>?)
-            ?.map(
-                (s) => SkillData.fromJson(s as Map<String, dynamic>))
+            ?.map((s) => SkillData.fromJson(s as Map<String, dynamic>))
             .toList() ??
         const [],
     damageTypes:
         (json['damageTypes'] as List<dynamic>?)
             ?.map((e) => e as String)
             .toList() ??
-        const ['火焰', '寒冷', '雷电', '毒素', '暗蚀', '光耀', '力场', '精神', '坏死', '穿刺', '挥砍', '钝击'],
+        const [
+          '火焰',
+          '寒冷',
+          '雷电',
+          '毒素',
+          '暗蚀',
+          '光耀',
+          '力场',
+          '精神',
+          '坏死',
+          '穿刺',
+          '挥砍',
+          '钝击',
+        ],
   );
 }

@@ -89,11 +89,13 @@ class RulesTab extends StatelessWidget {
           const SizedBox(height: 12),
           Row(
             children: [
-              const Icon(Icons.backpack_outlined,
-                  size: 22, color: Colors.deepPurple),
+              const Icon(
+                Icons.backpack_outlined,
+                size: 22,
+                color: Colors.deepPurple,
+              ),
               const SizedBox(width: 8),
-              const Text('物品栏格子上限',
-                  style: TextStyle(fontSize: 15)),
+              const Text('物品栏格子上限', style: TextStyle(fontSize: 15)),
               const Spacer(),
               IconButton(
                 onPressed: () {
@@ -101,8 +103,10 @@ class RulesTab extends StatelessWidget {
                     onBackpackSlotMaxChanged(backpackSlotMax - 4);
                   }
                 },
-                icon: const Icon(Icons.remove_circle_outline,
-                    color: Colors.deepPurple),
+                icon: const Icon(
+                  Icons.remove_circle_outline,
+                  color: Colors.deepPurple,
+                ),
                 tooltip: '减少',
               ),
               SizedBox(
@@ -117,10 +121,11 @@ class RulesTab extends StatelessWidget {
                 ),
               ),
               IconButton(
-                onPressed: () =>
-                    onBackpackSlotMaxChanged(backpackSlotMax + 4),
-                icon: const Icon(Icons.add_circle_outline,
-                    color: Colors.deepPurple),
+                onPressed: () => onBackpackSlotMaxChanged(backpackSlotMax + 4),
+                icon: const Icon(
+                  Icons.add_circle_outline,
+                  color: Colors.deepPurple,
+                ),
                 tooltip: '增加',
               ),
             ],
@@ -162,40 +167,60 @@ class RulesTab extends StatelessWidget {
                 child: Card(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 8),
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                     child: Row(
                       children: [
-                        const Icon(Icons.category_outlined,
-                            size: 20, color: Colors.deepPurple),
+                        const Icon(
+                          Icons.category_outlined,
+                          size: 20,
+                          color: Colors.deepPurple,
+                        ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(item.name,
-                                  style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600)),
+                              Text(
+                                item.name,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                               Row(
                                 children: [
-                                  Text(item.type,
-                                      style: TextStyle(
-                                          fontSize: 11,
-                                          color:
-                                              Colors.deepPurple.shade400)),
+                                  Text(
+                                    item.type,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.deepPurple.shade400,
+                                    ),
+                                  ),
                                   if (item.value > 0) ...[
                                     const SizedBox(width: 8),
-                                    const Icon(Icons.monetization_on_outlined,
-                                        size: 11, color: Colors.amber),
-                                    Text('${item.value}',
-                                        style: const TextStyle(fontSize: 11)),
+                                    const Icon(
+                                      Icons.monetization_on_outlined,
+                                      size: 11,
+                                      color: Colors.amber,
+                                    ),
+                                    Text(
+                                      '${item.value}',
+                                      style: const TextStyle(fontSize: 11),
+                                    ),
                                   ],
                                   if (item.weight > 0) ...[
                                     const SizedBox(width: 8),
-                                    const Icon(Icons.monitor_weight_outlined,
-                                        size: 11, color: Colors.grey),
-                                    Text('${item.weight}',
-                                        style: const TextStyle(fontSize: 11)),
+                                    const Icon(
+                                      Icons.monitor_weight_outlined,
+                                      size: 11,
+                                      color: Colors.grey,
+                                    ),
+                                    Text(
+                                      '${item.weight}',
+                                      style: const TextStyle(fontSize: 11),
+                                    ),
                                   ],
                                 ],
                               ),
@@ -203,16 +228,21 @@ class RulesTab extends StatelessWidget {
                           ),
                         ),
                         IconButton(
-                          onPressed: () => _showAddItemDialog(context, editIndex: i, editItem: item),
+                          onPressed: () => _showAddItemDialog(
+                            context,
+                            editIndex: i,
+                            editItem: item,
+                          ),
                           icon: const Icon(Icons.edit, size: 22),
                           tooltip: '编辑',
                         ),
                         IconButton(
                           onPressed: () => onRemoveItemTemplate(i),
                           icon: const Icon(
-                              Icons.remove_circle_outline,
-                              color: Colors.red,
-                              size: 20),
+                            Icons.remove_circle_outline,
+                            color: Colors.red,
+                            size: 20,
+                          ),
                           tooltip: '删除模板',
                         ),
                       ],
@@ -243,17 +273,22 @@ class RulesTab extends StatelessWidget {
               padding: const EdgeInsets.only(bottom: 4),
               child: Row(
                 children: [
-                  const Icon(Icons.shield_outlined,
-                      size: 20, color: Colors.deepPurple),
+                  const Icon(
+                    Icons.shield_outlined,
+                    size: 20,
+                    color: Colors.deepPurple,
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: Text(slot,
-                        style: const TextStyle(fontSize: 15)),
+                    child: Text(slot, style: const TextStyle(fontSize: 15)),
                   ),
                   IconButton(
                     onPressed: () => onRemoveEquipmentSlot(i),
-                    icon: const Icon(Icons.remove_circle_outline,
-                        color: Colors.red, size: 20),
+                    icon: const Icon(
+                      Icons.remove_circle_outline,
+                      color: Colors.red,
+                      size: 20,
+                    ),
                     tooltip: '删除装备栏',
                   ),
                 ],
@@ -301,47 +336,72 @@ class RulesTab extends StatelessWidget {
                 child: Card(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 8),
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                     child: Row(
                       children: [
-                        const Icon(Icons.shield_outlined,
-                            size: 20, color: Colors.deepPurple),
+                        const Icon(
+                          Icons.shield_outlined,
+                          size: 20,
+                          color: Colors.deepPurple,
+                        ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(eq.name,
-                                  style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600)),
+                              Text(
+                                eq.name,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                               Row(
                                 children: [
                                   Container(
                                     padding: const EdgeInsets.symmetric(
-                                        horizontal: 6, vertical: 1),
+                                      horizontal: 6,
+                                      vertical: 1,
+                                    ),
                                     decoration: BoxDecoration(
-                                      color: Colors.orange.withValues(alpha: 0.2),
+                                      color: Colors.orange.withValues(
+                                        alpha: 0.2,
+                                      ),
                                       borderRadius: BorderRadius.circular(4),
                                     ),
-                                    child: Text(eq.slot,
-                                        style: TextStyle(
-                                            fontSize: 10,
-                                            color: Colors.orange.shade800)),
+                                    child: Text(
+                                      eq.slot,
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: Colors.orange.shade800,
+                                      ),
+                                    ),
                                   ),
                                   if (eq.value > 0) ...[
                                     const SizedBox(width: 8),
-                                    const Icon(Icons.monetization_on_outlined,
-                                        size: 11, color: Colors.amber),
-                                    Text('${eq.value}',
-                                        style: const TextStyle(fontSize: 11)),
+                                    const Icon(
+                                      Icons.monetization_on_outlined,
+                                      size: 11,
+                                      color: Colors.amber,
+                                    ),
+                                    Text(
+                                      '${eq.value}',
+                                      style: const TextStyle(fontSize: 11),
+                                    ),
                                   ],
                                   if (eq.ac > 0) ...[
                                     const SizedBox(width: 8),
-                                    const Icon(Icons.shield_outlined,
-                                        size: 11, color: Colors.blue),
-                                    Text('AC${eq.ac}',
-                                        style: const TextStyle(fontSize: 11)),
+                                    const Icon(
+                                      Icons.shield_outlined,
+                                      size: 11,
+                                      color: Colors.blue,
+                                    ),
+                                    Text(
+                                      'AC${eq.ac}',
+                                      style: const TextStyle(fontSize: 11),
+                                    ),
                                   ],
                                 ],
                               ),
@@ -349,14 +409,21 @@ class RulesTab extends StatelessWidget {
                           ),
                         ),
                         IconButton(
-                          onPressed: () => _showAddEquipmentDialog(context, editIndex: i, editEq: eq),
+                          onPressed: () => _showAddEquipmentDialog(
+                            context,
+                            editIndex: i,
+                            editEq: eq,
+                          ),
                           icon: const Icon(Icons.edit, size: 22),
                           tooltip: '编辑',
                         ),
                         IconButton(
                           onPressed: () => onRemoveEquipmentTemplate(i),
-                          icon: const Icon(Icons.remove_circle_outline,
-                              color: Colors.red, size: 20),
+                          icon: const Icon(
+                            Icons.remove_circle_outline,
+                            color: Colors.red,
+                            size: 20,
+                          ),
                           tooltip: '删除模板',
                         ),
                       ],
@@ -397,59 +464,104 @@ class RulesTab extends StatelessWidget {
                 padding: const EdgeInsets.only(bottom: 4),
                 child: Card(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                     child: Row(
                       children: [
-                        const Icon(Icons.auto_fix_high, size: 20, color: Colors.teal),
+                        const Icon(
+                          Icons.auto_fix_high,
+                          size: 20,
+                          color: Colors.teal,
+                        ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(s.name,
-                                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                              Text(
+                                s.name,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                               if (s.damages.isNotEmpty) ...[
                                 const SizedBox(height: 4),
-                                ...s.damages.map((d) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 2),
-                                  child: Row(
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                                        decoration: BoxDecoration(
-                                          color: Colors.teal.withValues(alpha: 0.2),
-                                          borderRadius: BorderRadius.circular(4),
-                                        ),
-                                        child: Text(d.expression ?? '',
-                                            style: TextStyle(fontSize: 10, color: Colors.teal.shade800)),
-                                      ),
-                                      if (d.damageType != null) ...[
-                                        const SizedBox(width: 4),
+                                ...s.damages.map(
+                                  (d) => Padding(
+                                    padding: const EdgeInsets.only(bottom: 2),
+                                    child: Row(
+                                      children: [
                                         Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                                          decoration: BoxDecoration(
-                                            color: Colors.red.withValues(alpha: 0.15),
-                                            borderRadius: BorderRadius.circular(4),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 6,
+                                            vertical: 1,
                                           ),
-                                          child: Text(d.damageType!,
-                                              style: TextStyle(fontSize: 10, color: Colors.red.shade700)),
+                                          decoration: BoxDecoration(
+                                            color: Colors.teal.withValues(
+                                              alpha: 0.2,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              4,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            d.expression ?? '',
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              color: Colors.teal.shade800,
+                                            ),
+                                          ),
                                         ),
+                                        if (d.damageType != null) ...[
+                                          const SizedBox(width: 4),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 6,
+                                              vertical: 1,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: Colors.red.withValues(
+                                                alpha: 0.15,
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(4),
+                                            ),
+                                            child: Text(
+                                              d.damageType!,
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                color: Colors.red.shade700,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ],
-                                    ],
+                                    ),
                                   ),
-                                )),
+                                ),
                               ],
                             ],
                           ),
                         ),
                         IconButton(
-                          onPressed: () => _showAddSkillDialog(context, editIndex: i, editSkill: s),
+                          onPressed: () => _showAddSkillDialog(
+                            context,
+                            editIndex: i,
+                            editSkill: s,
+                          ),
                           icon: const Icon(Icons.edit, size: 22),
                           tooltip: '编辑',
                         ),
                         IconButton(
                           onPressed: () => onRemoveSkillTemplate(i),
-                          icon: const Icon(Icons.remove_circle_outline, color: Colors.red, size: 20),
+                          icon: const Icon(
+                            Icons.remove_circle_outline,
+                            color: Colors.red,
+                            size: 20,
+                          ),
                           tooltip: '删除模板',
                         ),
                       ],
@@ -616,7 +728,11 @@ class RulesTab extends StatelessWidget {
     );
   }
 
-  void _showAddItemDialog(BuildContext context, {int? editIndex, ItemData? editItem}) {
+  void _showAddItemDialog(
+    BuildContext context, {
+    int? editIndex,
+    ItemData? editItem,
+  }) {
     final isEdit = editIndex != null;
     final nameCtrl = TextEditingController(text: editItem?.name ?? '');
     final typeCtrl = TextEditingController(text: editItem?.type ?? '杂物');
@@ -679,7 +795,10 @@ class RulesTab extends StatelessWidget {
                         keyboardType: TextInputType.number,
                         decoration: const InputDecoration(
                           labelText: '价值',
-                          prefixIcon: Icon(Icons.monetization_on_outlined, size: 18),
+                          prefixIcon: Icon(
+                            Icons.monetization_on_outlined,
+                            size: 18,
+                          ),
                           border: OutlineInputBorder(),
                           isDense: true,
                         ),
@@ -692,7 +811,10 @@ class RulesTab extends StatelessWidget {
                         keyboardType: TextInputType.number,
                         decoration: const InputDecoration(
                           labelText: '负重',
-                          prefixIcon: Icon(Icons.monitor_weight_outlined, size: 18),
+                          prefixIcon: Icon(
+                            Icons.monitor_weight_outlined,
+                            size: 18,
+                          ),
                           border: OutlineInputBorder(),
                           isDense: true,
                         ),
@@ -707,17 +829,15 @@ class RulesTab extends StatelessWidget {
                       dialogTitle: '选择物品图片',
                       type: FileType.image,
                     );
-                    if (result != null &&
-                        result.files.single.path != null) {
-                      final bytes =
-                          await File(result.files.single.path!).readAsBytes();
+                    if (result != null && result.files.single.path != null) {
+                      final bytes = await File(
+                        result.files.single.path!,
+                      ).readAsBytes();
                       setDlg(() => imageBase64 = base64Encode(bytes));
                     }
                   },
                   icon: const Icon(Icons.image, size: 18),
-                  label: Text(
-                    imageBase64.isEmpty ? '选择图片' : '已选择图片',
-                  ),
+                  label: Text(imageBase64.isEmpty ? '选择图片' : '已选择图片'),
                 ),
               ],
             ),
@@ -742,12 +862,12 @@ class RulesTab extends StatelessWidget {
                   value: int.tryParse(valueCtrl.text.trim()) ?? 0,
                   weight: int.tryParse(weightCtrl.text.trim()) ?? 0,
                 );
-              if (isEdit) {
-                onEditItemTemplate(editIndex, item);
-              } else {
-                onAddItemTemplate(item);
-              }
-              Navigator.pop(ctx);
+                if (isEdit) {
+                  onEditItemTemplate(editIndex, item);
+                } else {
+                  onAddItemTemplate(item);
+                }
+                Navigator.pop(ctx);
               },
               child: const Text('添加'),
             ),
@@ -791,7 +911,11 @@ class RulesTab extends StatelessWidget {
     );
   }
 
-  void _showAddEquipmentDialog(BuildContext context, {int? editIndex, EquipmentData? editEq}) {
+  void _showAddEquipmentDialog(
+    BuildContext context, {
+    int? editIndex,
+    EquipmentData? editEq,
+  }) {
     final isEdit = editIndex != null;
     final nameCtrl = TextEditingController(text: editEq?.name ?? '');
     final typeCtrl = TextEditingController(text: editEq?.type ?? '防具');
@@ -800,7 +924,9 @@ class RulesTab extends StatelessWidget {
     final valueCtrl = TextEditingController(text: '${editEq?.value ?? 0}');
     final weightCtrl = TextEditingController(text: '${editEq?.weight ?? 0}');
     final acCtrl = TextEditingController(text: '${editEq?.ac ?? 0}');
-    String selectedSlot = editEq?.slot ?? (equipmentSlots.isNotEmpty ? equipmentSlots.first : '饰品');
+    String selectedSlot =
+        editEq?.slot ??
+        (equipmentSlots.isNotEmpty ? equipmentSlots.first : '饰品');
     String imageBase64 = editEq?.imageBase64 ?? '';
 
     showDialog(
@@ -825,7 +951,9 @@ class RulesTab extends StatelessWidget {
                 DropdownButtonFormField<String>(
                   initialValue: equipmentSlots.contains(selectedSlot)
                       ? selectedSlot
-                      : (equipmentSlots.isNotEmpty ? equipmentSlots.first : null),
+                      : (equipmentSlots.isNotEmpty
+                            ? equipmentSlots.first
+                            : null),
                   decoration: const InputDecoration(
                     labelText: '装备位置',
                     border: OutlineInputBorder(),
@@ -873,7 +1001,10 @@ class RulesTab extends StatelessWidget {
                         keyboardType: TextInputType.number,
                         decoration: const InputDecoration(
                           labelText: '价值',
-                          prefixIcon: Icon(Icons.monetization_on_outlined, size: 18),
+                          prefixIcon: Icon(
+                            Icons.monetization_on_outlined,
+                            size: 18,
+                          ),
                           border: OutlineInputBorder(),
                           isDense: true,
                         ),
@@ -886,7 +1017,10 @@ class RulesTab extends StatelessWidget {
                         keyboardType: TextInputType.number,
                         decoration: const InputDecoration(
                           labelText: '负重',
-                          prefixIcon: Icon(Icons.monitor_weight_outlined, size: 18),
+                          prefixIcon: Icon(
+                            Icons.monitor_weight_outlined,
+                            size: 18,
+                          ),
                           border: OutlineInputBorder(),
                           isDense: true,
                         ),
@@ -914,17 +1048,15 @@ class RulesTab extends StatelessWidget {
                       dialogTitle: '选择装备图片',
                       type: FileType.image,
                     );
-                    if (result != null &&
-                        result.files.single.path != null) {
-                      final bytes =
-                          await File(result.files.single.path!).readAsBytes();
+                    if (result != null && result.files.single.path != null) {
+                      final bytes = await File(
+                        result.files.single.path!,
+                      ).readAsBytes();
                       setDlg(() => imageBase64 = base64Encode(bytes));
                     }
                   },
                   icon: const Icon(Icons.image, size: 18),
-                  label: Text(
-                    imageBase64.isEmpty ? '选择图片' : '已选择图片',
-                  ),
+                  label: Text(imageBase64.isEmpty ? '选择图片' : '已选择图片'),
                 ),
               ],
             ),
@@ -951,12 +1083,12 @@ class RulesTab extends StatelessWidget {
                   ac: int.tryParse(acCtrl.text.trim()) ?? 0,
                   slot: selectedSlot,
                 );
-              if (isEdit) {
-                onEditEquipmentTemplate(editIndex, eq);
-              } else {
-                onAddEquipmentTemplate(eq);
-              }
-              Navigator.pop(ctx);
+                if (isEdit) {
+                  onEditEquipmentTemplate(editIndex, eq);
+                } else {
+                  onAddEquipmentTemplate(eq);
+                }
+                Navigator.pop(ctx);
               },
               child: const Text('添加'),
             ),
@@ -966,10 +1098,16 @@ class RulesTab extends StatelessWidget {
     );
   }
 
-  void _showAddSkillDialog(BuildContext context, {int? editIndex, SkillData? editSkill}) {
+  void _showAddSkillDialog(
+    BuildContext context, {
+    int? editIndex,
+    SkillData? editSkill,
+  }) {
     final isEdit = editIndex != null && editSkill != null;
     final nameCtrl = TextEditingController(text: isEdit ? editSkill.name : '');
-    final descCtrl = TextEditingController(text: isEdit ? editSkill.description : '');
+    final descCtrl = TextEditingController(
+      text: isEdit ? editSkill.description : '',
+    );
     String imageBase64 = isEdit ? (editSkill.imageBase64 ?? '') : '';
     final damages = <_SkillDamageRow>[
       if (isEdit)
@@ -979,7 +1117,9 @@ class RulesTab extends StatelessWidget {
             dmgType: d.damageType,
           ),
     ];
-    if (damages.isEmpty) damages.add(_SkillDamageRow(exprCtrl: TextEditingController()));
+    if (damages.isEmpty) {
+      damages.add(_SkillDamageRow(exprCtrl: TextEditingController()));
+    }
 
     showDialog(
       context: context,
@@ -1005,7 +1145,9 @@ class RulesTab extends StatelessWidget {
                       type: FileType.image,
                     );
                     if (result != null && result.files.single.path != null) {
-                      final bytes = await File(result.files.single.path!).readAsBytes();
+                      final bytes = await File(
+                        result.files.single.path!,
+                      ).readAsBytes();
                       setDialogState(() => imageBase64 = base64Encode(bytes));
                     }
                   },
@@ -1015,60 +1157,93 @@ class RulesTab extends StatelessWidget {
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    const Text('技能伤害', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                    const Text(
+                      '技能伤害',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                     const Spacer(),
                     TextButton.icon(
-                      onPressed: () => setDialogState(() =>
-                          damages.add(_SkillDamageRow(exprCtrl: TextEditingController()))),
+                      onPressed: () => setDialogState(
+                        () => damages.add(
+                          _SkillDamageRow(exprCtrl: TextEditingController()),
+                        ),
+                      ),
                       icon: const Icon(Icons.add, size: 16),
                       label: const Text('添加', style: TextStyle(fontSize: 13)),
                     ),
                   ],
                 ),
-                ...List.generate(damages.length, (i) => Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        flex: 2,
-                        child: TextField(
-                          controller: damages[i].exprCtrl,
-                          decoration: const InputDecoration(
-                            labelText: '表达式',
-                            hintText: '1d6+3',
-                            border: OutlineInputBorder(),
-                            isDense: true,
+                ...List.generate(
+                  damages.length,
+                  (i) => Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          flex: 2,
+                          child: TextField(
+                            controller: damages[i].exprCtrl,
+                            decoration: const InputDecoration(
+                              labelText: '表达式',
+                              hintText: '1d6+3',
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        flex: 2,
-                        child: DropdownButtonFormField<String?>(
-                          initialValue: damageTypes.contains(damages[i].dmgType) ? damages[i].dmgType : null,
-                          decoration: const InputDecoration(
-                            labelText: '伤害类型',
-                            border: OutlineInputBorder(),
-                            isDense: true,
+                        const SizedBox(width: 6),
+                        Expanded(
+                          flex: 2,
+                          child: DropdownButtonFormField<String?>(
+                            initialValue:
+                                damageTypes.contains(damages[i].dmgType)
+                                ? damages[i].dmgType
+                                : null,
+                            decoration: const InputDecoration(
+                              labelText: '伤害类型',
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                            ),
+                            items: [
+                              const DropdownMenuItem(
+                                value: null,
+                                child: Text(
+                                  '无',
+                                  style: TextStyle(fontSize: 13),
+                                ),
+                              ),
+                              ...damageTypes.map(
+                                (t) => DropdownMenuItem(
+                                  value: t,
+                                  child: Text(
+                                    t,
+                                    style: const TextStyle(fontSize: 13),
+                                  ),
+                                ),
+                              ),
+                            ],
+                            onChanged: (v) =>
+                                setDialogState(() => damages[i].dmgType = v),
                           ),
-                          items: [
-                            const DropdownMenuItem(value: null, child: Text('无', style: TextStyle(fontSize: 13))),
-                            ...damageTypes.map((t) =>
-                              DropdownMenuItem(value: t, child: Text(t, style: const TextStyle(fontSize: 13)))),
-                          ],
-                          onChanged: (v) => setDialogState(() => damages[i].dmgType = v),
                         ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.remove_circle_outline, size: 18, color: Colors.red),
-                        tooltip: '删除',
-                        onPressed: damages.length <= 1
-                            ? null
-                            : () => setDialogState(() => damages.removeAt(i)),
-                      ),
-                    ],
+                        IconButton(
+                          icon: const Icon(
+                            Icons.remove_circle_outline,
+                            size: 18,
+                            color: Colors.red,
+                          ),
+                          tooltip: '删除',
+                          onPressed: damages.length <= 1
+                              ? null
+                              : () => setDialogState(() => damages.removeAt(i)),
+                        ),
+                      ],
+                    ),
                   ),
-                )),
+                ),
                 const SizedBox(height: 10),
                 TextField(
                   controller: descCtrl,
@@ -1092,14 +1267,18 @@ class RulesTab extends StatelessWidget {
                 if (name.isEmpty) return;
                 final s = SkillData(
                   name: name,
-                  description: descCtrl.text.trim().isEmpty ? null : descCtrl.text.trim(),
+                  description: descCtrl.text.trim().isEmpty
+                      ? null
+                      : descCtrl.text.trim(),
                   imageBase64: imageBase64.isEmpty ? null : imageBase64,
                   damages: damages
                       .where((r) => r.exprCtrl.text.trim().isNotEmpty)
-                      .map((r) => SkillDamage(
-                            expression: r.exprCtrl.text.trim(),
-                            damageType: r.dmgType,
-                          ))
+                      .map(
+                        (r) => SkillDamage(
+                          expression: r.exprCtrl.text.trim(),
+                          damageType: r.dmgType,
+                        ),
+                      )
                       .toList(),
                 );
                 if (isEdit) {

@@ -57,10 +57,7 @@ class ExpressionEngine {
 // 词法分析
 // ══════════════════════════════════════════════
 
-const _pathStarters = {
-  '装备', '物品',
-  '力量', '敏捷', '体质', '智力', '感知', '魅力',
-};
+const _pathStarters = {'装备', '物品', '力量', '敏捷', '体质', '智力', '感知', '魅力'};
 
 bool _isPathStarter(String s) => _pathStarters.contains(s);
 
@@ -147,10 +144,26 @@ List<_Tok> _lex(String s) {
       continue;
     }
 
-    if (ch == '+' || ch == '-') { tokens.add(_Tok(_TT.op, ch)); i++; continue; }
-    if (ch == '*' || ch == '/') { tokens.add(_Tok(_TT.op, ch)); i++; continue; }
-    if (ch == '(') { tokens.add(_Tok(_TT.lparen, '(')); i++; continue; }
-    if (ch == ')') { tokens.add(_Tok(_TT.rparen, ')')); i++; continue; }
+    if (ch == '+' || ch == '-') {
+      tokens.add(_Tok(_TT.op, ch));
+      i++;
+      continue;
+    }
+    if (ch == '*' || ch == '/') {
+      tokens.add(_Tok(_TT.op, ch));
+      i++;
+      continue;
+    }
+    if (ch == '(') {
+      tokens.add(_Tok(_TT.lparen, '('));
+      i++;
+      continue;
+    }
+    if (ch == ')') {
+      tokens.add(_Tok(_TT.rparen, ')'));
+      i++;
+      continue;
+    }
 
     throw FormatException('表达式包含非法字符: "$ch" (位置 $i)');
   }
@@ -239,13 +252,17 @@ int _exec(List<_Tok> rpn, EvalContext ctx) {
         final b = stack.removeLast();
         final a = stack.removeLast();
         switch (tok.val) {
-          case '+': stack.add(a + b);
-          case '-': stack.add(a - b);
-          case '*': stack.add(a * b);
+          case '+':
+            stack.add(a + b);
+          case '-':
+            stack.add(a - b);
+          case '*':
+            stack.add(a * b);
           case '/':
             if (b == 0) throw const FormatException('除以零');
             stack.add(a ~/ b);
-          default: throw FormatException('未知运算符: ${tok.val}');
+          default:
+            throw FormatException('未知运算符: ${tok.val}');
         }
 
       case _TT.lparen:
@@ -280,10 +297,16 @@ int _resolvePath(String path, EvalContext ctx) {
     final eq = ctx.equipment[slot];
     if (eq == null) return 0;
     switch (prop) {
-      case 'ac': return eq.ac;
-      case 'value': case '价值': return eq.value;
-      case 'weight': case '负重': return eq.weight;
-      default: return 0;
+      case 'ac':
+        return eq.ac;
+      case 'value':
+      case '价值':
+        return eq.value;
+      case 'weight':
+      case '负重':
+        return eq.weight;
+      default:
+        return 0;
     }
   }
 

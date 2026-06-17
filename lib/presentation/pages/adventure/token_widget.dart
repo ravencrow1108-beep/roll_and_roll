@@ -112,22 +112,16 @@ class _TokenWidgetState extends State<TokenWidget> {
     }
 
     _dismissTimer?.cancel();
-    _dismissTimer = Timer(
-      const Duration(milliseconds: 300),
-      _dismissPopup,
-    );
+    _dismissTimer = Timer(const Duration(milliseconds: 300), _dismissPopup);
   }
 
   void _showPopup() {
     _dismissPopup();
     if (widget.characterData == null) return;
 
-    final box =
-        _avatarKey.currentContext?.findRenderObject() as RenderBox?;
+    final box = _avatarKey.currentContext?.findRenderObject() as RenderBox?;
     if (box == null || !box.hasSize) return;
-    final center = box.localToGlobal(
-      box.size.center(Offset.zero),
-    );
+    final center = box.localToGlobal(box.size.center(Offset.zero));
 
     _popupEntry = OverlayEntry(
       builder: (_) => Stack(
@@ -183,8 +177,9 @@ class _TokenWidgetState extends State<TokenWidget> {
     const double noteBubbleH = 19.0;
 
     // 注释条数 → 需要把整个 Column 向上偏移的量
-    final notesShift =
-        widget.isPlayer ? widget.notes.length * noteBubbleH : 0.0;
+    final notesShift = widget.isPlayer
+        ? widget.notes.length * noteBubbleH
+        : 0.0;
 
     // 头像锚点 = (x,y)，因为注释在上方，Positioned(top) 需额外上移 notesShift，
     // 这样头像的绝对坐标始终 = y*maxHeight
@@ -210,39 +205,35 @@ class _TokenWidgetState extends State<TokenWidget> {
             onEnter: _onHoverEnter,
             onExit: _onHoverExit,
             child: Container(
-                key: _avatarKey,
-                width: tokenSize,
-                height: tokenSize,
-                decoration: BoxDecoration(
-                  color: tokenColor,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: borderColor,
-                    width: borderWidth,
-                  ),
-                  boxShadow: widget.isDragged
-                      ? [
-                          BoxShadow(
-                            color: Colors.amber.withValues(alpha: 0.5),
-                            blurRadius: 8,
-                            spreadRadius: 2,
-                          ),
-                        ]
-                      : null,
-                ),
-                child: widget.isPlayer &&
-                        _cachedPortraitBytes != null
-                    ? ClipOval(
-                        child: Image.memory(
-                          _cachedPortraitBytes!,
-                          fit: BoxFit.cover,
-                          gaplessPlayback: true,
-                          errorBuilder: (ctx, err, _) => _initialText(),
+              key: _avatarKey,
+              width: tokenSize,
+              height: tokenSize,
+              decoration: BoxDecoration(
+                color: tokenColor,
+                shape: BoxShape.circle,
+                border: Border.all(color: borderColor, width: borderWidth),
+                boxShadow: widget.isDragged
+                    ? [
+                        BoxShadow(
+                          color: Colors.amber.withValues(alpha: 0.5),
+                          blurRadius: 8,
+                          spreadRadius: 2,
                         ),
-                      )
-                    : _initialText(),
+                      ]
+                    : null,
               ),
+              child: widget.isPlayer && _cachedPortraitBytes != null
+                  ? ClipOval(
+                      child: Image.memory(
+                        _cachedPortraitBytes!,
+                        fit: BoxFit.cover,
+                        gaplessPlayback: true,
+                        errorBuilder: (ctx, err, _) => _initialText(),
+                      ),
+                    )
+                  : _initialText(),
             ),
+          ),
           const SizedBox(height: 2),
           // ── 名称标签 ──
           Container(

@@ -41,7 +41,8 @@ class SkillData {
     name: json['name'] as String,
     description: json['description'] as String?,
     imageBase64: json['imageBase64'] as String?,
-    damages: (json['damages'] as List<dynamic>?)
+    damages:
+        (json['damages'] as List<dynamic>?)
             ?.map((d) => SkillDamage.fromJson(d as Map<String, dynamic>))
             .toList() ??
         const [],

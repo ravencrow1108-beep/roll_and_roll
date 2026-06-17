@@ -31,8 +31,9 @@ class CharacterManagePanel extends StatelessWidget {
         children: [
           Text(
             '角色管理',
-            style: theme.textTheme.titleSmall
-                ?.copyWith(fontWeight: FontWeight.w600),
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
           ),
           const SizedBox(height: 6),
           // ── 添加角色按钮（仅 GM） ──
@@ -58,15 +59,12 @@ class CharacterManagePanel extends StatelessWidget {
                   final c = characters[i];
                   return ListTile(
                     dense: true,
-                    contentPadding:
-                        const EdgeInsets.symmetric(horizontal: 4),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 4),
                     leading: CircleAvatar(
                       radius: 12,
                       backgroundColor: Colors.deepPurple,
                       child: Text(
-                        c.name.isNotEmpty
-                            ? c.name[0].toUpperCase()
-                            : '?',
+                        c.name.isNotEmpty ? c.name[0].toUpperCase() : '?',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 10,
@@ -81,12 +79,17 @@ class CharacterManagePanel extends StatelessWidget {
                     subtitle: Text(
                       '${c.className} · Lv${c.level}',
                       style: TextStyle(
-                          fontSize: 10, color: Colors.grey.shade600),
+                        fontSize: 10,
+                        color: Colors.grey.shade600,
+                      ),
                     ),
                     trailing: isGM
                         ? IconButton(
-                            icon: const Icon(Icons.remove_circle_outline,
-                                size: 18, color: Colors.red),
+                            icon: const Icon(
+                              Icons.remove_circle_outline,
+                              size: 18,
+                              color: Colors.red,
+                            ),
                             tooltip: '移除角色',
                             onPressed: () => onRemoveCharacter(i),
                           )

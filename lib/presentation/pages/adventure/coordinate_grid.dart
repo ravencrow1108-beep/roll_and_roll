@@ -10,6 +10,7 @@ class CoordinateGridPainter extends CustomPainter {
     this.showLabels = true,
     this.showGrid = true,
     this.showMinorGrid = false,
+    this.step = 1,
   });
 
   final int columns;
@@ -18,6 +19,9 @@ class CoordinateGridPainter extends CustomPainter {
   final bool showLabels;
   final bool showGrid;
   final bool showMinorGrid;
+
+  /// 网格步长：1 表示每格画线，2 表示隔一格画线，以此类推
+  final int step;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -46,14 +50,14 @@ class CoordinateGridPainter extends CustomPainter {
       ..color = Colors.white.withValues(alpha: 0.25)
       ..strokeWidth = 0.5;
 
-    // 竖线
-    for (int i = 1; i < columns; i++) {
-      final x = cellW * i;
+    // 竖线（按步长）
+    for (int i = step; i <= columns; i += step) {
+      final x = cellW * i.toDouble();
       canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
     }
-    // 横线
-    for (int i = 1; i < rows; i++) {
-      final y = cellH * i;
+    // 横线（按步长）
+    for (int i = step; i <= rows; i += step) {
+      final y = cellH * i.toDouble();
       canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
     }
   }
@@ -63,15 +67,17 @@ class CoordinateGridPainter extends CustomPainter {
       ..color = Colors.white.withValues(alpha: 0.1)
       ..strokeWidth = 0.4;
 
-    final halfW = cellW / 2;
-    final halfH = cellH / 2;
+    final int halfStep = (step ~/ 2).clamp(1, step);
+    if (halfStep == step || halfStep == 0) return;
 
-    for (int i = 0; i < columns; i++) {
-      final x = cellW * i + halfW;
+    for (int i = halfStep; i <= columns; i += halfStep) {
+      if (i % step == 0) continue;
+      final x = cellW * i.toDouble();
       canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
     }
-    for (int i = 0; i < rows; i++) {
-      final y = cellH * i + halfH;
+    for (int i = halfStep; i <= rows; i += halfStep) {
+      if (i % step == 0) continue;
+      final y = cellH * i.toDouble();
       canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
     }
   }
@@ -91,46 +97,36 @@ class CoordinateGridPainter extends CustomPainter {
     canvas.drawCircle(Offset.zero, 4, axisPaint);
   }
 
-  void _drawLabels(
-    Canvas canvas,
-    Size size,
-    double cellW,
-    double cellH,
-  ) {
+  void _drawLabels(Canvas canvas, Size size, double cellW, double cellH) {
     final labelStyle = TextStyle(
       color: Colors.white.withValues(alpha: 0.85),
       fontSize: 9,
       fontWeight: FontWeight.w600,
-      shadows: const [
-        Shadow(color: Colors.black87, blurRadius: 2),
-      ],
+      shadows: const [Shadow(color: Colors.black87, blurRadius: 2)],
     );
 
-    // X 轴标签（顶部）
-    for (int i = 0; i <= columns; i++) {
-      final x = cellW * i;
+    // X 轴标签（顶部）按步长
+    for (int i = 0; i <= columns; i += step) {
+      final double x = cellW * i.toDouble();
       final text = _labelText(i, unit);
       final tp = TextPainter(
         text: TextSpan(text: text, style: labelStyle),
         textDirection: TextDirection.ltr,
-      )..layout(maxWidth: cellW + 10);
+      )..layout(maxWidth: cellW * step.toDouble() + 10);
 
-      // 在格子顶部居中，略微偏移避免与轴重叠
-      final dx = x - tp.width / 2;
-      final dy = 4.0;
-      // 处理边界裁剪
-      final clippedDx = dx.clamp(0.0, size.width - tp.width);
-      tp.paint(canvas, Offset(clippedDx, dy));
+      final double dx = (x - tp.width / 2).clamp(0.0, size.width - tp.width);
+      final double dy = 4.0;
+      tp.paint(canvas, Offset(dx, dy));
     }
 
-    // Y 轴标签（左侧）
-    for (int i = 0; i <= rows; i++) {
-      final y = cellH * i;
+    // Y 轴标签（左侧）按步长
+    for (int i = 0; i <= rows; i += step) {
+      final double y = cellH * i.toDouble();
       final text = _labelText(i, unit);
       final tp = TextPainter(
         text: TextSpan(text: text, style: labelStyle),
         textDirection: TextDirection.ltr,
-      )..layout(maxWidth: cellW + 10);
+      )..layout(maxWidth: cellW * step.toDouble() + 10);
 
       final dx = 4.0;
       final dy = y - tp.height / 2;
@@ -151,6 +147,7 @@ class CoordinateGridPainter extends CustomPainter {
         unit != oldDelegate.unit ||
         showLabels != oldDelegate.showLabels ||
         showGrid != oldDelegate.showGrid ||
-        showMinorGrid != oldDelegate.showMinorGrid;
+        showMinorGrid != oldDelegate.showMinorGrid ||
+        step != oldDelegate.step;
   }
 }

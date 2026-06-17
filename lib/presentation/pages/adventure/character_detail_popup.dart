@@ -174,10 +174,7 @@ class _CharacterDetailPopupState extends State<CharacterDetailPopup> {
               const SizedBox(height: 2),
               Text(
                 'Lv.${c.level}',
-                style: TextStyle(
-                  color: Colors.grey.shade400,
-                  fontSize: 12,
-                ),
+                style: TextStyle(color: Colors.grey.shade400, fontSize: 12),
               ),
             ],
           ),
@@ -228,8 +225,8 @@ class _CharacterDetailPopupState extends State<CharacterDetailPopup> {
     final hpColor = ratio > 0.6
         ? Colors.green
         : ratio > 0.3
-            ? Colors.orange
-            : Colors.red;
+        ? Colors.orange
+        : Colors.red;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -277,10 +274,7 @@ class _CharacterDetailPopupState extends State<CharacterDetailPopup> {
         _infoRow('职业', c.className),
         // 双职业支持
         if (c.additionalClasses.isNotEmpty)
-          _infoRow(
-            '副职业',
-            c.additionalClasses.join(' / '),
-          ),
+          _infoRow('副职业', c.additionalClasses.join(' / ')),
         _infoRow('种族', c.race),
       ],
     );
@@ -303,18 +297,18 @@ class _CharacterDetailPopupState extends State<CharacterDetailPopup> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.psychology_outlined,
-                    size: 14, color: _accentColor),
+                const Icon(
+                  Icons.psychology_outlined,
+                  size: 14,
+                  color: _accentColor,
+                ),
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(
                     p.description != null && p.description!.isNotEmpty
                         ? '${p.trait}：${p.description}'
                         : p.trait,
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: 12,
-                    ),
+                    style: const TextStyle(color: Colors.white70, fontSize: 12),
                   ),
                 ),
               ],
@@ -349,28 +343,20 @@ class _CharacterDetailPopupState extends State<CharacterDetailPopup> {
       decoration: BoxDecoration(
         color: Colors.amber.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(
-          color: Colors.amber.withValues(alpha: 0.2),
-        ),
+        border: Border.all(color: Colors.amber.withValues(alpha: 0.2)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             '${index + 1}.',
-            style: TextStyle(
-              color: Colors.amber.shade200,
-              fontSize: 11,
-            ),
+            style: TextStyle(color: Colors.amber.shade200, fontSize: 11),
           ),
           const SizedBox(width: 4),
           Expanded(
             child: Text(
               text,
-              style: TextStyle(
-                color: Colors.amber.shade100,
-                fontSize: 11,
-              ),
+              style: TextStyle(color: Colors.amber.shade100, fontSize: 11),
             ),
           ),
         ],

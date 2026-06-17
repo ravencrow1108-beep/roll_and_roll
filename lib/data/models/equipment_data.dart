@@ -31,26 +31,26 @@ class EquipmentData {
 
   /// 转换为纯物品（丢掉 slot / ac 信息）
   ItemData toItem() => ItemData(
-        name: name,
-        imageBase64: imageBase64,
-        type: type,
-        effect: effect,
-        description: description,
-        weight: weight,
-        value: value,
-      );
+    name: name,
+    imageBase64: imageBase64,
+    type: type,
+    effect: effect,
+    description: description,
+    weight: weight,
+    value: value,
+  );
 
   Map<String, dynamic> toJson() => {
-        'name': name,
-        if (imageBase64.isNotEmpty) 'imageBase64': imageBase64,
-        'type': type,
-        if (effect.isNotEmpty) 'effect': effect,
-        if (description.isNotEmpty) 'description': description,
-        'weight': weight,
-        'value': value,
-        if (ac > 0) 'ac': ac,
-        'slot': slot,
-      };
+    'name': name,
+    if (imageBase64.isNotEmpty) 'imageBase64': imageBase64,
+    'type': type,
+    if (effect.isNotEmpty) 'effect': effect,
+    if (description.isNotEmpty) 'description': description,
+    'weight': weight,
+    'value': value,
+    if (ac > 0) 'ac': ac,
+    'slot': slot,
+  };
 
   factory EquipmentData.fromJson(Map<String, dynamic> json) {
     return EquipmentData(

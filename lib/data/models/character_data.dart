@@ -112,13 +112,15 @@ class CharacterData {
               .toList() ??
           [],
       equipment:
-          (json['equipment'] as Map<String, dynamic>?)
-                  ?.map((k, v) => MapEntry(
-                      k,
-                      v != null
-                          ? EquipmentData.fromJson(v as Map<String, dynamic>)
-                          : null)) ??
-              {},
+          (json['equipment'] as Map<String, dynamic>?)?.map(
+            (k, v) => MapEntry(
+              k,
+              v != null
+                  ? EquipmentData.fromJson(v as Map<String, dynamic>)
+                  : null,
+            ),
+          ) ??
+          {},
       strength: stats['strength'] as int? ?? 10,
       dexterity: stats['dexterity'] as int? ?? 10,
       constitution: stats['constitution'] as int? ?? 10,
@@ -130,7 +132,8 @@ class CharacterData {
           : const {},
       hp: json['hp'] as int? ?? 1,
       maxHp: json['maxHp'] as int? ?? 1,
-      notes: (json['notes'] as List<dynamic>?)
+      notes:
+          (json['notes'] as List<dynamic>?)
               ?.map((n) => n.toString())
               .toList() ??
           (json['note'] is String ? [json['note'] as String] : const []),

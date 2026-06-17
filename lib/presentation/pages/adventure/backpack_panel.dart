@@ -89,10 +89,7 @@ class _BackpackPanelState extends State<BackpackPanel> {
         const SizedBox(height: 4),
         Text(
           '背包 $count / $max',
-          style: TextStyle(
-            fontSize: 10,
-            color: Colors.grey.shade500,
-          ),
+          style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
         ),
       ],
     );
@@ -166,8 +163,7 @@ class _ItemSlot extends StatelessWidget {
         height: size,
         decoration: BoxDecoration(
           color: item != null
-              ? theme.colorScheme.surfaceContainerHighest
-                  .withValues(alpha: 0.5)
+              ? theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5)
               : Colors.grey.shade200.withValues(alpha: 0.3),
           borderRadius: BorderRadius.circular(6),
           border: Border.all(
@@ -176,9 +172,7 @@ class _ItemSlot extends StatelessWidget {
                 : Colors.grey.shade300.withValues(alpha: 0.3),
           ),
         ),
-        child: item == null
-            ? null
-            : _buildSlotChild(item!, size, theme),
+        child: item == null ? null : _buildSlotChild(item!, size, theme),
       ),
     );
   }
@@ -319,7 +313,9 @@ class _ItemDetailPopup extends StatelessWidget {
                           const SizedBox(height: 2),
                           Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 1),
+                              horizontal: 6,
+                              vertical: 1,
+                            ),
                             decoration: BoxDecoration(
                               color: _accentColor.withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(4),
@@ -344,11 +340,17 @@ class _ItemDetailPopup extends StatelessWidget {
                     _statChip(Icons.category_outlined, item.type),
                     const SizedBox(width: 6),
                     if (item.value > 0) ...[
-                      _statChip(Icons.monetization_on_outlined, '${item.value}G'),
+                      _statChip(
+                        Icons.monetization_on_outlined,
+                        '${item.value}G',
+                      ),
                       const SizedBox(width: 6),
                     ],
                     if (item.weight > 0)
-                      _statChip(Icons.monitor_weight_outlined, '${item.weight}'),
+                      _statChip(
+                        Icons.monitor_weight_outlined,
+                        '${item.weight}',
+                      ),
                   ],
                 ),
                 // ── 效果 ──
@@ -367,10 +369,7 @@ class _ItemDetailPopup extends StatelessWidget {
                   const Divider(color: _borderColor, height: 16),
                   Text(
                     item.description,
-                    style: const TextStyle(
-                      color: Colors.white60,
-                      fontSize: 11,
-                    ),
+                    style: const TextStyle(color: Colors.white60, fontSize: 11),
                   ),
                 ],
               ],

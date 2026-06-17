@@ -410,9 +410,9 @@ class CharacterTab extends StatelessWidget {
                   tooltip: '从模板添加技能',
                   icon: const Icon(Icons.add_circle_outline, size: 20),
                   onSelected: onAddSkillFromTemplate,
-                  itemBuilder: (_) => skillTemplates.map((s) =>
-                    PopupMenuItem(value: s, child: Text(s.name)),
-                  ).toList(),
+                  itemBuilder: (_) => skillTemplates
+                      .map((s) => PopupMenuItem(value: s, child: Text(s.name)))
+                      .toList(),
                 ),
             ],
           ),
@@ -455,8 +455,11 @@ class CharacterTab extends StatelessWidget {
                               onPressed: () => onEditSkill(i, s),
                             ),
                             IconButton(
-                              icon: const Icon(Icons.delete_outline,
-                                  size: 18, color: Colors.red),
+                              icon: const Icon(
+                                Icons.delete_outline,
+                                size: 18,
+                                color: Colors.red,
+                              ),
                               tooltip: '删除',
                               visualDensity: VisualDensity.compact,
                               onPressed: () => onRemoveSkill(i),
@@ -476,34 +479,54 @@ class CharacterTab extends StatelessWidget {
                         ],
                         if (s.damages.isNotEmpty) ...[
                           const SizedBox(height: 4),
-                          ...s.damages.map((d) => Padding(
-                            padding: const EdgeInsets.only(bottom: 2),
-                            child: Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                                  decoration: BoxDecoration(
-                                    color: Colors.teal.withValues(alpha: 0.2),
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: Text(d.expression ?? '',
-                                      style: TextStyle(fontSize: 10, color: Colors.teal.shade800)),
-                                ),
-                                if (d.damageType != null) ...[
-                                  const SizedBox(width: 4),
+                          ...s.damages.map(
+                            (d) => Padding(
+                              padding: const EdgeInsets.only(bottom: 2),
+                              child: Row(
+                                children: [
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 1,
+                                    ),
                                     decoration: BoxDecoration(
-                                      color: Colors.red.withValues(alpha: 0.15),
+                                      color: Colors.teal.withValues(alpha: 0.2),
                                       borderRadius: BorderRadius.circular(4),
                                     ),
-                                    child: Text(d.damageType!,
-                                        style: TextStyle(fontSize: 10, color: Colors.red.shade700)),
+                                    child: Text(
+                                      d.expression ?? '',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: Colors.teal.shade800,
+                                      ),
+                                    ),
                                   ),
+                                  if (d.damageType != null) ...[
+                                    const SizedBox(width: 4),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 1,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.red.withValues(
+                                          alpha: 0.15,
+                                        ),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: Text(
+                                        d.damageType!,
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: Colors.red.shade700,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ],
-                              ],
+                              ),
                             ),
-                          )),
+                          ),
                         ],
                       ],
                     ),
@@ -598,8 +621,11 @@ class CharacterTab extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              const Icon(Icons.shield_outlined,
-                  size: 20, color: Colors.deepPurple),
+              const Icon(
+                Icons.shield_outlined,
+                size: 20,
+                color: Colors.deepPurple,
+              ),
               const SizedBox(width: 4),
               Text(
                 'AC $_totalAc',
@@ -674,8 +700,10 @@ class CharacterTab extends StatelessWidget {
         children: [
           const Padding(
             padding: EdgeInsets.all(16),
-            child: Text('选择物品',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            child: Text(
+              '选择物品',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
           ),
           for (int i = 0; i < itemTemplates.length; i++)
             ListTile(
@@ -693,9 +721,11 @@ class CharacterTab extends StatelessWidget {
           if (itemTemplates.isEmpty)
             const Padding(
               padding: EdgeInsets.all(24),
-              child: Text('暂无物品模板，请先在规则页面添加',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.grey)),
+              child: Text(
+                '暂无物品模板，请先在规则页面添加',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey),
+              ),
             ),
           const SizedBox(height: 80),
         ],
@@ -783,10 +813,7 @@ class _ItemGridTile extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 9,
-                ),
+                style: const TextStyle(color: Colors.white, fontSize: 9),
               ),
             ),
           ),
@@ -828,8 +855,8 @@ class _EquipmentGridTile extends StatelessWidget {
       onTap: equipped != null
           ? null
           : _matching.isNotEmpty
-              ? () => _showPicker(context)
-              : null,
+          ? () => _showPicker(context)
+          : null,
       child: SizedBox(
         width: _boxSize + 16,
         child: Column(
@@ -843,8 +870,12 @@ class _EquipmentGridTile extends StatelessWidget {
                   height: _boxSize,
                   decoration: BoxDecoration(
                     color: equipped != null
-                        ? theme.colorScheme.primaryContainer.withValues(alpha: 0.3)
-                        : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                        ? theme.colorScheme.primaryContainer.withValues(
+                            alpha: 0.3,
+                          )
+                        : theme.colorScheme.surfaceContainerHighest.withValues(
+                            alpha: 0.4,
+                          ),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
                       color: equipped != null
@@ -855,27 +886,38 @@ class _EquipmentGridTile extends StatelessWidget {
                   child: Center(
                     child: equipped != null
                         ? equipped!.imageBase64.isNotEmpty
-                            ? ClipRRect(
-                                borderRadius: BorderRadius.circular(6),
-                                child: Image.memory(
-                                  base64Decode(equipped!.imageBase64),
-                                  width: _boxSize - 8,
-                                  height: _boxSize - 8,
-                                  fit: BoxFit.cover,
-                                  gaplessPlayback: true,
-                                ),
-                              )
-                            : Icon(Icons.shield_outlined, size: 30,
-                                color: theme.colorScheme.primary.withValues(alpha: 0.5))
+                              ? ClipRRect(
+                                  borderRadius: BorderRadius.circular(6),
+                                  child: Image.memory(
+                                    base64Decode(equipped!.imageBase64),
+                                    width: _boxSize - 8,
+                                    height: _boxSize - 8,
+                                    fit: BoxFit.cover,
+                                    gaplessPlayback: true,
+                                  ),
+                                )
+                              : Icon(
+                                  Icons.shield_outlined,
+                                  size: 30,
+                                  color: theme.colorScheme.primary.withValues(
+                                    alpha: 0.5,
+                                  ),
+                                )
                         : Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.shield_outlined, size: 28,
-                                  color: Colors.grey.shade400),
+                              Icon(
+                                Icons.shield_outlined,
+                                size: 28,
+                                color: Colors.grey.shade400,
+                              ),
                               const SizedBox(height: 2),
                               Text(
                                 _matching.isNotEmpty ? '点击选择' : '暂无',
-                                style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.grey.shade500,
+                                ),
                               ),
                             ],
                           ),
@@ -891,7 +933,11 @@ class _EquipmentGridTile extends StatelessWidget {
                       child: InkWell(
                         onTap: onUnequip,
                         borderRadius: BorderRadius.circular(10),
-                        child: const Icon(Icons.cancel, size: 18, color: Colors.red),
+                        child: const Icon(
+                          Icons.cancel,
+                          size: 18,
+                          color: Colors.red,
+                        ),
                       ),
                     ),
                   ),
@@ -916,8 +962,11 @@ class _EquipmentGridTile extends StatelessWidget {
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.shield_outlined, size: 13,
-                    color: Colors.deepPurple.withValues(alpha: 0.6)),
+                Icon(
+                  Icons.shield_outlined,
+                  size: 13,
+                  color: Colors.deepPurple.withValues(alpha: 0.6),
+                ),
                 const SizedBox(width: 4),
                 Text(
                   slotName,
@@ -938,24 +987,30 @@ class _EquipmentGridTile extends StatelessWidget {
         children: [
           Padding(
             padding: const EdgeInsets.all(16),
-            child: Text('选择 $slotName',
-                style: const TextStyle(
-                    fontSize: 18, fontWeight: FontWeight.bold)),
+            child: Text(
+              '选择 $slotName',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
           ),
           for (final eq in _matching)
             ListTile(
               leading: eq.imageBase64.isNotEmpty
                   ? ClipOval(
-                      child: Image.memory(base64Decode(eq.imageBase64),
-                          width: 32, height: 32, fit: BoxFit.cover),
+                      child: Image.memory(
+                        base64Decode(eq.imageBase64),
+                        width: 32,
+                        height: 32,
+                        fit: BoxFit.cover,
+                      ),
                     )
                   : const Icon(Icons.shield_outlined),
               title: Text(eq.name),
               subtitle: Text(
-                  '${eq.type}  '
-                  '${eq.ac > 0 ? '🛡AC${eq.ac}  ' : ''}'
-                  '${eq.value > 0 ? '💰${eq.value}  ' : ''}'
-                  '${eq.weight > 0 ? '⚖${eq.weight}' : ''}'),
+                '${eq.type}  '
+                '${eq.ac > 0 ? '🛡AC${eq.ac}  ' : ''}'
+                '${eq.value > 0 ? '💰${eq.value}  ' : ''}'
+                '${eq.weight > 0 ? '⚖${eq.weight}' : ''}',
+              ),
               trailing: TextButton(
                 onPressed: () {
                   onEquip(eq);

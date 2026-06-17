@@ -117,101 +117,108 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    'Roll and Roll',
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
+        child: SingleChildScrollView(
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            constraints: BoxConstraints(
+              minHeight:
+                  MediaQuery.of(context).size.height -
+                  MediaQuery.of(context).padding.top,
+            ),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Roll and Roll',
+                      style: Theme.of(context).textTheme.headlineMedium
+                          ?.copyWith(fontWeight: FontWeight.bold),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    '选择你想要开始的方式',
-                    style: Theme.of(
-                      context,
-                    ).textTheme.titleMedium?.copyWith(color: Colors.grey[700]),
-                  ),
-                  const SizedBox(height: 24),
-                  if (_webCannotHost)
-                    Card(
-                      color: Colors.amber.shade50,
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.info_outline,
-                              color: Colors.orange,
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                'Web 端不支持创建房间。你可以加入桌面端创建的房间，或直接使用直播模式。',
-                                style: Theme.of(context).textTheme.bodyMedium,
-                              ),
-                            ),
-                          ],
-                        ),
+                    const SizedBox(height: 12),
+                    Text(
+                      '选择你想要开始的方式',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: Colors.grey[700],
                       ),
                     ),
-                  if (_webCannotHost) const SizedBox(height: 16),
-                  TextField(
-                    controller: _playerNameController,
-                    textAlign: TextAlign.center,
-                    onChanged: (_) => setState(() {}),
-                    decoration: const InputDecoration(
-                      labelText: '你的玩家名称',
-                      hintText: '例如：阿宇',
-                      border: OutlineInputBorder(),
+                    const SizedBox(height: 24),
+                    if (_webCannotHost)
+                      Card(
+                        color: Colors.amber.shade50,
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.info_outline,
+                                color: Colors.orange,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Web 端不支持创建房间。你可以加入桌面端创建的房间，或直接使用直播模式。',
+                                  style: Theme.of(context).textTheme.bodyMedium,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    if (_webCannotHost) const SizedBox(height: 16),
+                    TextField(
+                      controller: _playerNameController,
+                      textAlign: TextAlign.center,
+                      onChanged: (_) => setState(() {}),
+                      decoration: const InputDecoration(
+                        labelText: '你的玩家名称',
+                        hintText: '例如：阿宇',
+                        border: OutlineInputBorder(),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 24),
-                  _ActionButton(
-                    label: '新建房间',
-                    icon: Icons.add_circle_outline,
-                    enabled: !_nameEmpty,
-                    onPressed: () => _handleRoomAction(
-                      context,
-                      CreateRoomPage(playerName: _getPlayerName()),
-                      isHost: true,
+                    const SizedBox(height: 24),
+                    _ActionButton(
+                      label: '新建房间',
+                      icon: Icons.add_circle_outline,
+                      enabled: !_nameEmpty,
+                      onPressed: () => _handleRoomAction(
+                        context,
+                        CreateRoomPage(playerName: _getPlayerName()),
+                        isHost: true,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  _ActionButton(
-                    label: '加入房间',
-                    icon: Icons.login_rounded,
-                    enabled: !_nameEmpty,
-                    onPressed: () => _handleRoomAction(
-                      context,
-                      JoinRoomPage(playerName: _getPlayerName()),
+                    const SizedBox(height: 16),
+                    _ActionButton(
+                      label: '加入房间',
+                      icon: Icons.login_rounded,
+                      enabled: !_nameEmpty,
+                      onPressed: () => _handleRoomAction(
+                        context,
+                        JoinRoomPage(playerName: _getPlayerName()),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  _ActionButton(
-                    label: '直播模式',
-                    icon: Icons.videocam_outlined,
-                    onPressed: () => _openPage(context, const LiveModePage()),
-                  ),
-                  const SizedBox(height: 16),
-                  _ActionButton(
-                    label: '创建存档',
-                    icon: Icons.edit_note_rounded,
-                    onPressed: () => _openPage(context, const CreateSavePage()),
-                  ),
-                  const SizedBox(height: 16),
-                  _ActionButton(
-                    label: '修改存档',
-                    icon: Icons.file_open_outlined,
-                    onPressed: _modifySaveFile,
-                  ),
-                ],
+                    const SizedBox(height: 16),
+                    _ActionButton(
+                      label: '直播模式',
+                      icon: Icons.videocam_outlined,
+                      onPressed: () => _openPage(context, const LiveModePage()),
+                    ),
+                    const SizedBox(height: 16),
+                    _ActionButton(
+                      label: '创建存档',
+                      icon: Icons.edit_note_rounded,
+                      onPressed: () =>
+                          _openPage(context, const CreateSavePage()),
+                    ),
+                    const SizedBox(height: 16),
+                    _ActionButton(
+                      label: '修改存档',
+                      icon: Icons.file_open_outlined,
+                      onPressed: _modifySaveFile,
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

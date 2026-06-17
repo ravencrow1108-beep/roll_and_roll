@@ -399,7 +399,7 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
         ],
       ),
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -482,26 +482,26 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
                 ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
-              Expanded(
-                child: ListView(
-                  children: roomMembers.map((name) {
-                    final role =
-                        RoomSession.instance.memberRolesNotifier.value[name] ??
-                        '';
-                    final roleIcon = role == '主持'
-                        ? Icons.mic
-                        : role == '玩家'
-                        ? Icons.person
-                        : Icons.account_circle;
-                    return Card(
-                      child: ListTile(
-                        leading: Icon(roleIcon),
-                        title: Text(name),
-                        subtitle: role.isNotEmpty ? Text(role) : null,
-                      ),
-                    );
-                  }).toList(),
-                ),
+              ListView(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                children: roomMembers.map((name) {
+                  final role =
+                      RoomSession.instance.memberRolesNotifier.value[name] ??
+                      '';
+                  final roleIcon = role == '主持'
+                      ? Icons.mic
+                      : role == '玩家'
+                      ? Icons.person
+                      : Icons.account_circle;
+                  return Card(
+                    child: ListTile(
+                      leading: Icon(roleIcon),
+                      title: Text(name),
+                      subtitle: role.isNotEmpty ? Text(role) : null,
+                    ),
+                  );
+                }).toList(),
               ),
               const SizedBox(height: 12),
               SizedBox(

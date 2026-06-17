@@ -231,7 +231,22 @@ class _CharacterSelectPageState extends State<CharacterSelectPage> {
     final nameCtrl = TextEditingController(text: oldSkill.name);
     final descCtrl = TextEditingController(text: oldSkill.description ?? '');
     String imageBase64 = oldSkill.imageBase64 ?? '';
-    final dmgTypes = _loadedRules?.damageTypes ?? const ['火焰', '寒冷', '雷电', '毒素', '暗蚀', '光耀', '力场', '精神', '坏死', '穿刺', '挥砍', '钝击'];
+    final dmgTypes =
+        _loadedRules?.damageTypes ??
+        const [
+          '火焰',
+          '寒冷',
+          '雷电',
+          '毒素',
+          '暗蚀',
+          '光耀',
+          '力场',
+          '精神',
+          '坏死',
+          '穿刺',
+          '挥砍',
+          '钝击',
+        ];
     final damages = <_SkillDamageRow>[
       for (final d in oldSkill.damages)
         _SkillDamageRow(
@@ -239,143 +254,183 @@ class _CharacterSelectPageState extends State<CharacterSelectPage> {
           dmgType: d.damageType,
         ),
     ];
-    if (damages.isEmpty) damages.add(_SkillDamageRow(exprCtrl: TextEditingController()));
+    if (damages.isEmpty) {
+      damages.add(_SkillDamageRow(exprCtrl: TextEditingController()));
+    }
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
-        title: const Text('编辑技能'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameCtrl,
-                decoration: const InputDecoration(
-                  labelText: '技能名称',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 10),
-              OutlinedButton.icon(
-                onPressed: () async {
-                  final result = await FilePicker.pickFiles(
-                    dialogTitle: '选择技能图标',
-                    type: FileType.image,
-                  );
-                  if (result != null && result.files.single.path != null) {
-                    final bytes = await File(result.files.single.path!).readAsBytes();
-                    setDialogState(() => imageBase64 = base64Encode(bytes));
-                  }
-                },
-                icon: const Icon(Icons.image, size: 18),
-                label: Text(imageBase64.isEmpty ? '上传图标' : '已选择图标'),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  const Text('技能伤害', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
-                  const Spacer(),
-                  TextButton.icon(
-                    onPressed: () => setDialogState(() =>
-                        damages.add(_SkillDamageRow(exprCtrl: TextEditingController()))),
-                    icon: const Icon(Icons.add, size: 16),
-                    label: const Text('添加', style: TextStyle(fontSize: 13)),
+          title: const Text('编辑技能'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameCtrl,
+                  decoration: const InputDecoration(
+                    labelText: '技能名称',
+                    border: OutlineInputBorder(),
                   ),
-                ],
-              ),
-              ...List.generate(damages.length, (i) => Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Row(
+                ),
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    final result = await FilePicker.pickFiles(
+                      dialogTitle: '选择技能图标',
+                      type: FileType.image,
+                    );
+                    if (result != null && result.files.single.path != null) {
+                      final bytes = await File(
+                        result.files.single.path!,
+                      ).readAsBytes();
+                      setDialogState(() => imageBase64 = base64Encode(bytes));
+                    }
+                  },
+                  icon: const Icon(Icons.image, size: 18),
+                  label: Text(imageBase64.isEmpty ? '上传图标' : '已选择图标'),
+                ),
+                const SizedBox(height: 12),
+                Row(
                   children: [
-                    Expanded(
-                      flex: 2,
-                      child: TextField(
-                        controller: damages[i].exprCtrl,
-                        decoration: const InputDecoration(
-                          labelText: '表达式',
-                          hintText: '1d6+3',
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                        ),
+                    const Text(
+                      '技能伤害',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      flex: 2,
-                      child: DropdownButtonFormField<String?>(
-                        initialValue: dmgTypes.contains(damages[i].dmgType) ? damages[i].dmgType : null,
-                        decoration: const InputDecoration(
-                          labelText: '伤害类型',
-                          border: OutlineInputBorder(),
-                          isDense: true,
+                    const Spacer(),
+                    TextButton.icon(
+                      onPressed: () => setDialogState(
+                        () => damages.add(
+                          _SkillDamageRow(exprCtrl: TextEditingController()),
                         ),
-                        items: [
-                          const DropdownMenuItem(value: null, child: Text('无', style: TextStyle(fontSize: 13))),
-                          ...dmgTypes.map((t) =>
-                            DropdownMenuItem(value: t, child: Text(t, style: const TextStyle(fontSize: 13)))),
-                        ],
-                        onChanged: (v) => setDialogState(() => damages[i].dmgType = v),
                       ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.remove_circle_outline, size: 18, color: Colors.red),
-                      onPressed: damages.length <= 1
-                          ? null
-                          : () => setDialogState(() => damages.removeAt(i)),
+                      icon: const Icon(Icons.add, size: 16),
+                      label: const Text('添加', style: TextStyle(fontSize: 13)),
                     ),
                   ],
                 ),
-              )),
-              const SizedBox(height: 10),
-              TextField(
-                controller: descCtrl,
-                decoration: const InputDecoration(
-                  labelText: '描述（可选）',
-                  border: OutlineInputBorder(),
+                ...List.generate(
+                  damages.length,
+                  (i) => Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          flex: 2,
+                          child: TextField(
+                            controller: damages[i].exprCtrl,
+                            decoration: const InputDecoration(
+                              labelText: '表达式',
+                              hintText: '1d6+3',
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          flex: 2,
+                          child: DropdownButtonFormField<String?>(
+                            initialValue: dmgTypes.contains(damages[i].dmgType)
+                                ? damages[i].dmgType
+                                : null,
+                            decoration: const InputDecoration(
+                              labelText: '伤害类型',
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                            ),
+                            items: [
+                              const DropdownMenuItem(
+                                value: null,
+                                child: Text(
+                                  '无',
+                                  style: TextStyle(fontSize: 13),
+                                ),
+                              ),
+                              ...dmgTypes.map(
+                                (t) => DropdownMenuItem(
+                                  value: t,
+                                  child: Text(
+                                    t,
+                                    style: const TextStyle(fontSize: 13),
+                                  ),
+                                ),
+                              ),
+                            ],
+                            onChanged: (v) =>
+                                setDialogState(() => damages[i].dmgType = v),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(
+                            Icons.remove_circle_outline,
+                            size: 18,
+                            color: Colors.red,
+                          ),
+                          onPressed: damages.length <= 1
+                              ? null
+                              : () => setDialogState(() => damages.removeAt(i)),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-                maxLines: 2,
-              ),
-            ],
+                const SizedBox(height: 10),
+                TextField(
+                  controller: descCtrl,
+                  decoration: const InputDecoration(
+                    labelText: '描述（可选）',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 2,
+                ),
+              ],
+            ),
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('取消'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final name = nameCtrl.text.trim();
-              if (name.isEmpty) return;
-              final idx = _loadedCharacters.indexOf(c);
-              final updatedSkills = c.skills.toList();
-              final oldIdx = updatedSkills.indexOf(oldSkill);
-              if (oldIdx >= 0) {
-                updatedSkills[oldIdx] = SkillData(
-                  name: name,
-                  description: descCtrl.text.trim().isEmpty ? null : descCtrl.text.trim(),
-                  imageBase64: imageBase64.isEmpty ? null : imageBase64,
-                  damages: damages
-                      .where((r) => r.exprCtrl.text.trim().isNotEmpty)
-                      .map((r) => SkillDamage(
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('取消'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final name = nameCtrl.text.trim();
+                if (name.isEmpty) return;
+                final idx = _loadedCharacters.indexOf(c);
+                final updatedSkills = c.skills.toList();
+                final oldIdx = updatedSkills.indexOf(oldSkill);
+                if (oldIdx >= 0) {
+                  updatedSkills[oldIdx] = SkillData(
+                    name: name,
+                    description: descCtrl.text.trim().isEmpty
+                        ? null
+                        : descCtrl.text.trim(),
+                    imageBase64: imageBase64.isEmpty ? null : imageBase64,
+                    damages: damages
+                        .where((r) => r.exprCtrl.text.trim().isNotEmpty)
+                        .map(
+                          (r) => SkillDamage(
                             expression: r.exprCtrl.text.trim(),
                             damageType: r.dmgType,
-                          ))
-                      .toList(),
-                );
-              }
-              final updated = c.copyWith(skills: updatedSkills);
-              Navigator.pop(ctx);
-              if (idx >= 0) {
-                await _updateCharacterInSave(idx, updated);
-              }
-            },
-            child: const Text('保存'),
-          ),
-        ],
+                          ),
+                        )
+                        .toList(),
+                  );
+                }
+                final updated = c.copyWith(skills: updatedSkills);
+                Navigator.pop(ctx);
+                if (idx >= 0) {
+                  await _updateCharacterInSave(idx, updated);
+                }
+              },
+              child: const Text('保存'),
+            ),
+          ],
+        ),
       ),
-    ),
     );
   }
 
@@ -486,27 +541,53 @@ class _CharacterSelectPageState extends State<CharacterSelectPage> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     if (s.damages.isNotEmpty)
-                                      ...s.damages.map((d) => Padding(
-                                        padding: const EdgeInsets.only(top: 2),
-                                        child: Row(
-                                          children: [
-                                            Text('🎲 ${d.expression ?? ""}',
-                                                style: TextStyle(fontSize: 11, fontFamily: 'monospace', color: Colors.grey.shade600)),
-                                            if (d.damageType != null) ...[
-                                              const SizedBox(width: 6),
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                                                decoration: BoxDecoration(
-                                                  color: Colors.red.withValues(alpha: 0.12),
-                                                  borderRadius: BorderRadius.circular(3),
+                                      ...s.damages.map(
+                                        (d) => Padding(
+                                          padding: const EdgeInsets.only(
+                                            top: 2,
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              Text(
+                                                '🎲 ${d.expression ?? ""}',
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  fontFamily: 'monospace',
+                                                  color: Colors.grey.shade600,
                                                 ),
-                                                child: Text(d.damageType!,
-                                                    style: TextStyle(fontSize: 10, color: Colors.red.shade700)),
                                               ),
+                                              if (d.damageType != null) ...[
+                                                const SizedBox(width: 6),
+                                                Container(
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        horizontal: 4,
+                                                        vertical: 1,
+                                                      ),
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.red
+                                                        .withValues(
+                                                          alpha: 0.12,
+                                                        ),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          3,
+                                                        ),
+                                                  ),
+                                                  child: Text(
+                                                    d.damageType!,
+                                                    style: TextStyle(
+                                                      fontSize: 10,
+                                                      color:
+                                                          Colors.red.shade700,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
                                             ],
-                                          ],
+                                          ),
                                         ),
-                                      )),
+                                      ),
                                     if (s.description != null &&
                                         s.description!.isNotEmpty)
                                       Text(s.description!),
@@ -629,7 +710,7 @@ class _CharacterSelectPageState extends State<CharacterSelectPage> {
     return Scaffold(
       appBar: AppBar(title: const Text('选择角色')),
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -723,44 +804,44 @@ class _CharacterSelectPageState extends State<CharacterSelectPage> {
               // ── 已加载的角色列表 ──
               if (_loadedCharacters.isNotEmpty) ...[
                 const SizedBox(height: 12),
-                Expanded(
-                  child: ListView.builder(
-                    itemCount: _loadedCharacters.length,
-                    itemBuilder: (_, i) {
-                      final c = _loadedCharacters[i];
-                      return Card(
-                        child: ListTile(
-                          leading: CircleAvatar(
-                            backgroundImage: c.portraitBase64.isNotEmpty
-                                ? MemoryImage(base64Decode(c.portraitBase64))
-                                : null,
-                            child: c.portraitBase64.isEmpty
-                                ? const Icon(Icons.person)
-                                : null,
-                          ),
-                          title: Text(
-                            c.name,
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          subtitle: Text(
-                            '${c.className} · ${c.race} · Lv${c.level}',
-                          ),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                icon: const Icon(Icons.edit, size: 18),
-                                tooltip: '编辑角色',
-                                onPressed: () => _navigateToEditCharacter(i),
-                              ),
-                              const Icon(Icons.arrow_forward_ios, size: 16),
-                            ],
-                          ),
-                          onTap: () => _selectCharacter(c),
+                ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: _loadedCharacters.length,
+                  itemBuilder: (_, i) {
+                    final c = _loadedCharacters[i];
+                    return Card(
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundImage: c.portraitBase64.isNotEmpty
+                              ? MemoryImage(base64Decode(c.portraitBase64))
+                              : null,
+                          child: c.portraitBase64.isEmpty
+                              ? const Icon(Icons.person)
+                              : null,
                         ),
-                      );
-                    },
-                  ),
+                        title: Text(
+                          c.name,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Text(
+                          '${c.className} · ${c.race} · Lv${c.level}',
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.edit, size: 18),
+                              tooltip: '编辑角色',
+                              onPressed: () => _navigateToEditCharacter(i),
+                            ),
+                            const Icon(Icons.arrow_forward_ios, size: 16),
+                          ],
+                        ),
+                        onTap: () => _selectCharacter(c),
+                      ),
+                    );
+                  },
                 ),
               ] else if (_saveFilePath != null) ...[
                 const SizedBox(height: 12),
@@ -957,9 +1038,24 @@ class _AddCharacterPageState extends State<_AddCharacterPage> {
               onRemoveSkill: (i) => setState(() => _char.skills.removeAt(i)),
               onEditSkill: (i, old) {
                 final nameCtrl = TextEditingController(text: old.name);
-                final descCtrl = TextEditingController(text: old.description ?? '');
+                final descCtrl = TextEditingController(
+                  text: old.description ?? '',
+                );
                 String imageBase64 = old.imageBase64 ?? '';
-                const dmgTypes = ['火焰', '寒冷', '雷电', '毒素', '暗蚀', '光耀', '力场', '精神', '坏死', '穿刺', '挥砍', '钝击'];
+                const dmgTypes = [
+                  '火焰',
+                  '寒冷',
+                  '雷电',
+                  '毒素',
+                  '暗蚀',
+                  '光耀',
+                  '力场',
+                  '精神',
+                  '坏死',
+                  '穿刺',
+                  '挥砍',
+                  '钝击',
+                ];
                 final damages = <_SkillDamageRow>[
                   for (final d in old.damages)
                     _SkillDamageRow(
@@ -967,84 +1063,200 @@ class _AddCharacterPageState extends State<_AddCharacterPage> {
                       dmgType: d.damageType,
                     ),
                 ];
-                if (damages.isEmpty) damages.add(_SkillDamageRow(exprCtrl: TextEditingController()));
+                if (damages.isEmpty) {
+                  damages.add(
+                    _SkillDamageRow(exprCtrl: TextEditingController()),
+                  );
+                }
                 showDialog(
                   context: context,
                   builder: (ctx) => StatefulBuilder(
                     builder: (ctx, setDialogState) => AlertDialog(
-                    title: const Text('编辑技能'),
-                    content: SingleChildScrollView(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: '技能名称', border: OutlineInputBorder())),
-                          const SizedBox(height: 10),
-                          OutlinedButton.icon(
-                            onPressed: () async {
-                              final result = await FilePicker.pickFiles(dialogTitle: '选择技能图标', type: FileType.image);
-                              if (result != null && result.files.single.path != null) {
-                                final bytes = await File(result.files.single.path!).readAsBytes();
-                                setDialogState(() => imageBase64 = base64Encode(bytes));
-                              }
-                            },
-                            icon: const Icon(Icons.image, size: 18),
-                            label: Text(imageBase64.isEmpty ? '上传图标' : '已选择图标'),
-                          ),
-                          const SizedBox(height: 12),
-                          Row(children: [
-                            const Text('技能伤害', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
-                            const Spacer(),
-                            TextButton.icon(
-                              onPressed: () => setDialogState(() => damages.add(_SkillDamageRow(exprCtrl: TextEditingController()))),
-                              icon: const Icon(Icons.add, size: 16),
-                              label: const Text('添加', style: TextStyle(fontSize: 13)),
-                            ),
-                          ]),
-                          ...List.generate(damages.length, (j) => Padding(
-                            padding: const EdgeInsets.only(bottom: 6),
-                            child: Row(children: [
-                              Expanded(flex: 2, child: TextField(
-                                controller: damages[j].exprCtrl,
-                                decoration: const InputDecoration(labelText: '表达式', hintText: '1d6+3', border: OutlineInputBorder(), isDense: true),
-                              )),
-                              const SizedBox(width: 6),
-                              Expanded(flex: 2, child: DropdownButtonFormField<String?>(
-                                initialValue: dmgTypes.contains(damages[j].dmgType) ? damages[j].dmgType : null,
-                                decoration: const InputDecoration(labelText: '伤害类型', border: OutlineInputBorder(), isDense: true),
-                                items: [
-                                  const DropdownMenuItem(value: null, child: Text('无', style: TextStyle(fontSize: 13))),
-                                  ...dmgTypes.map((t) => DropdownMenuItem(value: t, child: Text(t, style: const TextStyle(fontSize: 13)))),
-                                ],
-                                onChanged: (v) => setDialogState(() => damages[j].dmgType = v),
-                              )),
-                              IconButton(
-                                icon: const Icon(Icons.remove_circle_outline, size: 18, color: Colors.red),
-                                onPressed: damages.length <= 1 ? null : () => setDialogState(() => damages.removeAt(j)),
+                      title: const Text('编辑技能'),
+                      content: SingleChildScrollView(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            TextField(
+                              controller: nameCtrl,
+                              decoration: const InputDecoration(
+                                labelText: '技能名称',
+                                border: OutlineInputBorder(),
                               ),
-                            ]),
-                          )),
-                          const SizedBox(height: 10),
-                          TextField(controller: descCtrl, decoration: const InputDecoration(labelText: '描述（可选）', border: OutlineInputBorder()), maxLines: 2),
-                        ],
+                            ),
+                            const SizedBox(height: 10),
+                            OutlinedButton.icon(
+                              onPressed: () async {
+                                final result = await FilePicker.pickFiles(
+                                  dialogTitle: '选择技能图标',
+                                  type: FileType.image,
+                                );
+                                if (result != null &&
+                                    result.files.single.path != null) {
+                                  final bytes = await File(
+                                    result.files.single.path!,
+                                  ).readAsBytes();
+                                  setDialogState(
+                                    () => imageBase64 = base64Encode(bytes),
+                                  );
+                                }
+                              },
+                              icon: const Icon(Icons.image, size: 18),
+                              label: Text(
+                                imageBase64.isEmpty ? '上传图标' : '已选择图标',
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                const Text(
+                                  '技能伤害',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const Spacer(),
+                                TextButton.icon(
+                                  onPressed: () => setDialogState(
+                                    () => damages.add(
+                                      _SkillDamageRow(
+                                        exprCtrl: TextEditingController(),
+                                      ),
+                                    ),
+                                  ),
+                                  icon: const Icon(Icons.add, size: 16),
+                                  label: const Text(
+                                    '添加',
+                                    style: TextStyle(fontSize: 13),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            ...List.generate(
+                              damages.length,
+                              (j) => Padding(
+                                padding: const EdgeInsets.only(bottom: 6),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      flex: 2,
+                                      child: TextField(
+                                        controller: damages[j].exprCtrl,
+                                        decoration: const InputDecoration(
+                                          labelText: '表达式',
+                                          hintText: '1d6+3',
+                                          border: OutlineInputBorder(),
+                                          isDense: true,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      flex: 2,
+                                      child: DropdownButtonFormField<String?>(
+                                        initialValue:
+                                            dmgTypes.contains(
+                                              damages[j].dmgType,
+                                            )
+                                            ? damages[j].dmgType
+                                            : null,
+                                        decoration: const InputDecoration(
+                                          labelText: '伤害类型',
+                                          border: OutlineInputBorder(),
+                                          isDense: true,
+                                        ),
+                                        items: [
+                                          const DropdownMenuItem(
+                                            value: null,
+                                            child: Text(
+                                              '无',
+                                              style: TextStyle(fontSize: 13),
+                                            ),
+                                          ),
+                                          ...dmgTypes.map(
+                                            (t) => DropdownMenuItem(
+                                              value: t,
+                                              child: Text(
+                                                t,
+                                                style: const TextStyle(
+                                                  fontSize: 13,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                        onChanged: (v) => setDialogState(
+                                          () => damages[j].dmgType = v,
+                                        ),
+                                      ),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.remove_circle_outline,
+                                        size: 18,
+                                        color: Colors.red,
+                                      ),
+                                      onPressed: damages.length <= 1
+                                          ? null
+                                          : () => setDialogState(
+                                              () => damages.removeAt(j),
+                                            ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            TextField(
+                              controller: descCtrl,
+                              decoration: const InputDecoration(
+                                labelText: '描述（可选）',
+                                border: OutlineInputBorder(),
+                              ),
+                              maxLines: 2,
+                            ),
+                          ],
+                        ),
                       ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          child: const Text('取消'),
+                        ),
+                        ElevatedButton(
+                          onPressed: () {
+                            final name = nameCtrl.text.trim();
+                            if (name.isEmpty) return;
+                            setState(
+                              () => _char.skills[i] = SkillData(
+                                name: name,
+                                description: descCtrl.text.trim().isEmpty
+                                    ? null
+                                    : descCtrl.text.trim(),
+                                imageBase64: imageBase64.isEmpty
+                                    ? null
+                                    : imageBase64,
+                                damages: damages
+                                    .where(
+                                      (r) => r.exprCtrl.text.trim().isNotEmpty,
+                                    )
+                                    .map(
+                                      (r) => SkillDamage(
+                                        expression: r.exprCtrl.text.trim(),
+                                        damageType: r.dmgType,
+                                      ),
+                                    )
+                                    .toList(),
+                              ),
+                            );
+                            Navigator.pop(ctx);
+                          },
+                          child: const Text('保存'),
+                        ),
+                      ],
                     ),
-                    actions: [
-                      TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
-                      ElevatedButton(onPressed: () {
-                        final name = nameCtrl.text.trim();
-                        if (name.isEmpty) return;
-                        setState(() => _char.skills[i] = SkillData(
-                          name: name,
-                          description: descCtrl.text.trim().isEmpty ? null : descCtrl.text.trim(),
-                          imageBase64: imageBase64.isEmpty ? null : imageBase64,
-                          damages: damages.where((r) => r.exprCtrl.text.trim().isNotEmpty).map((r) =>
-                            SkillDamage(expression: r.exprCtrl.text.trim(), damageType: r.dmgType)).toList(),
-                        ));
-                        Navigator.pop(ctx);
-                      }, child: const Text('保存')),
-                    ],
                   ),
-                ),
                 );
               },
               skillTemplates: const [],

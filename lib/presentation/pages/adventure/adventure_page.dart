@@ -58,6 +58,9 @@ class _AdventurePageState extends State<AdventurePage> {
   final TextEditingController _chatCtrl = TextEditingController();
   final ScrollController _chatScrollCtrl = ScrollController();
 
+  // --- Left panel: selected player detail ---
+  String? _selectedPlayerName;
+
   StreamSubscription<String>? _msgSub;
 
   bool get _isGM => widget.role == '主持';
@@ -130,8 +133,7 @@ class _AdventurePageState extends State<AdventurePage> {
             if (data['positions'] != null) {
               final list = (data['positions'] as List<dynamic>)
                   .map(
-                    (p) =>
-                        PlayerPosition.fromJson(p as Map<String, dynamic>),
+                    (p) => PlayerPosition.fromJson(p as Map<String, dynamic>),
                   )
                   .toList();
               RoomSession.instance.playerPositionsNotifier.value = list;
@@ -147,8 +149,7 @@ class _AdventurePageState extends State<AdventurePage> {
             if (data['positions'] != null) {
               final list = (data['positions'] as List<dynamic>)
                   .map(
-                    (p) =>
-                        PlayerPosition.fromJson(p as Map<String, dynamic>),
+                    (p) => PlayerPosition.fromJson(p as Map<String, dynamic>),
                   )
                   .toList();
               RoomSession.instance.playerPositionsNotifier.value = list;
@@ -157,10 +158,7 @@ class _AdventurePageState extends State<AdventurePage> {
           case 'character_update':
             if (data['characters'] != null) {
               _loadedCharacters = (data['characters'] as List<dynamic>)
-                  .map(
-                    (c) =>
-                        CharacterData.fromJson(c as Map<String, dynamic>),
-                  )
+                  .map((c) => CharacterData.fromJson(c as Map<String, dynamic>))
                   .toList();
               if (mounted) setState(() {});
             }
@@ -182,17 +180,14 @@ class _AdventurePageState extends State<AdventurePage> {
     } else {
       portrait = _loadedCharacters
           .cast<CharacterData?>()
-          .firstWhere(
-            (c) => c?.name == from,
-            orElse: () => null,
-          )
+          .firstWhere((c) => c?.name == from, orElse: () => null)
           ?.portraitBase64;
     }
-    setState(() => _chatMessages.add(ChatMessage(
-          from: from,
-          text: text,
-          portraitBase64: portrait,
-        )));
+    setState(
+      () => _chatMessages.add(
+        ChatMessage(from: from, text: text, portraitBase64: portrait),
+      ),
+    );
     _scrollChatToBottom();
   }
 
@@ -390,10 +385,7 @@ class _AdventurePageState extends State<AdventurePage> {
                     .map((ch) => ch.toJson())
                     .toList(),
               });
-              _addChat(
-                '系统',
-                '$name HP: $hp/$maxHp',
-              );
+              _addChat('系统', '$name HP: $hp/$maxHp');
             },
             child: const Text('确定'),
           ),
@@ -434,9 +426,7 @@ class _AdventurePageState extends State<AdventurePage> {
                 Navigator.pop(ctx);
                 return;
               }
-              _loadedCharacters[idx] = c.copyWith(
-                notes: [...c.notes, text],
-              );
+              _loadedCharacters[idx] = c.copyWith(notes: [...c.notes, text]);
               setState(() {});
               _saveCharacterChanges();
               Navigator.pop(ctx);
@@ -461,6 +451,10 @@ class _AdventurePageState extends State<AdventurePage> {
     _addChat('系统', '$name 注释已删除');
   }
 
+  void _onPlayerTapped(String name) {
+    setState(() => _selectedPlayerName = name);
+  }
+
   Future<void> _saveProgress() async {
     if (_saveFilePath == null) return;
     final ok = await _confirmOverwrite();
@@ -471,6 +465,7 @@ class _AdventurePageState extends State<AdventurePage> {
         createdAt: DateTime.now().toIso8601String(),
         characters: _loadedCharacters,
         maps: save.maps,
+        items: save.items,
         rules: save.rules,
         playerPositions: RoomSession.instance.playerPositionsNotifier.value,
       );
@@ -532,6 +527,9 @@ class _AdventurePageState extends State<AdventurePage> {
         maps: _saveFilePath != null
             ? (await SaveData.fromZip(_saveFilePath!)).maps
             : [],
+        items: _saveFilePath != null
+            ? (await SaveData.fromZip(_saveFilePath!)).items
+            : [],
         rules: _saveFilePath != null
             ? (await SaveData.fromZip(_saveFilePath!)).rules
             : RuleData(),
@@ -574,6 +572,7 @@ class _AdventurePageState extends State<AdventurePage> {
         createdAt: DateTime.now().toIso8601String(),
         characters: _loadedCharacters,
         maps: save.maps,
+        items: save.items,
         rules: save.rules,
         playerPositions: save.playerPositions,
       );
@@ -642,8 +641,9 @@ class _AdventurePageState extends State<AdventurePage> {
     _chatScrollCtrl.dispose();
     RoomSession.instance.readyMembersNotifier.removeListener(_onReadyChanged);
     RoomSession.instance.mapNotifier.removeListener(_onMapChanged);
-    RoomSession.instance.playerPositionsNotifier
-        .removeListener(_onPositionsChanged);
+    RoomSession.instance.playerPositionsNotifier.removeListener(
+      _onPositionsChanged,
+    );
     super.dispose();
   }
 
@@ -658,13 +658,21 @@ class _AdventurePageState extends State<AdventurePage> {
     return _isGM ? _buildMapSelection() : _buildCharacterSelection();
   }
 
-  /// 构建冒险主界面 — 聊天改为悬浮按钮 + 侧滑面板。
+  /// 构建冒险主界面 — 左侧角色详情 + 地图 + 聊天浮窗
   Widget _buildAdventureView() {
     final m = _displayedMap!;
     final positions = RoomSession.instance.playerPositionsNotifier.value;
     final members = RoomSession.instance.membersNotifier.value;
     final roles = RoomSession.instance.memberRolesNotifier.value;
     final theme = Theme.of(context);
+
+    // 默认选中自己的角色，主持无角色时选第一个
+    final selectedChar = _loadedCharacters.cast<CharacterData?>().firstWhere(
+      (c) => c?.name == _selectedPlayerName,
+      orElse: () =>
+          _character ??
+          (_loadedCharacters.isNotEmpty ? _loadedCharacters.first : null),
+    );
 
     final mainContent = SafeArea(
       child: MapDisplay(
@@ -677,18 +685,28 @@ class _AdventurePageState extends State<AdventurePage> {
         characters: _loadedCharacters,
         backpackItems: _character?.backpack ?? const [],
         backpackSlotMax: _loadedRules.backpackSlotMax,
-        onPositionChanged:
-            _isGM ? _onPlayerPositionChanged : null,
+        onPositionChanged: _isGM ? _onPlayerPositionChanged : null,
         onEditHp: _isGM ? _onEditCharacterHp : null,
         onAddNote: _isGM ? _onAddCharacterNote : null,
-        onDeleteNote:
-            _isGM ? _onDeleteCharacterNote : null,
+        onDeleteNote: _isGM ? _onDeleteCharacterNote : null,
+        onPlayerTap: _isGM ? _onPlayerTapped : null,
       ),
     );
 
     return Scaffold(
       appBar: AppBar(
         title: Text('冒险中 · ${m.name}'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            RoomSession.instance.broadcast({'type': 'return_to_room'});
+            RoomSession.instance.startAdventureNotifier.value = false;
+            RoomSession.instance.mapNotifier.value = null;
+            RoomSession.instance.playerPositionsNotifier.value = [];
+            RoomSession.instance.readyMembersNotifier.value = {};
+            Navigator.of(context).pop();
+          },
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.save_outlined),
@@ -716,7 +734,22 @@ class _AdventurePageState extends State<AdventurePage> {
       ),
       body: Stack(
         children: [
-          Positioned.fill(child: mainContent),
+          Positioned.fill(
+            child: Row(
+              children: [
+                // ── 左侧角色详情面板 ──
+                _PlayerDetailPanel(
+                  character: selectedChar,
+                  onClose: () => setState(() => _selectedPlayerName = null),
+                  playerNames: _loadedCharacters.map((c) => c.name).toList(),
+                  onSelectPlayer: (name) =>
+                      setState(() => _selectedPlayerName = name),
+                ),
+                // ── 地图 ──
+                Expanded(child: mainContent),
+              ],
+            ),
+          ),
           // ── 聊天浮窗遮罩 ──
           Positioned.fill(
             child: IgnorePointer(
@@ -731,7 +764,6 @@ class _AdventurePageState extends State<AdventurePage> {
               ),
             ),
           ),
-          // ── 聊天面板（从右侧滑入，圆角悬浮卡片） ──
           _buildChatPanelSlide(theme, members, roles),
         ],
       ),
@@ -870,8 +902,11 @@ class _AdventurePageState extends State<AdventurePage> {
               color: Colors.white.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Icon(Icons.chat_rounded,
-                size: 18, color: Colors.white),
+            child: const Icon(
+              Icons.chat_rounded,
+              size: 18,
+              color: Colors.white,
+            ),
           ),
           const SizedBox(width: 10),
           const Expanded(
@@ -885,8 +920,7 @@ class _AdventurePageState extends State<AdventurePage> {
             ),
           ),
           Container(
-            padding: const EdgeInsets.symmetric(
-                horizontal: 8, vertical: 3),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.25),
               borderRadius: BorderRadius.circular(10),
@@ -909,6 +943,568 @@ class _AdventurePageState extends State<AdventurePage> {
             visualDensity: VisualDensity.compact,
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// 左侧角色详情面板 — 装备、物品、技能（法术表）
+class _PlayerDetailPanel extends StatefulWidget {
+  const _PlayerDetailPanel({
+    required this.character,
+    required this.onClose,
+    required this.playerNames,
+    required this.onSelectPlayer,
+  });
+
+  final CharacterData? character;
+  final VoidCallback onClose;
+  final List<String> playerNames;
+  final ValueChanged<String> onSelectPlayer;
+
+  @override
+  State<_PlayerDetailPanel> createState() => _PlayerDetailPanelState();
+}
+
+class _PlayerDetailPanelState extends State<_PlayerDetailPanel> {
+  int _tabIndex = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = widget.character;
+    final theme = Theme.of(context);
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+      width: c != null ? 260 : 0,
+      clipBehavior: Clip.hardEdge,
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        border: Border(
+          right: BorderSide(
+            color: theme.dividerColor.withValues(alpha: 0.3),
+            width: 1,
+          ),
+        ),
+      ),
+      child: c == null
+          ? const SizedBox.shrink()
+          : Column(
+              children: [
+                // ── 头部：头像 + 名称 + HP + 切换 ──
+                _PanelHeader(
+                  character: c,
+                  playerNames: widget.playerNames,
+                  selectedName: widget.character!.name,
+                  onSelectPlayer: widget.onSelectPlayer,
+                  onClose: widget.onClose,
+                ),
+                const Divider(height: 1),
+                // ── Tab 切换 ──
+                _TabBarRow(
+                  tabs: const ['装备', '物品', '技能'],
+                  current: _tabIndex,
+                  onChanged: (i) => setState(() => _tabIndex = i),
+                ),
+                const Divider(height: 1),
+                // ── Tab 内容 ──
+                Expanded(
+                  child: IndexedStack(
+                    index: _tabIndex,
+                    children: [
+                      _EquipmentTab(character: c),
+                      _BackpackTab(character: c),
+                      _SkillsTab(character: c),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+}
+
+/// 面板头部：头像、名称、HP条、角色选择下拉
+class _PanelHeader extends StatelessWidget {
+  const _PanelHeader({
+    required this.character,
+    required this.playerNames,
+    required this.selectedName,
+    required this.onSelectPlayer,
+    required this.onClose,
+  });
+
+  final CharacterData character;
+  final List<String> playerNames;
+  final String selectedName;
+  final ValueChanged<String> onSelectPlayer;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(10, 8, 4, 8),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              // 头像
+              if (character.portraitBase64.isNotEmpty)
+                ClipOval(
+                  child: Image.memory(
+                    base64Decode(character.portraitBase64),
+                    width: 36,
+                    height: 36,
+                    fit: BoxFit.cover,
+                  ),
+                )
+              else
+                CircleAvatar(
+                  radius: 18,
+                  backgroundColor: theme.colorScheme.primary.withValues(
+                    alpha: 0.15,
+                  ),
+                  child: Text(
+                    character.name.isNotEmpty
+                        ? character.name[0].toUpperCase()
+                        : '?',
+                    style: TextStyle(
+                      color: theme.colorScheme.primary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+              const SizedBox(width: 8),
+              // 名称 + HP
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: 160,
+                      child: playerNames.length > 1
+                          ? DropdownButtonHideUnderline(
+                              child: DropdownButton<String>(
+                                value: selectedName,
+                                isExpanded: true,
+                                isDense: true,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: theme.colorScheme.onSurface,
+                                ),
+                                items: playerNames
+                                    .map(
+                                      (n) => DropdownMenuItem(
+                                        value: n,
+                                        child: Text(
+                                          n,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    )
+                                    .toList(),
+                                onChanged: (v) {
+                                  if (v != null) onSelectPlayer(v);
+                                },
+                              ),
+                            )
+                          : Text(
+                              character.name,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                    ),
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.favorite,
+                          size: 12,
+                          color: Colors.red.shade400,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'HP ${character.hp}/${character.maxHp}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Lv${character.level}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey.shade500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close, size: 16),
+                onPressed: onClose,
+                tooltip: '关闭面板',
+                visualDensity: VisualDensity.compact,
+              ),
+            ],
+          ),
+          // HP 进度条
+          const SizedBox(height: 4),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(3),
+            child: LinearProgressIndicator(
+              value: character.maxHp > 0 ? character.hp / character.maxHp : 0,
+              minHeight: 4,
+              backgroundColor: Colors.grey.shade200,
+              valueColor: AlwaysStoppedAnimation<Color>(
+                character.hp / (character.maxHp > 0 ? character.maxHp : 1) > 0.5
+                    ? Colors.green
+                    : character.hp /
+                              (character.maxHp > 0 ? character.maxHp : 1) >
+                          0.25
+                    ? Colors.orange
+                    : Colors.red,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Tab 切换行
+class _TabBarRow extends StatelessWidget {
+  const _TabBarRow({
+    required this.tabs,
+    required this.current,
+    required this.onChanged,
+  });
+
+  final List<String> tabs;
+  final int current;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SizedBox(
+      height: 36,
+      child: Row(
+        children: List.generate(tabs.length, (i) {
+          final active = i == current;
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => onChanged(i),
+              child: Container(
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(
+                      color: active
+                          ? theme.colorScheme.primary
+                          : Colors.transparent,
+                      width: 2,
+                    ),
+                  ),
+                ),
+                child: Text(
+                  tabs[i],
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                    color: active
+                        ? theme.colorScheme.primary
+                        : Colors.grey.shade600,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }),
+      ),
+    );
+  }
+}
+
+/// 装备 Tab
+class _EquipmentTab extends StatelessWidget {
+  const _EquipmentTab({required this.character});
+  final CharacterData character;
+
+  @override
+  Widget build(BuildContext context) {
+    final eq = character.equipment;
+    if (eq.isEmpty) {
+      return const Center(
+        child: Text('暂无装备', style: TextStyle(fontSize: 12, color: Colors.grey)),
+      );
+    }
+    return ListView(
+      padding: const EdgeInsets.all(8),
+      children: eq.entries
+          .where((e) => e.value != null)
+          .map((e) => _buildEqCard(e.key, e.value!, context))
+          .toList(),
+    );
+  }
+
+  Widget _buildEqCard(String slot, EquipmentData eq, BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 4),
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: Row(
+          children: [
+            if (eq.imageBase64.isNotEmpty)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: Image.memory(
+                  base64Decode(eq.imageBase64),
+                  width: 36,
+                  height: 36,
+                  fit: BoxFit.cover,
+                ),
+              )
+            else
+              const Icon(
+                Icons.shield_outlined,
+                size: 28,
+                color: Colors.deepPurple,
+              ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    eq.name,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Text(
+                    slot,
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: Colors.orange.shade700,
+                    ),
+                  ),
+                  if (eq.effect.isNotEmpty)
+                    Text(
+                      eq.effect,
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            if (eq.ac > 0)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(3),
+                ),
+                child: Text(
+                  'AC${eq.ac}',
+                  style: TextStyle(fontSize: 10, color: Colors.blue.shade700),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 物品（背包） Tab
+class _BackpackTab extends StatelessWidget {
+  const _BackpackTab({required this.character});
+  final CharacterData character;
+
+  @override
+  Widget build(BuildContext context) {
+    final items = character.backpack;
+    if (items.isEmpty) {
+      return const Center(
+        child: Text('暂无物品', style: TextStyle(fontSize: 12, color: Colors.grey)),
+      );
+    }
+    return ListView(
+      padding: const EdgeInsets.all(8),
+      children: items.map((item) => _buildItemCard(item)).toList(),
+    );
+  }
+
+  Widget _buildItemCard(ItemData item) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 4),
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: Row(
+          children: [
+            if (item.imageBase64.isNotEmpty)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: Image.memory(
+                  base64Decode(item.imageBase64),
+                  width: 28,
+                  height: 28,
+                  fit: BoxFit.cover,
+                ),
+              )
+            else
+              const Icon(
+                Icons.category_outlined,
+                size: 22,
+                color: Colors.deepPurple,
+              ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.name,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if (item.effect.isNotEmpty)
+                    Text(
+                      item.effect,
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            if (item.value > 0)
+              Text('💎${item.value}', style: const TextStyle(fontSize: 10)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 技能（法术表） Tab
+class _SkillsTab extends StatelessWidget {
+  const _SkillsTab({required this.character});
+  final CharacterData character;
+
+  @override
+  Widget build(BuildContext context) {
+    final skills = character.skills;
+    if (skills.isEmpty) {
+      return const Center(
+        child: Text('暂无技能', style: TextStyle(fontSize: 12, color: Colors.grey)),
+      );
+    }
+    return ListView(
+      padding: const EdgeInsets.all(8),
+      children: skills.map((s) => _buildSkillCard(s, context)).toList(),
+    );
+  }
+
+  Widget _buildSkillCard(SkillData s, BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 4),
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.auto_fix_high, size: 16, color: Colors.teal),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    s.name,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (s.description != null && s.description!.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text(
+                s.description!,
+                style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+              ),
+            ],
+            if (s.damages.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              ...s.damages.map(
+                (d) => Padding(
+                  padding: const EdgeInsets.only(bottom: 2),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 5,
+                          vertical: 1,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.teal.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                        child: Text(
+                          d.expression ?? '',
+                          style: const TextStyle(
+                            fontSize: 9,
+                            fontFamily: 'monospace',
+                          ),
+                        ),
+                      ),
+                      if (d.damageType != null) ...[
+                        const SizedBox(width: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 1,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.red.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                          child: Text(
+                            d.damageType!,
+                            style: TextStyle(
+                              fontSize: 9,
+                              color: Colors.red.shade700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
