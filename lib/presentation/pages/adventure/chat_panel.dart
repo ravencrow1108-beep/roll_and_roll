@@ -483,8 +483,6 @@ class _ChatMessageItem extends StatelessWidget {
   }
 
   Widget _buildNormalMessage(ThemeData theme, bool hasAvatar) {
-    final showName = !isMe;
-
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Row(
@@ -594,7 +592,7 @@ class _MiniAvatar extends StatelessWidget {
                 height: size,
                 fit: BoxFit.cover,
                 gaplessPlayback: true,
-                errorBuilder: (_, __, ___) => _fallback(theme),
+                errorBuilder: (_, _, _) => _fallback(theme),
               ),
             )
           : _fallback(theme),

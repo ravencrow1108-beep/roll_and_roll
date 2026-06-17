@@ -548,25 +548,23 @@ class _AdventurePageState extends State<AdventurePage> {
     final positions = RoomSession.instance.playerPositionsNotifier.value;
     final members = RoomSession.instance.membersNotifier.value;
     final roles = RoomSession.instance.memberRolesNotifier.value;
-    final isWide = MediaQuery.of(context).size.width > 600;
+    final theme = Theme.of(context);
 
     final mainContent = SafeArea(
-      child: Expanded(
-        child: MapDisplay(
-          mapData: m,
-          positions: positions,
-          enemies: m.enemies,
-          isGM: _isGM,
-          playerName: widget.playerName,
-          character: _character,
-          characters: _loadedCharacters,
-          onPositionChanged:
-              _isGM ? _onPlayerPositionChanged : null,
-          onEditHp: _isGM ? _onEditCharacterHp : null,
-          onAddNote: _isGM ? _onAddCharacterNote : null,
-          onDeleteNote:
-              _isGM ? _onDeleteCharacterNote : null,
-        ),
+      child: MapDisplay(
+        mapData: m,
+        positions: positions,
+        enemies: m.enemies,
+        isGM: _isGM,
+        playerName: widget.playerName,
+        character: _character,
+        characters: _loadedCharacters,
+        onPositionChanged:
+            _isGM ? _onPlayerPositionChanged : null,
+        onEditHp: _isGM ? _onEditCharacterHp : null,
+        onAddNote: _isGM ? _onAddCharacterNote : null,
+        onDeleteNote:
+            _isGM ? _onDeleteCharacterNote : null,
       ),
     );
 
@@ -590,24 +588,23 @@ class _AdventurePageState extends State<AdventurePage> {
       ),
       body: Stack(
         children: [
-          mainContent,
-          // 聊天浮窗（从右侧滑入，含骰子+聊天）
-          _ChatOverlay(
-            isOpen: _isChatOpen,
-            isWide: isWide,
-            members: members,
-            roles: roles,
-            chatMessages: _chatMessages,
-            chatCtrl: _chatCtrl,
-            chatScrollCtrl: _chatScrollCtrl,
-            playerName: widget.playerName,
-            onSend: _sendChat,
-            onClose: () => setState(() => _isChatOpen = false),
-            diceInputCtrl: _diceInputCtrl,
-            diceResult: _diceResult,
-            onRollDice: _rollDice,
-            onRollCustom: _rollCustomDice,
+          Positioned.fill(child: mainContent),
+          // ── 聊天浮窗遮罩 ──
+          Positioned.fill(
+            child: IgnorePointer(
+              ignoring: !_isChatOpen,
+              child: AnimatedOpacity(
+                opacity: _isChatOpen ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 250),
+                child: GestureDetector(
+                  onTap: () => setState(() => _isChatOpen = false),
+                  child: Container(color: Colors.black38),
+                ),
+              ),
+            ),
           ),
+          // ── 聊天面板（从右侧滑入，圆角悬浮卡片） ──
+          _buildChatPanelSlide(theme, members, roles),
         ],
       ),
       floatingActionButton: FloatingActionButton(
@@ -669,180 +666,122 @@ class _AdventurePageState extends State<AdventurePage> {
       onCreateSave: _navigateToCreateSave,
     );
   }
-}
 
-// ──────────────────────────────────────────────
-// 聊天浮窗覆盖层
-// ──────────────────────────────────────────────
-
-/// 从右侧滑入的聊天浮窗，包含成员列表 + 聊天面板。
-/// 展开时覆盖半透明遮罩，点击遮罩可关闭。
-class _ChatOverlay extends StatelessWidget {
-  const _ChatOverlay({
-    required this.isOpen,
-    required this.isWide,
-    required this.members,
-    required this.roles,
-    required this.chatMessages,
-    required this.chatCtrl,
-    required this.chatScrollCtrl,
-    required this.playerName,
-    required this.onSend,
-    required this.onClose,
-    required this.diceInputCtrl,
-    required this.diceResult,
-    required this.onRollDice,
-    required this.onRollCustom,
-  });
-
-  final bool isOpen;
-  final bool isWide;
-  final List<String> members;
-  final Map<String, String> roles;
-  final List<ChatMessage> chatMessages;
-  final TextEditingController chatCtrl;
-  final ScrollController chatScrollCtrl;
-  final String playerName;
-  final VoidCallback onSend;
-  final VoidCallback onClose;
-
-  // ── 骰子 ──
-  final TextEditingController diceInputCtrl;
-  final String diceResult;
-  final void Function(int sides) onRollDice;
-  final VoidCallback onRollCustom;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+  /// 聊天面板侧滑卡片（直接返回 AnimatedPositioned 作为 Stack 子项）
+  Widget _buildChatPanelSlide(
+    ThemeData theme,
+    List<String> members,
+    Map<String, String> roles,
+  ) {
     final screenWidth = MediaQuery.of(context).size.width;
-    // 宽屏侧边栏宽度 300，窄屏占 85% 宽度
+    final isWide = screenWidth > 600;
     final panelWidth = isWide ? 300.0 : screenWidth * 0.85;
     const double cardMargin = 12.0;
-    const double fabBottomMargin = 16.0; // FAB 默认底部边距
-    const double fabSize = 56.0; // FAB 标准尺寸
-    const double fabGap = 16.0; // 聊天框与 FAB 之间的额外间距
-    const double bottomSpace = fabBottomMargin + fabSize + fabGap; // ≈88
+    const double bottomSpace = 88.0;
 
-    return Stack(
-      children: [
-        // 半透明遮罩
-        AnimatedOpacity(
-          opacity: isOpen ? 1.0 : 0.0,
-          duration: const Duration(milliseconds: 250),
-          child: isOpen
-              ? GestureDetector(
-                  onTap: onClose,
-                  child: Container(color: Colors.black38),
-                )
-              : const SizedBox.shrink(),
-        ),
-        // 聊天面板（从右侧滑入，圆角悬浮卡片）
-        AnimatedPositioned(
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeInOut,
-          top: cardMargin,
-          bottom: bottomSpace,
-          right: isOpen ? cardMargin : -(panelWidth + cardMargin * 2),
-          width: panelWidth,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: Container(
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surface,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.3),
-                    blurRadius: 20,
-                    offset: const Offset(-4, 4),
-                  ),
-                ],
+    return AnimatedPositioned(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+      top: cardMargin,
+      bottom: bottomSpace,
+      right: _isChatOpen ? cardMargin : -(panelWidth + cardMargin * 2),
+      width: panelWidth,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.3),
+                blurRadius: 20,
+                offset: const Offset(-4, 4),
               ),
-              child: Column(
-                children: [
-                  // 标题栏 — 渐变头部
-                  Container(
-                    padding: const EdgeInsets.fromLTRB(14, 10, 6, 10),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          theme.colorScheme.primary,
-                          theme.colorScheme.primary.withValues(alpha: 0.8),
-                        ],
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Icon(Icons.chat_rounded,
-                              size: 18, color: Colors.white),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            '聊天',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                        // 消息计数
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.25),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Text(
-                            '${chatMessages.length}',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        IconButton(
-                          icon: const Icon(Icons.close, size: 18),
-                          onPressed: onClose,
-                          tooltip: '关闭',
-                          color: Colors.white,
-                          visualDensity: VisualDensity.compact,
-                        ),
-                      ],
-                    ),
-                  ),
-                  // 成员列表
-                  MemberList(members: members, roles: roles),
-                  // 聊天区域
-                  Expanded(
-                    child: ChatPanel(
-                      chatMessages: chatMessages,
-                      chatCtrl: chatCtrl,
-                      chatScrollCtrl: chatScrollCtrl,
-                      playerName: playerName,
-                      onSend: onSend,
-                      diceInputCtrl: diceInputCtrl,
-                      diceResult: diceResult,
-                      onRollDice: onRollDice,
-                      onRollCustom: onRollCustom,
-                    ),
-                  ),
-                ],
+            ],
+          ),
+          child: Column(
+            children: [
+              _buildChatHeader(theme),
+              MemberList(members: members, roles: roles),
+              Expanded(
+                child: ChatPanel(
+                  chatMessages: _chatMessages,
+                  chatCtrl: _chatCtrl,
+                  chatScrollCtrl: _chatScrollCtrl,
+                  playerName: widget.playerName,
+                  onSend: _sendChat,
+                  diceInputCtrl: _diceInputCtrl,
+                  diceResult: _diceResult,
+                  onRollDice: _rollDice,
+                  onRollCustom: _rollCustomDice,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildChatHeader(ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 10, 6, 10),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            theme.colorScheme.primary,
+            theme.colorScheme.primary.withValues(alpha: 0.8),
+          ],
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(Icons.chat_rounded,
+                size: 18, color: Colors.white),
+          ),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Text(
+              '聊天',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
               ),
             ),
           ),
-        ),
-      ],
+          Container(
+            padding: const EdgeInsets.symmetric(
+                horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.25),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              '${_chatMessages.length}',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
+          IconButton(
+            icon: const Icon(Icons.close, size: 18),
+            onPressed: () => setState(() => _isChatOpen = false),
+            tooltip: '关闭',
+            color: Colors.white,
+            visualDensity: VisualDensity.compact,
+          ),
+        ],
+      ),
     );
   }
 }
