@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:record/record.dart';
 
 import '../../providers/room_state.dart';
 import '../../../data/models/models.dart';
@@ -13,7 +14,6 @@ import 'character_views.dart';
 import 'map_display.dart';
 import 'map_views.dart';
 import 'chat_panel.dart';
-import 'member_list.dart';
 
 /// 冒险主页面：骰子投掷、地图显示、聊天面板与角色管理
 class AdventurePage extends StatefulWidget {
@@ -110,6 +110,7 @@ class _AdventurePageState extends State<AdventurePage> {
     // 语音 UI 状态刷新
     _voice.isInChannel.addListener(_onVoiceStateChanged);
     _voice.isMuted.addListener(_onVoiceStateChanged);
+    _voice.speakingMembers.addListener(_onVoiceStateChanged);
   }
 
   void _onVoiceStateChanged() {
@@ -684,6 +685,7 @@ class _AdventurePageState extends State<AdventurePage> {
     _voice.onAudioCaptured = null;
     _voice.isInChannel.removeListener(_onVoiceStateChanged);
     _voice.isMuted.removeListener(_onVoiceStateChanged);
+    _voice.speakingMembers.removeListener(_onVoiceStateChanged);
     _msgSub?.cancel();
     _diceInputCtrl.dispose();
     _chatCtrl.dispose();
@@ -720,8 +722,6 @@ class _AdventurePageState extends State<AdventurePage> {
   Widget _buildAdventureView() {
     final m = _displayedMap!;
     final positions = RoomSession.instance.playerPositionsNotifier.value;
-    final members = RoomSession.instance.membersNotifier.value;
-    final roles = RoomSession.instance.memberRolesNotifier.value;
     final theme = Theme.of(context);
 
     // 默认选中自己的角色，主持无角色时选第一个
@@ -767,11 +767,120 @@ class _AdventurePageState extends State<AdventurePage> {
           },
         ),
         actions: [
+          // ── 发言者指示器（仅在频道内） ──
+          ValueListenableBuilder<bool>(
+            valueListenable: _voice.isInChannel,
+            builder: (_, inChannel, _) {
+              if (!inChannel) return const SizedBox.shrink();
+              return ValueListenableBuilder<Set<String>>(
+                valueListenable: _voice.speakingMembers,
+                builder: (_, speakers, _) {
+                  if (speakers.isEmpty) return const SizedBox.shrink();
+                  final label = speakers.length == 1
+                      ? speakers.first
+                      : '${speakers.length} 人';
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 4),
+                    child: Chip(
+                      avatar: const Icon(
+                        Icons.mic,
+                        size: 14,
+                        color: Colors.green,
+                      ),
+                      label: Text(label, style: const TextStyle(fontSize: 11)),
+                      backgroundColor: Colors.green.shade50,
+                      side: BorderSide.none,
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+          // ── 麦克风静音（仅在频道内，带音量指示） ──
+          ValueListenableBuilder<bool>(
+            valueListenable: _voice.isInChannel,
+            builder: (_, inChannel, _) {
+              if (!inChannel) return const SizedBox.shrink();
+              return ValueListenableBuilder<bool>(
+                valueListenable: _voice.isMuted,
+                builder: (_, muted, _) => ValueListenableBuilder<double>(
+                  valueListenable: _voice.micVolume,
+                  builder: (_, vol, _) => IconButton(
+                    icon: muted
+                        ? Icon(Icons.mic_off, color: Colors.red.shade400)
+                        : _MicVolumeIcon(volume: vol),
+                    tooltip: muted ? '打开麦克风' : '关闭麦克风',
+                    onPressed: () async {
+                      await _voice.toggleMute();
+                      if (mounted) setState(() {});
+                    },
+                  ),
+                ),
+              );
+            },
+          ),
+          // ── 麦克风选择（仅在频道内且多于1个设备时） ──
+          ValueListenableBuilder<bool>(
+            valueListenable: _voice.isInChannel,
+            builder: (_, inChannel, _) {
+              if (!inChannel) return const SizedBox.shrink();
+              return ValueListenableBuilder<List<InputDevice>>(
+                valueListenable: _voice.availableMics,
+                builder: (_, mics, _) {
+                  if (mics.length < 2) return const SizedBox.shrink();
+                  return ValueListenableBuilder<String?>(
+                    valueListenable: _voice.selectedMicId,
+                    builder: (_, selId, _) => PopupMenuButton<String>(
+                      tooltip: '选择麦克风',
+                      icon: const Icon(Icons.keyboard_arrow_down, size: 20),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(
+                        minWidth: 28,
+                        minHeight: 36,
+                      ),
+                      onSelected: (id) {
+                        _voice.selectedMicId.value = id;
+                      },
+                      itemBuilder: (_) => mics.map((m) {
+                        final isSel = m.id == selId;
+                        return PopupMenuItem<String>(
+                          value: m.id,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                isSel
+                                    ? Icons.radio_button_checked
+                                    : Icons.radio_button_unchecked,
+                                size: 18,
+                                color: isSel ? Colors.green : null,
+                              ),
+                              const SizedBox(width: 8),
+                              Flexible(
+                                child: Text(
+                                  m.label,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+          // ── 加入/退出语音频道 ──
           ValueListenableBuilder<bool>(
             valueListenable: _voice.isInChannel,
             builder: (_, inChannel, _) => IconButton(
               icon: Icon(
-                inChannel ? Icons.mic : Icons.mic_none,
+                inChannel ? Icons.phonelink_erase : Icons.mic_none,
                 color: inChannel ? Colors.green : null,
               ),
               tooltip: inChannel ? '退出语音频道' : '加入语音频道',
@@ -851,53 +960,20 @@ class _AdventurePageState extends State<AdventurePage> {
               ),
             ),
           ),
-          _buildChatPanelSlide(theme, members, roles),
+          _buildChatPanelSlide(theme),
         ],
       ),
-      floatingActionButton: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ValueListenableBuilder<bool>(
-            valueListenable: _voice.isInChannel,
-            builder: (_, inChannel, _) {
-              if (!inChannel) return const SizedBox.shrink();
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: ValueListenableBuilder<bool>(
-                  valueListenable: _voice.isMuted,
-                  builder: (_, muted, _) => FloatingActionButton(
-                    heroTag: 'voice_mute',
-                    mini: true,
-                    backgroundColor: muted
-                        ? Colors.red.shade400
-                        : Colors.green.shade400,
-                    onPressed: () async {
-                      await _voice.toggleMute();
-                      if (mounted) setState(() {});
-                    },
-                    tooltip: muted ? '打开麦克风' : '关闭麦克风',
-                    child: Icon(
-                      muted ? Icons.mic_off : Icons.mic,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              );
-            },
+      floatingActionButton: FloatingActionButton(
+        heroTag: 'chat_toggle',
+        onPressed: () => setState(() => _isChatOpen = !_isChatOpen),
+        tooltip: _isChatOpen ? '关闭聊天' : '打开聊天',
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 200),
+          child: Icon(
+            _isChatOpen ? Icons.close : Icons.chat,
+            key: ValueKey(_isChatOpen),
           ),
-          FloatingActionButton(
-            heroTag: 'chat_toggle',
-            onPressed: () => setState(() => _isChatOpen = !_isChatOpen),
-            tooltip: _isChatOpen ? '关闭聊天' : '打开聊天',
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 200),
-              child: Icon(
-                _isChatOpen ? Icons.close : Icons.chat,
-                key: ValueKey(_isChatOpen),
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -949,11 +1025,7 @@ class _AdventurePageState extends State<AdventurePage> {
   }
 
   /// 聊天面板侧滑卡片（直接返回 AnimatedPositioned 作为 Stack 子项）
-  Widget _buildChatPanelSlide(
-    ThemeData theme,
-    List<String> members,
-    Map<String, String> roles,
-  ) {
+  Widget _buildChatPanelSlide(ThemeData theme) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isWide = screenWidth > 600;
     final panelWidth = isWide ? 300.0 : screenWidth * 0.85;
@@ -983,7 +1055,6 @@ class _AdventurePageState extends State<AdventurePage> {
           child: Column(
             children: [
               _buildChatHeader(theme),
-              MemberList(members: members, roles: roles),
               Expanded(
                 child: ChatPanel(
                   chatMessages: _chatMessages,
@@ -1065,6 +1136,35 @@ class _AdventurePageState extends State<AdventurePage> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// 带麦克风音量环的图标
+class _MicVolumeIcon extends StatelessWidget {
+  const _MicVolumeIcon({required this.volume});
+
+  final double volume; // 0.0 ~ 1.0
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        SizedBox(
+          width: 28,
+          height: 28,
+          child: CircularProgressIndicator(
+            value: volume,
+            strokeWidth: 2.5,
+            backgroundColor: Colors.grey.shade300,
+            valueColor: AlwaysStoppedAnimation<Color>(
+              Color.lerp(Colors.green, Colors.green.shade700, volume)!,
+            ),
+          ),
+        ),
+        Icon(Icons.mic, size: 18, color: Colors.green.shade600),
+      ],
     );
   }
 }

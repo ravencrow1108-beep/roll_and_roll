@@ -20,12 +20,23 @@ class VoiceService {
   /// 麦克风是否静音
   final ValueNotifier<bool> isMuted = ValueNotifier(false);
 
+  /// 可用麦克风设备列表
+  final ValueNotifier<List<InputDevice>> availableMics =
+      ValueNotifier<List<InputDevice>>([]);
+
+  /// 当前选中的麦克风设备 ID
+  final ValueNotifier<String?> selectedMicId = ValueNotifier<String?>(null);
+
   /// 正在发言的成员名
   final ValueNotifier<Set<String>> speakingMembers = ValueNotifier<Set<String>>(
     {},
   );
 
+  /// 自身麦克风音量 (0.0 ~ 1.0)
+  final ValueNotifier<double> micVolume = ValueNotifier<double>(0.0);
+
   StreamSubscription<Uint8List>? _recordingSub;
+  StreamSubscription<Amplitude>? _amplitudeSub;
   bool _isRecording = false;
 
   /// 音频数据回调 (PCM bytes → 外部通过 socket 发送)
@@ -38,6 +49,17 @@ class VoiceService {
     final hasPermission = await _recorder.hasPermission();
     if (!hasPermission) {
       throw Exception('没有麦克风权限');
+    }
+
+    // 枚举可用麦克风
+    try {
+      final mics = await _recorder.listInputDevices();
+      availableMics.value = mics;
+      if (mics.isNotEmpty && selectedMicId.value == null) {
+        selectedMicId.value = mics.first.id;
+      }
+    } catch (_) {
+      availableMics.value = [];
     }
 
     isInChannel.value = true;
@@ -53,27 +75,22 @@ class VoiceService {
     speakingMembers.value = {};
   }
 
-  /// 切换静音
+  /// 切换静音（不停止录音器，只在回调中丢弃数据）
   Future<void> toggleMute() async {
     isMuted.value = !isMuted.value;
-    if (isMuted.value) {
-      await _stopRecording();
-    } else if (isInChannel.value) {
-      await _startRecording();
-    }
+    micVolume.value = 0.0;
   }
 
   Future<void> _startRecording() async {
     if (_isRecording) return;
 
     try {
-      final stream = await _recorder.startStream(
-        const RecordConfig(
-          encoder: AudioEncoder.pcm16bits,
-          numChannels: 1,
-          sampleRate: 16000,
-        ),
+      final config = const RecordConfig(
+        encoder: AudioEncoder.pcm16bits,
+        numChannels: 1,
+        sampleRate: 16000,
       );
+      final stream = await _recorder.startStream(config);
 
       _isRecording = true;
       _recordingSub = stream.listen(
@@ -84,6 +101,16 @@ class VoiceService {
         onError: (_) => _isRecording = false,
         cancelOnError: true,
       );
+
+      // 振幅监听（自身音量指示器）
+      _amplitudeSub?.cancel();
+      _amplitudeSub = _recorder
+          .onAmplitudeChanged(const Duration(milliseconds: 100))
+          .listen((amp) {
+            if (isMuted.value) return;
+            final v = ((amp.current + 60) / 60).clamp(0.0, 1.0);
+            micVolume.value = v;
+          });
     } catch (_) {
       _isRecording = false;
     }
@@ -92,6 +119,9 @@ class VoiceService {
   Future<void> _stopRecording() async {
     await _recordingSub?.cancel();
     _recordingSub = null;
+    await _amplitudeSub?.cancel();
+    _amplitudeSub = null;
+    micVolume.value = 0.0;
     _isRecording = false;
     try {
       if (await _recorder.isRecording()) {
@@ -134,5 +164,8 @@ class VoiceService {
     isInChannel.dispose();
     isMuted.dispose();
     speakingMembers.dispose();
+    availableMics.dispose();
+    selectedMicId.dispose();
+    micVolume.dispose();
   }
 }
