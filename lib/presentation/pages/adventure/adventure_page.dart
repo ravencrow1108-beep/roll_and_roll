@@ -9,10 +9,10 @@ import '../../../data/models/models.dart';
 import '../../../data/services/socket_support.dart';
 import '../create_save/create_save_page.dart';
 import 'character_views.dart';
-import 'dice_panel.dart';
 import 'map_display.dart';
 import 'map_views.dart';
-import 'right_panel.dart';
+import 'chat_panel.dart';
+import 'member_list.dart';
 
 /// 冒险主页面：骰子投掷、地图显示、聊天面板与角色管理
 class AdventurePage extends StatefulWidget {
@@ -44,6 +44,9 @@ class _AdventurePageState extends State<AdventurePage> {
   bool _isReady = false;
   bool _adventureStarted = false;
   MapData? _displayedMap;
+
+  // --- Chat floating ---
+  bool _isChatOpen = false;
 
   // --- Dice rolling ---
   final TextEditingController _diceInputCtrl = TextEditingController();
@@ -500,13 +503,33 @@ class _AdventurePageState extends State<AdventurePage> {
     return _isGM ? _buildMapSelection() : _buildCharacterSelection();
   }
 
-  /// 构建冒险主界面，根据屏幕宽度切换横竖布局
+  /// 构建冒险主界面 — 聊天改为悬浮按钮 + 侧滑面板。
   Widget _buildAdventureView() {
     final m = _displayedMap!;
     final positions = RoomSession.instance.playerPositionsNotifier.value;
     final members = RoomSession.instance.membersNotifier.value;
     final roles = RoomSession.instance.memberRolesNotifier.value;
     final isWide = MediaQuery.of(context).size.width > 600;
+
+    final mainContent = SafeArea(
+      child: Expanded(
+        child: MapDisplay(
+          mapData: m,
+          positions: positions,
+          enemies: m.enemies,
+          isGM: _isGM,
+          playerName: widget.playerName,
+          character: _character,
+          characters: _loadedCharacters,
+          onPositionChanged:
+              _isGM ? _onPlayerPositionChanged : null,
+          onEditHp: _isGM ? _onEditCharacterHp : null,
+          onAddNote: _isGM ? _onAddCharacterNote : null,
+          onDeleteNote:
+              _isGM ? _onDeleteCharacterNote : null,
+        ),
+      ),
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -526,79 +549,38 @@ class _AdventurePageState extends State<AdventurePage> {
           ),
         ],
       ),
-      body: SafeArea(
-        child: isWide
-            ? Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  DicePanel(
-                    diceInputCtrl: _diceInputCtrl,
-                    diceResult: _diceResult,
-                    onRollDice: _rollDice,
-                    onRollCustom: _rollCustomDice,
-                  ),
-                  Expanded(
-                    flex: 4,
-                    child: MapDisplay(
-                      mapData: m,
-                      positions: positions,
-                      enemies: m.enemies,
-                      isGM: _isGM,
-                      playerName: widget.playerName,
-                      character: _character,
-                      characters: _loadedCharacters,
-                      onPositionChanged: _isGM
-                          ? _onPlayerPositionChanged
-                          : null,
-                      onEditHp:
-                          _isGM ? _onEditCharacterHp : null,
-                      onAddNote:
-                          _isGM ? _onAddCharacterNote : null,
-                      onDeleteNote:
-                          _isGM ? _onDeleteCharacterNote : null,
-                    ),
-                  ),
-                  RightPanel(
-                    members: members,
-                    roles: roles,
-                    chatMessages: _chatMessages,
-                    chatCtrl: _chatCtrl,
-                    chatScrollCtrl: _chatScrollCtrl,
-                    playerName: widget.playerName,
-                    onSend: _sendChat,
-                  ),
-                ],
-              )
-            : Column(
-                children: [
-                  Expanded(
-                    child: MapDisplay(
-                      mapData: m,
-                      positions: positions,
-                      enemies: m.enemies,
-                      isGM: _isGM,
-                      playerName: widget.playerName,
-                      character: _character,
-                      characters: _loadedCharacters,
-                      onPositionChanged: _isGM
-                          ? _onPlayerPositionChanged
-                          : null,
-                      onEditHp:
-                          _isGM ? _onEditCharacterHp : null,
-                      onAddNote:
-                          _isGM ? _onAddCharacterNote : null,
-                      onDeleteNote:
-                          _isGM ? _onDeleteCharacterNote : null,
-                    ),
-                  ),
-                  DicePanel(
-                    diceInputCtrl: _diceInputCtrl,
-                    diceResult: _diceResult,
-                    onRollDice: _rollDice,
-                    onRollCustom: _rollCustomDice,
-                  ),
-                ],
-              ),
+      body: Stack(
+        children: [
+          mainContent,
+          // 聊天浮窗（从右侧滑入，含骰子+聊天）
+          _ChatOverlay(
+            isOpen: _isChatOpen,
+            isWide: isWide,
+            members: members,
+            roles: roles,
+            chatMessages: _chatMessages,
+            chatCtrl: _chatCtrl,
+            chatScrollCtrl: _chatScrollCtrl,
+            playerName: widget.playerName,
+            onSend: _sendChat,
+            onClose: () => setState(() => _isChatOpen = false),
+            diceInputCtrl: _diceInputCtrl,
+            diceResult: _diceResult,
+            onRollDice: _rollDice,
+            onRollCustom: _rollCustomDice,
+          ),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => setState(() => _isChatOpen = !_isChatOpen),
+        tooltip: _isChatOpen ? '关闭聊天' : '打开聊天',
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 200),
+          child: Icon(
+            _isChatOpen ? Icons.close : Icons.chat,
+            key: ValueKey(_isChatOpen),
+          ),
+        ),
       ),
     );
   }
@@ -646,6 +628,152 @@ class _AdventurePageState extends State<AdventurePage> {
       onPickSaveFile: _pickSaveFile,
       onSelectMap: _selectMap,
       onCreateSave: _navigateToCreateSave,
+    );
+  }
+}
+
+// ──────────────────────────────────────────────
+// 聊天浮窗覆盖层
+// ──────────────────────────────────────────────
+
+/// 从右侧滑入的聊天浮窗，包含成员列表 + 聊天面板。
+/// 展开时覆盖半透明遮罩，点击遮罩可关闭。
+class _ChatOverlay extends StatelessWidget {
+  const _ChatOverlay({
+    required this.isOpen,
+    required this.isWide,
+    required this.members,
+    required this.roles,
+    required this.chatMessages,
+    required this.chatCtrl,
+    required this.chatScrollCtrl,
+    required this.playerName,
+    required this.onSend,
+    required this.onClose,
+    required this.diceInputCtrl,
+    required this.diceResult,
+    required this.onRollDice,
+    required this.onRollCustom,
+  });
+
+  final bool isOpen;
+  final bool isWide;
+  final List<String> members;
+  final Map<String, String> roles;
+  final List<ChatMessage> chatMessages;
+  final TextEditingController chatCtrl;
+  final ScrollController chatScrollCtrl;
+  final String playerName;
+  final VoidCallback onSend;
+  final VoidCallback onClose;
+
+  // ── 骰子 ──
+  final TextEditingController diceInputCtrl;
+  final String diceResult;
+  final void Function(int sides) onRollDice;
+  final VoidCallback onRollCustom;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final screenWidth = MediaQuery.of(context).size.width;
+    // 宽屏侧边栏宽度 300，窄屏占 85% 宽度
+    final panelWidth = isWide ? 300.0 : screenWidth * 0.85;
+    const double cardMargin = 12.0;
+    const double fabBottomMargin = 16.0; // FAB 默认底部边距
+    const double fabSize = 56.0; // FAB 标准尺寸
+    const double fabGap = 16.0; // 聊天框与 FAB 之间的额外间距
+    const double bottomSpace = fabBottomMargin + fabSize + fabGap; // ≈88
+
+    return Stack(
+      children: [
+        // 半透明遮罩
+        AnimatedOpacity(
+          opacity: isOpen ? 1.0 : 0.0,
+          duration: const Duration(milliseconds: 250),
+          child: isOpen
+              ? GestureDetector(
+                  onTap: onClose,
+                  child: Container(color: Colors.black38),
+                )
+              : const SizedBox.shrink(),
+        ),
+        // 聊天面板（从右侧滑入，圆角悬浮卡片）
+        AnimatedPositioned(
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+          top: cardMargin,
+          bottom: bottomSpace,
+          right: isOpen ? cardMargin : -(panelWidth + cardMargin * 2),
+          width: panelWidth,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.3),
+                    blurRadius: 20,
+                    offset: const Offset(-4, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  // 标题栏
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surfaceContainerHighest,
+                      border: Border(
+                        bottom: BorderSide(color: theme.dividerColor),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.chat,
+                            size: 18, color: theme.colorScheme.primary),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            '聊天 · ${chatMessages.length} 条消息',
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close, size: 20),
+                          onPressed: onClose,
+                          tooltip: '关闭',
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ],
+                    ),
+                  ),
+                  // 成员列表
+                  MemberList(members: members, roles: roles),
+                  // 聊天区域
+                  Expanded(
+                    child: ChatPanel(
+                      chatMessages: chatMessages,
+                      chatCtrl: chatCtrl,
+                      chatScrollCtrl: chatScrollCtrl,
+                      playerName: playerName,
+                      onSend: onSend,
+                      diceInputCtrl: diceInputCtrl,
+                      diceResult: diceResult,
+                      onRollDice: onRollDice,
+                      onRollCustom: onRollCustom,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

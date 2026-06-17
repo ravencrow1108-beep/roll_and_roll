@@ -10,10 +10,7 @@ void main() async {
   await SharedPreferences.getInstance();
   runApp(const MyApp());
 }
-// TODO:地图频繁渲染闪屏 
-// 局内添加角色 
-// 攻击便捷扣血 
-// 聊天框悬浮 
+// TODO:局内添加角色 
 // 局内背包 
 // 地图缩放拖动 
 // 主持和玩家权限区分 
@@ -26,3 +23,4 @@ void main() async {
 // 投掷动画 
 // 地图编辑视野阻挡物 
 // 地图编辑明区暗区
+// 攻击便捷扣血 
