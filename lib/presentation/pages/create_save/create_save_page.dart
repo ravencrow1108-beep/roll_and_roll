@@ -450,6 +450,24 @@ class _CreateSavePageState extends State<CreateSavePage>
       );
       return;
     }
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('确认保存'),
+        content: const Text('当前操作会覆盖旧的存档，是否继续？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('取消'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
     setState(() => _isSaving = true);
     try {
       final save = SaveData(
@@ -502,6 +520,54 @@ class _CreateSavePageState extends State<CreateSavePage>
       setState(() => _isSaving = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('保存失败：$e'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
+  /// 另存为：始终弹出文件选择器保存到新文件
+  Future<void> _saveAs() async {
+    setState(() => _isSaving = true);
+    try {
+      final save = SaveData(
+        createdAt: DateTime.now().toIso8601String(),
+        characters: _chars.map((c) => c.toCharacterData()).toList(),
+        maps: _maps,
+        rules: RuleData(
+          turnSettings: List<String>.from(_turnSettings),
+          phaseSettings: List<String>.from(_phaseSettings),
+        ),
+      );
+
+      final first = _chars.first.nameCtrl.text.trim();
+      final fileName =
+          '${first.isEmpty ? 'archive' : first}_${DateTime.now().millisecondsSinceEpoch}.zip';
+      String? outputPath = await FilePicker.saveFile(
+        dialogTitle: '另存为',
+        fileName: fileName,
+        type: FileType.any,
+      );
+      if (outputPath == null) {
+        if (mounted) setState(() => _isSaving = false);
+        return;
+      }
+      if (!outputPath.endsWith('.zip')) {
+        outputPath = '$outputPath.zip';
+      }
+      await save.packToZip(outputPath);
+      if (!mounted) return;
+      setState(() => _isSaving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('已另存为 $outputPath'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      Navigator.pop(context, outputPath);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isSaving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('另存失败：$e'), backgroundColor: Colors.red),
       );
     }
   }
@@ -659,30 +725,49 @@ class _CreateSavePageState extends State<CreateSavePage>
             ),
             Padding(
               padding: const EdgeInsets.all(16),
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: _isSaving ? null : _saveToFile,
-                  icon: _isSaving
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.save_outlined),
-                  label: Text(
-                    _isSaving
-                        ? '保存中...'
-                        : (widget.isEditMode ? '保存修改' : '保存存档'),
-                    style: const TextStyle(fontSize: 16),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: _isSaving ? null : _saveToFile,
+                      icon: _isSaving
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.save_outlined),
+                      label: Text(
+                        _isSaving
+                            ? '保存中...'
+                            : (widget.isEditMode ? '保存修改' : '保存存档'),
+                        style: const TextStyle(fontSize: 16),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: _isSaving ? null : _saveAs,
+                      icon: const Icon(Icons.save_as_outlined),
+                      label: const Text('另存为', style: TextStyle(fontSize: 16)),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        backgroundColor: Colors.blue.shade50,
+                        foregroundColor: Colors.blue.shade700,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],

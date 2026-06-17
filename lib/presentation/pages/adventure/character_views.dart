@@ -163,6 +163,11 @@ class CharacterSelectionView extends StatelessWidget {
                             const SizedBox(width: 12),
                             Expanded(child: Text(saveFileName)),
                             IconButton(
+                              icon: const Icon(Icons.save_as_outlined),
+                              tooltip: '另存为',
+                              onPressed: onPickSaveFile,
+                            ),
+                            IconButton(
                               icon: const Icon(Icons.folder_open),
                               tooltip: '选择存档文件',
                               onPressed: onPickSaveFile,

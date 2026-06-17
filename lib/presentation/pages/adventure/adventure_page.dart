@@ -459,8 +459,113 @@ class _AdventurePageState extends State<AdventurePage> {
     _addChat('系统', '$name 注释已删除');
   }
 
+  Future<void> _saveProgress() async {
+    if (_saveFilePath == null) return;
+    final ok = await _confirmOverwrite();
+    if (ok != true) return;
+    try {
+      final save = await SaveData.fromZip(_saveFilePath!);
+      final updated = SaveData(
+        createdAt: DateTime.now().toIso8601String(),
+        characters: _loadedCharacters,
+        maps: save.maps,
+        rules: save.rules,
+        playerPositions: RoomSession.instance.playerPositionsNotifier.value,
+      );
+      await updated.packToZip(_saveFilePath!);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('进度已保存'),
+            duration: Duration(seconds: 1),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('保存失败'),
+            duration: Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  /// 弹出确认覆盖对话框，返回 true 表示用户确认
+  Future<bool?> _confirmOverwrite() {
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('确认保存'),
+        content: const Text('当前操作会覆盖旧的存档，是否继续？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('取消'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _saveAsProgress() async {
+    try {
+      final result = await FilePicker.saveFile(
+        dialogTitle: '另存为',
+        fileName: _saveFileName,
+        type: FileType.any,
+      );
+      if (result == null) return;
+      final save = SaveData(
+        createdAt: DateTime.now().toIso8601String(),
+        characters: _loadedCharacters,
+        maps: _saveFilePath != null
+            ? (await SaveData.fromZip(_saveFilePath!)).maps
+            : [],
+        rules: _saveFilePath != null
+            ? (await SaveData.fromZip(_saveFilePath!)).rules
+            : RuleData(),
+        playerPositions: RoomSession.instance.playerPositionsNotifier.value,
+      );
+      await save.packToZip(result);
+      if (mounted) {
+        setState(() {
+          _saveFilePath = result;
+          _saveFileName = result.split('/').last.split('\\').last;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('已另存为 $_saveFileName'),
+            duration: const Duration(seconds: 1),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('另存失败'),
+            duration: Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _saveCharacterChanges() async {
     if (_saveFilePath == null) return;
+    final ok = await _confirmOverwrite();
+    if (ok != true) return;
     try {
       final save = await SaveData.fromZip(_saveFilePath!);
       final updated = SaveData(
@@ -471,6 +576,15 @@ class _AdventurePageState extends State<AdventurePage> {
         playerPositions: save.playerPositions,
       );
       await updated.packToZip(_saveFilePath!);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('已保存'),
+            duration: Duration(seconds: 1),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     } catch (_) {}
   }
 
@@ -572,6 +686,16 @@ class _AdventurePageState extends State<AdventurePage> {
       appBar: AppBar(
         title: Text('冒险中 · ${m.name}'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.save_outlined),
+            tooltip: '保存进度',
+            onPressed: _saveProgress,
+          ),
+          IconButton(
+            icon: const Icon(Icons.save_as_outlined),
+            tooltip: '另存为',
+            onPressed: _saveAsProgress,
+          ),
           TextButton.icon(
             onPressed: () {
               RoomSession.instance.broadcast({'type': 'return_to_room'});

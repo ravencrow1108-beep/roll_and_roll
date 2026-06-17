@@ -508,6 +508,11 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
                                 onPressed: _editSaveFile,
                               ),
                             IconButton(
+                              icon: const Icon(Icons.save_as_outlined),
+                              tooltip: '另存为',
+                              onPressed: _selectSaveFile,
+                            ),
+                            IconButton(
                               icon: const Icon(Icons.folder_open),
                               tooltip: '选择存档文件',
                               onPressed: _selectSaveFile,

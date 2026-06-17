@@ -354,6 +354,11 @@ class _MapEditPageState extends State<MapEditPage> {
                               const SizedBox(width: 12),
                               Expanded(child: Text(_saveFileName)),
                               IconButton(
+                                icon: const Icon(Icons.save_as_outlined),
+                                tooltip: '另存为',
+                                onPressed: _pickSaveFile,
+                              ),
+                              IconButton(
                                 icon: const Icon(Icons.folder_open),
                                 tooltip: '选择存档文件',
                                 onPressed: _pickSaveFile,
