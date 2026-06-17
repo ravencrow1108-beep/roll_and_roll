@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import '../../../data/models/chat_message.dart';
 
@@ -97,55 +99,9 @@ class _ChatPanelBodyState extends State<_ChatPanelBody> {
             itemBuilder: (_, i) {
               final msg = widget.chatMessages[i];
               final isMe = msg.from == widget.playerName;
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Align(
-                  alignment: isMe
-                      ? Alignment.centerRight
-                      : Alignment.centerLeft,
-                  child: Container(
-                    constraints: const BoxConstraints(maxWidth: 180),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: msg.isSystem
-                          ? Colors.grey.shade200
-                          : isMe
-                              ? Colors.deepPurple.shade100
-                              : Colors.white,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: msg.isSystem
-                        ? Text(
-                            msg.text,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey.shade700,
-                            ),
-                          )
-                        : Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (!isMe)
-                                Text(
-                                  msg.from,
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.deepPurple.shade700,
-                                  ),
-                                ),
-                              Text(
-                                msg.text,
-                                style: const TextStyle(fontSize: 13),
-                              ),
-                            ],
-                          ),
-                  ),
-                ),
+              return _ChatMessageItem(
+                message: msg,
+                isMe: isMe,
               );
             },
           ),
@@ -167,69 +123,110 @@ class _ChatPanelBodyState extends State<_ChatPanelBody> {
           ),
         // ── 输入栏 ──
         Container(
-          padding: const EdgeInsets.fromLTRB(6, 4, 6, 6),
+          padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
           decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerHighest,
-            border: Border(top: BorderSide(color: theme.dividerColor)),
+            color: theme.colorScheme.surface,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.06),
+                blurRadius: 6,
+                offset: const Offset(0, -2),
+              ),
+            ],
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Row(
-                children: [
-                  // ── 骰子折叠按钮 ──
-                  if (widget.hasDice) ...[
-                    IconButton(
-                      onPressed: () =>
-                          setState(() => _diceExpanded = !_diceExpanded),
-                      icon: AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 200),
-                        child: Icon(
-                          _diceExpanded
-                              ? Icons.casino
-                              : Icons.casino_outlined,
-                          key: ValueKey(_diceExpanded),
-                          size: 20,
-                        ),
-                      ),
-                      color: _diceExpanded
-                          ? Colors.deepPurple
-                          : Colors.grey.shade600,
-                      tooltip: _diceExpanded ? '收起骰子' : '展开骰子',
-                      visualDensity: VisualDensity.compact,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(
-                        minWidth: 36,
-                        minHeight: 36,
+              // ── 骰子折叠按钮 ──
+              if (widget.hasDice)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 2),
+                  child: IconButton(
+                    onPressed: () =>
+                        setState(() => _diceExpanded = !_diceExpanded),
+                    icon: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 200),
+                      child: Icon(
+                        _diceExpanded
+                            ? Icons.casino
+                            : Icons.casino_outlined,
+                        key: ValueKey(_diceExpanded),
+                        size: 22,
                       ),
                     ),
-                    const SizedBox(width: 2),
-                  ],
-                  // ── 消息输入 ──
-                  Expanded(
-                    child: TextField(
-                      controller: widget.chatCtrl,
-                      decoration: const InputDecoration(
-                        hintText: '输入消息…',
-                        border: OutlineInputBorder(),
-                        isDense: true,
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 8,
-                        ),
-                      ),
-                      style: const TextStyle(fontSize: 13),
-                      onSubmitted: (_) => widget.onSend(),
+                    color: _diceExpanded
+                        ? theme.colorScheme.primary
+                        : Colors.grey.shade500,
+                    tooltip: _diceExpanded ? '收起骰子' : '展开骰子',
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 40,
+                      minHeight: 40,
                     ),
                   ),
-                  const SizedBox(width: 4),
-                  IconButton(
-                    onPressed: widget.onSend,
-                    icon: const Icon(Icons.send, size: 20),
-                    color: Colors.deepPurple,
-                    tooltip: '发送',
+                ),
+              // ── 消息输入（圆角胶囊） ──
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest
+                        .withValues(alpha: 0.6),
+                    borderRadius: BorderRadius.circular(20),
                   ),
-                ],
+                  child: TextField(
+                    controller: widget.chatCtrl,
+                    textInputAction: TextInputAction.send,
+                    decoration: InputDecoration(
+                      hintText: '输入消息…',
+                      hintStyle: TextStyle(
+                        color: Colors.grey.shade500,
+                        fontSize: 13,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(20),
+                        borderSide: BorderSide.none,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(20),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(20),
+                        borderSide: BorderSide(
+                          color: theme.colorScheme.primary.withValues(alpha: 0.4),
+                          width: 1.5,
+                        ),
+                      ),
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 9,
+                      ),
+                    ),
+                    style: const TextStyle(fontSize: 13),
+                    onSubmitted: (_) => widget.onSend(),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              // ── 发送按钮 ──
+              Container(
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary,
+                  shape: BoxShape.circle,
+                ),
+                child: IconButton(
+                  onPressed: widget.onSend,
+                  icon: const Icon(Icons.send_rounded, size: 18),
+                  color: Colors.white,
+                  tooltip: '发送',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 40,
+                    minHeight: 40,
+                  ),
+                ),
               ),
             ],
           ),
@@ -262,10 +259,13 @@ class _DiceBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Container(
-      padding: const EdgeInsets.fromLTRB(8, 4, 8, 6),
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest,
-        border: Border(bottom: BorderSide(color: theme.dividerColor)),
+        color: theme.colorScheme.surface,
+        border: Border(
+          top: BorderSide(color: theme.dividerColor.withValues(alpha: 0.3)),
+          bottom: BorderSide(color: theme.dividerColor.withValues(alpha: 0.3)),
+        ),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -273,52 +273,90 @@ class _DiceBar extends StatelessWidget {
         children: [
           // 快捷骰子按钮
           Wrap(
-            spacing: 4,
-            runSpacing: 4,
+            spacing: 6,
+            runSpacing: 6,
             children: _dice
                 .map((d) => SizedBox(
-                      width: 50,
-                      height: 32,
+                      width: 46,
+                      height: 30,
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           padding: EdgeInsets.zero,
+                          elevation: 0,
                           backgroundColor: d == 100
-                              ? Colors.red.shade100
-                              : Colors.deepPurple.shade100,
+                              ? Colors.red.shade50
+                              : theme.colorScheme.primaryContainer
+                                  .withValues(alpha: 0.5),
                           foregroundColor: d == 100
-                              ? Colors.red.shade900
-                              : Colors.deepPurple.shade900,
+                              ? Colors.red.shade700
+                              : theme.colorScheme.onPrimaryContainer,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                         ),
                         onPressed: () => onRollDice(d),
                         child: Text('d$d',
                             style: const TextStyle(
-                                fontWeight: FontWeight.bold, fontSize: 13)),
+                                fontWeight: FontWeight.w700, fontSize: 12)),
                       ),
                     ))
                 .toList(),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           // 自定义表达式
           Row(
             children: [
               Expanded(
-                child: TextField(
-                  controller: diceInputCtrl,
-                  decoration: const InputDecoration(
-                    hintText: '2d6+3',
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                    contentPadding:
-                        EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest
+                        .withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  style: const TextStyle(fontSize: 13),
-                  onSubmitted: (_) => onRollCustom(),
+                  child: TextField(
+                    controller: diceInputCtrl,
+                    decoration: InputDecoration(
+                      hintText: '2d6+3',
+                      hintStyle: TextStyle(
+                        color: Colors.grey.shade500,
+                        fontSize: 12,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide.none,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(
+                          color: theme.colorScheme.primary.withValues(alpha: 0.4),
+                        ),
+                      ),
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 8),
+                    ),
+                    style: const TextStyle(fontSize: 13),
+                    onSubmitted: (_) => onRollCustom(),
+                  ),
                 ),
               ),
-              const SizedBox(width: 4),
+              const SizedBox(width: 6),
               SizedBox(
                 height: 34,
                 child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    elevation: 0,
+                    backgroundColor: theme.colorScheme.primary,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                  ),
                   onPressed: onRollCustom,
                   child: const Text('投掷', style: TextStyle(fontSize: 13)),
                 ),
@@ -327,23 +365,252 @@ class _DiceBar extends StatelessWidget {
           ),
           // 结果展示
           if (diceResult.isNotEmpty) ...[
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               decoration: BoxDecoration(
-                color: Colors.deepPurple.shade50,
-                borderRadius: BorderRadius.circular(4),
+                gradient: LinearGradient(
+                  colors: [
+                    theme.colorScheme.primaryContainer.withValues(alpha: 0.4),
+                    theme.colorScheme.primaryContainer.withValues(alpha: 0.2),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
                 diceResult,
-                style: const TextStyle(
-                    fontWeight: FontWeight.bold, fontSize: 13),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                  color: theme.colorScheme.onPrimaryContainer,
+                ),
                 textAlign: TextAlign.center,
               ),
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+// ──────────────────────────────────────────────
+// 聊天气泡项 — 头像 + 名字 + 消息内容
+// ──────────────────────────────────────────────
+
+class _ChatMessageItem extends StatelessWidget {
+  const _ChatMessageItem({
+    required this.message,
+    required this.isMe,
+  });
+
+  final ChatMessage message;
+  final bool isMe;
+
+  static const double _avatarSize = 28.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final hasAvatar = message.portraitBase64 != null &&
+        message.portraitBase64!.isNotEmpty;
+
+    // 骰子消息用特殊样式
+    if (message.isDice) {
+      return _buildDiceMessage(theme, hasAvatar);
+    }
+
+    return _buildNormalMessage(theme, hasAvatar);
+  }
+
+  Widget _buildDiceMessage(ThemeData theme, bool hasAvatar) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Align(
+        alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 220),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                theme.colorScheme.primaryContainer.withValues(alpha: 0.35),
+                theme.colorScheme.primaryContainer.withValues(alpha: 0.15),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: theme.colorScheme.primary.withValues(alpha: 0.15),
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 小头像
+              _MiniAvatar(portraitBase64: message.portraitBase64, size: 18),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      message.from,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 1),
+                    Text(
+                      message.text,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: theme.colorScheme.onSurface,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNormalMessage(ThemeData theme, bool hasAvatar) {
+    final showName = !isMe;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        mainAxisAlignment:
+            isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          // 对方头像（左侧）
+          if (!isMe) ...[
+            _MiniAvatar(
+              portraitBase64: message.portraitBase64,
+              size: _avatarSize,
+            ),
+            const SizedBox(width: 6),
+          ],
+          // 消息气泡
+          Flexible(
+            child: Column(
+              crossAxisAlignment:
+                  isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // 名字标签
+                Text(
+                  message.from,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: isMe
+                        ? theme.colorScheme.primary
+                        : Colors.grey.shade700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Container(
+                  constraints: const BoxConstraints(maxWidth: 200),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isMe
+                        ? theme.colorScheme.primaryContainer
+                            .withValues(alpha: 0.4)
+                        : theme.colorScheme.surfaceContainerHighest
+                            .withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.only(
+                      topLeft: const Radius.circular(12),
+                      topRight: const Radius.circular(12),
+                      bottomLeft: isMe
+                          ? const Radius.circular(12)
+                          : const Radius.circular(4),
+                      bottomRight: isMe
+                          ? const Radius.circular(4)
+                          : const Radius.circular(12),
+                    ),
+                  ),
+                  child: Text(
+                    message.text,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: theme.colorScheme.onSurface,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // 自己头像（右侧）
+          if (isMe) ...[
+            const SizedBox(width: 6),
+            _MiniAvatar(
+              portraitBase64: message.portraitBase64,
+              size: _avatarSize,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ──────────────────────────────────────────────
+// 迷你圆形头像
+// ──────────────────────────────────────────────
+
+class _MiniAvatar extends StatelessWidget {
+  const _MiniAvatar({this.portraitBase64, required this.size});
+
+  final String? portraitBase64;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final hasImage =
+        portraitBase64 != null && portraitBase64!.isNotEmpty;
+
+    return SizedBox(
+      width: size,
+      height: size,
+      child: hasImage
+          ? ClipOval(
+              child: Image.memory(
+                base64Decode(portraitBase64!),
+                width: size,
+                height: size,
+                fit: BoxFit.cover,
+                gaplessPlayback: true,
+                errorBuilder: (_, __, ___) => _fallback(theme),
+              ),
+            )
+          : _fallback(theme),
+    );
+  }
+
+  Widget _fallback(ThemeData theme) {
+    return Container(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: theme.colorScheme.primary.withValues(alpha: 0.15),
+      ),
+      child: Icon(
+        Icons.person,
+        size: size * 0.6,
+        color: theme.colorScheme.primary.withValues(alpha: 0.5),
       ),
     );
   }

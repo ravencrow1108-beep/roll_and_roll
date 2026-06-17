@@ -174,7 +174,24 @@ class _AdventurePageState extends State<AdventurePage> {
   }
 
   void _addChat(String from, String text) {
-    setState(() => _chatMessages.add(ChatMessage(from: from, text: text)));
+    // 查找发送者的头像
+    String? portrait;
+    if (_character?.name == from) {
+      portrait = _character?.portraitBase64;
+    } else {
+      portrait = _loadedCharacters
+          .cast<CharacterData?>()
+          .firstWhere(
+            (c) => c?.name == from,
+            orElse: () => null,
+          )
+          ?.portraitBase64;
+    }
+    setState(() => _chatMessages.add(ChatMessage(
+          from: from,
+          text: text,
+          portraitBase64: portrait,
+        )));
     _scrollChatToBottom();
   }
 
@@ -204,7 +221,17 @@ class _AdventurePageState extends State<AdventurePage> {
     } else {
       RoomSession.instance.clientHandle?.send(socketEncode(msg));
     }
-    _addChat(widget.playerName, text);
+    final displayName = _character?.name ?? widget.playerName;
+    setState(() {
+      _chatMessages.add(
+        ChatMessage(
+          from: displayName,
+          text: text,
+          portraitBase64: _character?.portraitBase64,
+        ),
+      );
+    });
+    _scrollChatToBottom();
   }
 
   void _checkAllReady() {
@@ -449,14 +476,20 @@ class _AdventurePageState extends State<AdventurePage> {
 
   void _rollDice(int sides) {
     final roll = (DateTime.now().millisecondsSinceEpoch % sides) + 1;
-    setState(() => _diceResult = 'd$sides = $roll');
-    _chatMessages.add(
-      ChatMessage(
-        from: widget.playerName,
-        text: '\u{1F3B2} d$sides = $roll',
-        isSystem: true,
-      ),
-    );
+    final displayName = _character?.name ?? widget.playerName;
+    final portrait = _character?.portraitBase64;
+    setState(() {
+      _diceResult = 'd$sides = $roll';
+      _chatMessages.add(
+        ChatMessage(
+          from: displayName,
+          text: '\u{1F3B2} d$sides = $roll',
+          isSystem: true,
+          isDice: true,
+          portraitBase64: portrait,
+        ),
+      );
+    });
     _scrollChatToBottom();
   }
 
@@ -465,14 +498,20 @@ class _AdventurePageState extends State<AdventurePage> {
     if (text.isEmpty) return;
     try {
       final result = DiceExpression.roll(text);
-      setState(() => _diceResult = result.toString());
-      _chatMessages.add(
-        ChatMessage(
-          from: widget.playerName,
-          text: '\u{1F3B2} ${result.toString()}',
-          isSystem: true,
-        ),
-      );
+      final displayName = _character?.name ?? widget.playerName;
+      final portrait = _character?.portraitBase64;
+      setState(() {
+        _diceResult = result.toString();
+        _chatMessages.add(
+          ChatMessage(
+            from: displayName,
+            text: '\u{1F3B2} ${result.toString()}',
+            isSystem: true,
+            isDice: true,
+            portraitBase64: portrait,
+          ),
+        );
+      });
       _scrollChatToBottom();
     } catch (_) {
       setState(() => _diceResult = '表达式无效');
@@ -721,32 +760,62 @@ class _ChatOverlay extends StatelessWidget {
               ),
               child: Column(
                 children: [
-                  // 标题栏
+                  // 标题栏 — 渐变头部
                   Container(
-                    padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
+                    padding: const EdgeInsets.fromLTRB(14, 10, 6, 10),
                     decoration: BoxDecoration(
-                      color: theme.colorScheme.surfaceContainerHighest,
-                      border: Border(
-                        bottom: BorderSide(color: theme.dividerColor),
+                      gradient: LinearGradient(
+                        colors: [
+                          theme.colorScheme.primary,
+                          theme.colorScheme.primary.withValues(alpha: 0.8),
+                        ],
                       ),
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.chat,
-                            size: 18, color: theme.colorScheme.primary),
-                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(Icons.chat_rounded,
+                              size: 18, color: Colors.white),
+                        ),
+                        const SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            '聊天 · ${chatMessages.length} 条消息',
-                            style: theme.textTheme.titleSmall?.copyWith(
+                            '聊天',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        // 消息计数
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.25),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            '${chatMessages.length}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
                         ),
+                        const SizedBox(width: 4),
                         IconButton(
-                          icon: const Icon(Icons.close, size: 20),
+                          icon: const Icon(Icons.close, size: 18),
                           onPressed: onClose,
                           tooltip: '关闭',
+                          color: Colors.white,
                           visualDensity: VisualDensity.compact,
                         ),
                       ],
