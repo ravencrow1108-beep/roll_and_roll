@@ -476,6 +476,40 @@ class CharacterTab extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
+          // ── 装备栏 ──
+          Row(
+            children: [
+              Text(
+                '装备栏',
+                style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey),
+              ),
+            ],
+          ),
+          if (equipmentSlots.isEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              '请在规则页面添加装备栏',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+            ),
+          ] else ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: equipmentSlots.map((slot) {
+                final eq = equipment[slot];
+                return _EquipmentGridTile(
+                  slotName: slot,
+                  equipped: eq,
+                  templates: equipmentTemplates,
+                  onEquip: (e) => onEquipItem(slot, e),
+                  onUnequip: () => onUnequipItem(slot),
+                );
+              }).toList(),
+            ),
+          ],
+          const SizedBox(height: 16),
+          // ── 物品栏 ──
           Row(
             children: [
               Text(
@@ -499,7 +533,6 @@ class CharacterTab extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 8),
-          // ── 物品方格 ──
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -511,34 +544,6 @@ class CharacterTab extends StatelessWidget {
               );
             }),
           ),
-          const SizedBox(height: 24),
-
-          // ── 装备栏 ──
-          Text(
-            '装备',
-            style: theme.textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          if (equipmentSlots.isEmpty) ...[
-            const SizedBox(height: 8),
-            Text(
-              '请在规则页面添加装备栏',
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
-            ),
-          ] else ...[
-            const SizedBox(height: 8),
-            ...equipmentSlots.map((slot) {
-              final eq = equipment[slot];
-              return _EquipmentSlotRow(
-                slotName: slot,
-                equipped: eq,
-                templates: equipmentTemplates,
-                onEquip: (e) => onEquipItem(slot, e),
-                onUnequip: () => onUnequipItem(slot),
-              );
-            }),
-          ],
           const SizedBox(height: 24),
           Text(
             '属性分配',
@@ -724,11 +729,11 @@ class _ItemGridTile extends StatelessWidget {
 }
 
 // ──────────────────────────────────────────────
-// 装备栏行
+// 装备方格（横排摆放）
 // ──────────────────────────────────────────────
 
-class _EquipmentSlotRow extends StatelessWidget {
-  const _EquipmentSlotRow({
+class _EquipmentGridTile extends StatelessWidget {
+  const _EquipmentGridTile({
     required this.slotName,
     required this.equipped,
     required this.templates,
@@ -745,78 +750,115 @@ class _EquipmentSlotRow extends StatelessWidget {
   List<EquipmentData> get _matching =>
       templates.where((e) => e.slot == slotName).toList();
 
+  static const double _boxSize = 72.0;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Row(
-        children: [
-          const Icon(Icons.shield_outlined,
-              size: 18, color: Colors.deepPurple),
-          const SizedBox(width: 8),
-          SizedBox(
-            width: 48,
-            child: Text(slotName,
-                style: const TextStyle(
-                    fontSize: 13, fontWeight: FontWeight.w600)),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Container(
-              height: 36,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest
-                    .withValues(alpha: 0.4),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: equipped != null
-                  ? Row(
-                      children: [
-                        const SizedBox(width: 8),
-                        if (equipped!.imageBase64.isNotEmpty)
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(4),
-                            child: Image.memory(
-                              base64Decode(equipped!.imageBase64),
-                              width: 24,
-                              height: 24,
-                              fit: BoxFit.cover,
-                            ),
+
+    return GestureDetector(
+      onTap: equipped != null
+          ? null
+          : _matching.isNotEmpty
+              ? () => _showPicker(context)
+              : null,
+      child: SizedBox(
+        width: _boxSize + 16,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // ── 灰色缩略图区域 ──
+            Stack(
+              children: [
+                Container(
+                  width: _boxSize,
+                  height: _boxSize,
+                  decoration: BoxDecoration(
+                    color: equipped != null
+                        ? theme.colorScheme.primaryContainer.withValues(alpha: 0.3)
+                        : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: equipped != null
+                          ? theme.colorScheme.primary.withValues(alpha: 0.3)
+                          : theme.colorScheme.outline.withValues(alpha: 0.12),
+                    ),
+                  ),
+                  child: Center(
+                    child: equipped != null
+                        ? equipped!.imageBase64.isNotEmpty
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(6),
+                                child: Image.memory(
+                                  base64Decode(equipped!.imageBase64),
+                                  width: _boxSize - 8,
+                                  height: _boxSize - 8,
+                                  fit: BoxFit.cover,
+                                  gaplessPlayback: true,
+                                ),
+                              )
+                            : Icon(Icons.shield_outlined, size: 30,
+                                color: theme.colorScheme.primary.withValues(alpha: 0.5))
+                        : Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.shield_outlined, size: 28,
+                                  color: Colors.grey.shade400),
+                              const SizedBox(height: 2),
+                              Text(
+                                _matching.isNotEmpty ? '点击选择' : '暂无',
+                                style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
+                              ),
+                            ],
                           ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(equipped!.name,
-                              style: const TextStyle(fontSize: 13)),
-                        ),
-                        IconButton(
-                          onPressed: onUnequip,
-                          icon: const Icon(Icons.close, size: 16),
-                          tooltip: '卸下',
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(
-                              minWidth: 28, minHeight: 28),
-                        ),
-                      ],
-                    )
-                  : GestureDetector(
-                      onTap: _matching.isNotEmpty
-                          ? () => _showPicker(context)
-                          : null,
-                      child: Row(
-                        children: [
-                          const SizedBox(width: 8),
-                          Text(
-                            _matching.isNotEmpty ? '点击选择' : '无可用装备',
-                            style: TextStyle(
-                                fontSize: 12, color: Colors.grey.shade500),
-                          ),
-                        ],
+                  ),
+                ),
+                // 卸下按钮（右上角）
+                if (equipped != null)
+                  Positioned(
+                    top: -2,
+                    right: -2,
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: onUnequip,
+                        borderRadius: BorderRadius.circular(10),
+                        child: const Icon(Icons.cancel, size: 18, color: Colors.red),
                       ),
                     ),
+                  ),
+              ],
             ),
-          ),
-        ],
+            const SizedBox(height: 4),
+            // ── 装备名称（灰色框下方，仅已装备时显示） ──
+            if (equipped != null)
+              Text(
+                equipped!.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
+            const SizedBox(height: 4),
+            // ── 盾牌图标 + 位置名称 ──
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.shield_outlined, size: 13,
+                    color: Colors.deepPurple.withValues(alpha: 0.6)),
+                const SizedBox(width: 4),
+                Text(
+                  slotName,
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
