@@ -21,7 +21,7 @@ import '../../lib/data/services/transport/signaling/websocket_signaling.dart';
 //   flutter run -t test/transport/cloudflare_signaling_test.dart -d windows
 // ═══════════════════════════════════════════════════════════════
 
-const workerHost = 'roll-room.ravencrow1108.workers.dev';
+const workerHost = 'signal.roll-and-roll.com';
 const workerUrl = 'https://$workerHost';
 
 void main() => runApp(const CloudflareSignalingApp());
@@ -113,11 +113,16 @@ class _CloudflareSignalingAppState extends State<CloudflareSignalingApp> {
     );
   }
 
-  void _add(String title, String detail) =>
+  void _add(String title, String detail) {
+      debugPrint('  ➤ $title  $detail');
       setState(() => _steps.add(_Step(title: title, detail: detail)));
+    }
 
-  void _mark(int i, bool ok, String detail) =>
+  void _mark(int i, bool ok, String detail) {
+      final icon = ok ? '✅' : '❌';
+      debugPrint('    $icon $detail');
       setState(() => _steps[i] = _steps[i].copyWith(passed: ok, detail: detail));
+    }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // ════════════ TEST ════════════
