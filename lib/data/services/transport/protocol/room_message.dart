@@ -73,24 +73,22 @@ class RoomMessage {
 
   // ─── Phase 0 兼容：与旧协议互转 ───
 
-  /// 从旧协议字符串创建（Phase 0 过渡用）
+  /// 从旧协议 Map 创建（Phase 0 过渡用）。
   ///
   /// 旧协议格式: `{"type":"chat_message","from":"张三","text":"hello"}`
   /// 映射规则：
   ///   - `from` → senderId
   ///   - 其余字段 → payload
   ///   - `type` 映射到新类型名（参见 [_legacyTypeMap]）
-  factory RoomMessage.fromLegacyString(String raw) {
-    final map = jsonDecode(raw) as Map<String, dynamic>;
+  factory RoomMessage.fromLegacy(Map<String, dynamic> map) {
     final legacyType = map['type'] as String? ?? '';
     final from = map['from'] as String? ?? map['name'] as String? ?? '';
 
-    // 复制所有字段到 payload
+    // 复制所有字段到 payload（不含 type/from）
     final payload = Map<String, dynamic>.from(map);
     payload.remove('type');
     payload.remove('from');
 
-    // 保留原始 type 在 payload 中以供旧代码兼容
     final newType = _legacyTypeMap[legacyType] ?? legacyType;
 
     return RoomMessage.create(
@@ -100,17 +98,31 @@ class RoomMessage {
     );
   }
 
-  /// 转换回旧协议 JSON 字符串（Phase 0 过渡用）
-  String toLegacyString() {
+  /// 从旧协议 JSON 字符串创建（Phase 0 过渡用）。
+  ///
+  /// 委托给 [RoomMessage.fromLegacy]。
+  factory RoomMessage.fromLegacyString(String raw) {
+    final map = jsonDecode(raw) as Map<String, dynamic>;
+    return RoomMessage.fromLegacy(map);
+  }
+
+  /// 转换回旧协议 Map（Phase 0 过渡用）。
+  ///
+  /// 注意：先展开 payload，再覆盖 type/from，确保 payload 中的
+  /// type/from 不会污染输出。
+  Map<String, dynamic> toLegacy() {
     final map = <String, dynamic>{
+      ...payload,
       'type': _reverseLegacyTypeMap[type] ?? type,
       'from': senderId,
-      ...payload,
     };
-    // 如果 payload 中有 'from'，用 senderId 覆盖
-    map['from'] = senderId;
-    return jsonEncode(map);
+    return map;
   }
+
+  /// 转换回旧协议 JSON 字符串（Phase 0 过渡用）。
+  ///
+  /// 委托给 [toLegacy]。
+  String toLegacyString() => jsonEncode(toLegacy());
 
   // ─── 调试 ───
 

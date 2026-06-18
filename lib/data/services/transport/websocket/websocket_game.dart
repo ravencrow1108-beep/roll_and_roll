@@ -3,7 +3,7 @@ import 'dart:convert';
 
 import '../../socket_support.dart' show RoomServerHandle, RoomClientHandle;
 import '../protocol/room_message.dart';
-import 'game_transport.dart';
+import '../game/game_transport.dart';
 
 /// WebSocket 实现的 Host 端游戏传输（Phase 0）。
 ///

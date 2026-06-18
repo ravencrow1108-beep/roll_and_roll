@@ -4,7 +4,7 @@ import 'socket_support_io.dart'
     if (dart.library.html) 'socket_support_web.dart'
     as socket_impl;
 
-import 'transport/game/websocket_game.dart';
+import 'transport/websocket/websocket_game.dart';
 import 'transport/legacy/socket_support_adapter.dart';
 
 // ═══════════════════════════════════════════════════════════════
