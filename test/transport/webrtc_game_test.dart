@@ -140,15 +140,28 @@ void main() {
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   group('IceConfig', () {
-    test('default config contains Google STUN', () {
+    test('default config contains Chinese and Google STUN', () {
       final config = IceConfig.defaultConfig;
       final servers = config['iceServers'] as List<dynamic>;
-      expect(servers.length, 1);
+      // 5 entries: Xiaomi, Tencent, Bilibili, Google x2
+      expect(servers.length, 5);
 
-      final stun = servers[0] as Map<String, dynamic>;
-      final urls = stun['urls'] as List<dynamic>;
-      expect(urls.any((u) => (u as String).contains('stun.l.google.com')),
-          true);
+      // Collect all URLs
+      final allUrls = <String>{};
+      for (final s in servers) {
+        final urls = (s as Map<String, dynamic>)['urls'];
+        if (urls is String) {
+          allUrls.add(urls);
+        }
+      }
+
+      // 国内 STUN
+      expect(allUrls.contains('stun:stun.miwifi.com:3478'), true);
+      expect(allUrls.contains('stun:stun.qq.com:3478'), true);
+      expect(allUrls.contains('stun:stun.chat.bilibili.com:3478'), true);
+
+      // 国际兜底
+      expect(allUrls.any((u) => u.contains('stun.l.google.com')), true);
     });
 
     test('default config uses all transport policy', () {
@@ -163,7 +176,8 @@ void main() {
       );
       final config = IceConfig.withTurn(turn);
       final servers = config['iceServers'] as List<dynamic>;
-      expect(servers.length, 2); // STUN + TURN
+      // 5 STUN + 1 TURN
+      expect(servers.length, 6);
     });
   });
 

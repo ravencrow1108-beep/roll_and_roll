@@ -44,6 +44,7 @@ app.*.map.json
 .env
 *.secret
 secrets.json
+worker/wrangler.toml
 
 # Android Studio will place build artifacts here
 /android/app/debug

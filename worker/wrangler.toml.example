@@ -1,0 +1,36 @@
+# ═══════════════════════════════════════════════════════════════
+# Roll & Roll — Cloudflare Worker 配置示例
+#
+# 使用方法：
+#   1. cp wrangler.toml.example wrangler.toml
+#   2. 修改 account_id 为你的 Cloudflare account ID
+#   3. 修改 workers_dev.subdomain 为你的 workers.dev 子域名
+#   4. npx wrangler deploy
+#
+# 注意：
+#   wrangler.toml 包含 account_id，建议添加到 .gitignore
+# ═══════════════════════════════════════════════════════════════
+
+name = "roll-room"
+main = "src/index.js"
+compatibility_date = "2025-06-01"
+compatibility_flags = ["nodejs_compat"]
+
+# 你的 account_id (从 Cloudflare Dashboard 获取)
+# account_id = ""
+
+workers_dev = true
+
+# 如果你的 workers.dev 子域名不是自动分配的，设置这里：
+# workers_dev.subdomain = "ravencrow1108"
+
+# ══ Durable Object 绑定 ══
+# 定义一个 ROOM DO 类，在 Worker 代码中通过 env.ROOM 访问
+[[durable_objects.bindings]]
+name = "ROOM"
+class_name = "RoomDO"
+
+# DO 迁移（首次部署时需要）
+[[migrations]]
+tag = "v1"
+new_classes = ["RoomDO"]
