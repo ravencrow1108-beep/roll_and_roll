@@ -195,10 +195,17 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
         return;
       }
 
+      // Phase 2: DO 模式下显示房间号
+      final roomId = PlatformSocketSupport.lastRoomId;
       setState(() {
         _isHosting = true;
-        _status = '已开放端口 $port';
-        _roomAddress = '本机地址: 127.0.0.1:$port';
+        if (roomId != null) {
+          _status = '房间号: $roomId';
+          _roomAddress = '房间号: $roomId（告诉队友这个）';
+        } else {
+          _status = '已开放端口 $port';
+          _roomAddress = '本机地址: 127.0.0.1:$port';
+        }
       });
       RoomSession.instance.initializeHost(
         widget.playerName,

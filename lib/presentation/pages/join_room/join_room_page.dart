@@ -20,14 +20,13 @@ class JoinRoomPage extends StatefulWidget {
 
 class _JoinRoomPageState extends State<JoinRoomPage> {
   // ── 连接表单 ──
-  final TextEditingController _ipController = TextEditingController(
-    text: '127.0.0.1',
-  );
+  final TextEditingController _ipController = TextEditingController();
   final TextEditingController _portController = TextEditingController(
     text: '33333',
   );
   bool _isJoining = false;
-  String _status = '请输入房间地址';
+  bool get _isDO => PlatformSocketSupport.useDO;
+  String _status = '请输入房间号';
   String _role = '玩家';
 
   // ── 已连接状态 ──
@@ -353,7 +352,7 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
           child: ListView(
             children: [
               Text(
-                '通过 IP 和端口加入房间',
+                _isDO ? '输入房间号加入' : '通过 IP 和端口加入房间',
                 style: Theme.of(
                   context,
                 ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
@@ -361,18 +360,19 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
               const SizedBox(height: 12),
               TextField(
                 controller: _ipController,
-                decoration: const InputDecoration(
-                  labelText: '房间 IP',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: _isDO ? '房间号' : '房间 IP',
+                  hintText: _isDO ? '例如: ABC123' : '例如: 127.0.0.1',
+                  border: const OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: _portController,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: '房间端口',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: _isDO ? '端口（任意）' : '房间端口',
+                  border: const OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 24),
@@ -457,8 +457,12 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
               const SizedBox(height: 12),
               Text('已连接到房间', style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 8),
-              Text('IP: $_connectedIp'),
-              Text('端口: $_connectedPort'),
+              if (_isDO)
+                Text('房间号: $_connectedIp')
+              else ...[
+                Text('IP: $_connectedIp'),
+                Text('端口: $_connectedPort'),
+              ],
               const SizedBox(height: 8),
               Text('你的名称: $_playerName'),
               Text('你的身份: $_role'),
