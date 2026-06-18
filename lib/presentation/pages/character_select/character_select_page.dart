@@ -18,6 +18,8 @@ class CharacterSelectPage extends StatefulWidget {
     required this.role,
     this.saveFilePath,
     this.hostSaveName = '',
+    this.characters,
+    this.rules,
     super.key,
   });
 
@@ -25,6 +27,12 @@ class CharacterSelectPage extends StatefulWidget {
   final String role;
   final String? saveFilePath;
   final String hostSaveName;
+
+  /// 房主通过 socket 发来的角色列表（远程玩家使用）
+  final List<CharacterData>? characters;
+
+  /// 房主通过 socket 发来的规则数据（远程玩家使用）
+  final RuleData? rules;
 
   @override
   State<CharacterSelectPage> createState() => _CharacterSelectPageState();
@@ -53,6 +61,12 @@ class _CharacterSelectPageState extends State<CharacterSelectPage> {
     if (_saveFilePath != null) {
       _saveFileName = _saveFilePath!.split('/').last.split('\\').last;
       _loadSaveData();
+    } else if (widget.characters != null) {
+      // 远程玩家：使用房主通过 socket 发来的角色数据
+      _loadedCharacters = widget.characters!;
+      _loadedRules = widget.rules;
+      _hostSettingUp = true;
+      setState(() {});
     }
 
     // Listen for server messages (adventure_started)

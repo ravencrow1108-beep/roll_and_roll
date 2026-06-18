@@ -31,6 +31,7 @@ class IoRoomServerHandle implements RoomServerHandle {
   StreamSubscription<HttpRequest>? _serverSub;
   final StreamController<String> _sc;
   final List<_ClientInfo> _clients = [];
+  final Set<String> _readyMembers = {};
 
   @override
   void updateHostRole(String role) {
@@ -50,6 +51,17 @@ class IoRoomServerHandle implements RoomServerHandle {
 
   @override
   void broadcast(String message) {
+    // Track ready state from host-initiated broadcasts so members_list stays correct
+    try {
+      final line = message.trim();
+      final data = jsonDecode(line) as Map<String, dynamic>;
+      if (data['type'] == 'player_ready') {
+        _readyMembers.add(data['name'] as String? ?? '');
+      } else if (data['type'] == 'player_cancel_ready') {
+        _readyMembers.remove(data['name'] as String? ?? '');
+      }
+    } catch (_) {}
+
     final dead = <_ClientInfo>[];
     for (final c in _clients) {
       try {
@@ -69,6 +81,7 @@ class IoRoomServerHandle implements RoomServerHandle {
     final leaving = _clients.where((c) => c.ws == ws).toList();
     _clients.removeWhere((c) => c.ws == ws);
     for (final c in leaving) {
+      _readyMembers.remove(c.name);
       final msg = socketEncode({'type': 'member_left', 'name': c.name});
       broadcast(msg);
       _onMessage(msg.trim());
@@ -87,6 +100,9 @@ class IoRoomServerHandle implements RoomServerHandle {
       } catch (_) {}
     }
     if (target.isNotEmpty) {
+      for (final c in target) {
+        _readyMembers.remove(c.name);
+      }
       _clients.removeWhere((c) => target.contains(c));
       final msg = socketEncode({'type': 'member_left', 'name': name});
       broadcast(msg);
@@ -96,6 +112,28 @@ class IoRoomServerHandle implements RoomServerHandle {
 
   void _onMessage(String message) {
     _sc.add(message);
+  }
+
+  /// Build members_list payload including ready state.
+  List<Map<String, dynamic>> _buildMembersList() {
+    final hostEntry = <String, dynamic>{
+      'name': hostName,
+      'role': hostRole,
+      'isReady': _readyMembers.contains(hostName),
+    };
+    if (hostSaveFileName.isNotEmpty) {
+      hostEntry['hostSaveName'] = hostSaveFileName;
+    }
+    return [
+      hostEntry,
+      ..._clients.map(
+        (c) => {
+          'name': c.name,
+          'role': c.role,
+          'isReady': _readyMembers.contains(c.name),
+        },
+      ),
+    ];
   }
 
   @override
@@ -108,6 +146,7 @@ class IoRoomServerHandle implements RoomServerHandle {
       } catch (_) {}
     }
     _clients.clear();
+    _readyMembers.clear();
     await _sc.close();
     await _httpServer.close();
   }
@@ -182,23 +221,11 @@ void _handleWebSocket(
             handle._addClient(ws, name, role);
             onClient(remote, name, role);
 
-            final existing = <Map<String, dynamic>>[
-              {
-                'name': handle.hostName,
-                'role': handle.hostRole,
-                if (handle.hostSaveFileName.isNotEmpty)
-                  'hostSaveName': handle.hostSaveFileName,
-              },
-            ];
-            for (final c in handle._clients) {
-              if (c.ws != ws) {
-                existing.add({'name': c.name, 'role': c.role});
-              }
-            }
-            if (existing.isNotEmpty) {
+            final members = handle._buildMembersList();
+            if (members.isNotEmpty) {
               try {
                 ws.add(
-                  socketEncode({'type': 'members_list', 'members': existing}),
+                  socketEncode({'type': 'members_list', 'members': members}),
                 );
               } catch (_) {}
             }
@@ -207,19 +234,11 @@ void _handleWebSocket(
 
           if (joined) {
             if (msg['type'] == 'request_members') {
-              final hostEntry = <String, dynamic>{
-                'name': handle.hostName,
-                'role': handle.hostRole,
-              };
-              if (handle.hostSaveFileName.isNotEmpty) {
-                hostEntry['hostSaveName'] = handle.hostSaveFileName;
-              }
-              final all = <Map<String, dynamic>>[
-                hostEntry,
-                ...handle._clients.map((c) => {'name': c.name, 'role': c.role}),
-              ];
+              final members = handle._buildMembersList();
               try {
-                ws.add(socketEncode({'type': 'members_list', 'members': all}));
+                ws.add(
+                  socketEncode({'type': 'members_list', 'members': members}),
+                );
               } catch (_) {}
               continue;
             }
@@ -241,6 +260,20 @@ void _handleWebSocket(
                 }).trim(),
               );
               continue;
+            }
+
+            // Track ready state on the server so members_list includes it
+            if (msg['type'] == 'player_ready') {
+              final readyName = (msg['name'] as String?) ?? '';
+              if (readyName.isNotEmpty) {
+                handle._readyMembers.add(readyName);
+              }
+            }
+            if (msg['type'] == 'player_cancel_ready') {
+              final cancelName = (msg['name'] as String?) ?? '';
+              if (cancelName.isNotEmpty) {
+                handle._readyMembers.remove(cancelName);
+              }
             }
 
             handle._onMessage('$trimmed\n');

@@ -28,6 +28,7 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
   RoomServerHandle? _server;
   StreamSubscription<String>? _serverSub;
   bool _isHosting = false;
+  bool _isReady = false;
   String _status = '尚未开放端口';
   String _roomAddress = '等待开放端口';
   String? _saveFilePath;
@@ -43,6 +44,7 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
     );
     RoomSession.instance.membersNotifier.addListener(_onMembersChanged);
     RoomSession.instance.memberRolesNotifier.addListener(_onMembersChanged);
+    RoomSession.instance.readyMembersNotifier.addListener(_onMembersChanged);
     RoomSession.instance.startAdventureNotifier.addListener(_onStateChanged);
     RoomSession.instance.mapNotifier.addListener(_onStateChanged);
   }
@@ -203,6 +205,10 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
           final name = data['name'] as String? ?? '';
           RoomSession.instance.onPlayerReady(name);
           break;
+        case 'player_cancel_ready':
+          final cancelName = data['name'] as String? ?? '';
+          RoomSession.instance.setStateNotReady(cancelName);
+          break;
         case 'role_change':
           final name = data['name'] as String? ?? '';
           final role = data['role'] as String? ?? '玩家';
@@ -210,6 +216,27 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
           break;
       }
     } catch (_) {}
+  }
+
+  void _markHostReady() {
+    setState(() => _isReady = true);
+    RoomSession.instance.setPlayerReady(widget.playerName);
+    // 房主自身没有 clientHandle，需通过广播通知玩家
+    RoomSession.instance.broadcast({
+      'type': 'player_ready',
+      'name': widget.playerName,
+    });
+  }
+
+  void _cancelHostReady() {
+    setState(() => _isReady = false);
+    // 房主本地取消准备
+    RoomSession.instance.setStateNotReady(widget.playerName);
+    // 通知其他玩家
+    RoomSession.instance.broadcast({
+      'type': 'player_cancel_ready',
+      'name': widget.playerName,
+    });
   }
 
   Future<void> _stopHosting() async {
@@ -224,6 +251,7 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
     RoomSession.instance.reset();
     setState(() {
       _isHosting = false;
+      _isReady = false;
       _status = '已关闭端口';
       _roomAddress = '等待开放端口';
       _role = '玩家';
@@ -245,6 +273,16 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
     if (_saveFileName != '未选择') {
       msg['saveFileName'] = _saveFileName;
     }
+
+    // 加载存档中的角色数据一并发送给客户端
+    if (_saveFilePath != null) {
+      try {
+        final save = await SaveData.fromZip(_saveFilePath!);
+        msg['characters'] = save.characters.map((c) => c.toJson()).toList();
+        msg['rules'] = save.rules.toJson();
+      } catch (_) {}
+    }
+
     RoomSession.instance.broadcast(msg);
 
     final page = _role == '主持'
@@ -274,6 +312,7 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
   void dispose() {
     RoomSession.instance.membersNotifier.removeListener(_onMembersChanged);
     RoomSession.instance.memberRolesNotifier.removeListener(_onMembersChanged);
+    RoomSession.instance.readyMembersNotifier.removeListener(_onMembersChanged);
     RoomSession.instance.startAdventureNotifier.removeListener(_onStateChanged);
     RoomSession.instance.mapNotifier.removeListener(_onStateChanged);
     _serverSub?.cancel();
@@ -385,6 +424,8 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
                 ...() {
                   final members = RoomSession.instance.membersNotifier.value;
                   final roles = RoomSession.instance.memberRolesNotifier.value;
+                  final readyMembers =
+                      RoomSession.instance.readyMembersNotifier.value;
                   return [
                     Text(
                       '房间成员 (${members.length})',
@@ -396,6 +437,7 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
                     ...members.map((name) {
                       final role = roles[name] ?? '';
                       final isSelf = name == widget.playerName;
+                      final isReady = readyMembers.contains(name);
                       final roleIcon = role == '主持'
                           ? Icons.mic
                           : role == '玩家'
@@ -406,11 +448,31 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
                           leading: Icon(roleIcon),
                           title: Text(name),
                           subtitle: role.isNotEmpty ? Text(role) : null,
-                          trailing: !isSelf
-                              ? IconButton(
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                isReady
+                                    ? Icons.check_circle
+                                    : Icons.hourglass_empty,
+                                size: 20,
+                                color: isReady ? Colors.green : Colors.orange,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                isReady ? '已准备' : '未准备',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isReady ? Colors.green : Colors.orange,
+                                ),
+                              ),
+                              if (!isSelf) ...[
+                                const SizedBox(width: 8),
+                                IconButton(
                                   icon: const Icon(
                                     Icons.remove_circle_outline,
                                     color: Colors.red,
+                                    size: 20,
                                   ),
                                   tooltip: '踢出 $name',
                                   onPressed: () {
@@ -444,11 +506,33 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
                                       ),
                                     );
                                   },
-                                )
-                              : null,
+                                ),
+                              ],
+                            ],
+                          ),
                         ),
                       );
                     }),
+                    const SizedBox(height: 16),
+                    // ── 房主准备 / 取消准备 ──
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: _isReady ? _cancelHostReady : _markHostReady,
+                        icon: Icon(
+                          _isReady
+                              ? Icons.cancel_outlined
+                              : Icons.check_circle_outline,
+                        ),
+                        label: Text(
+                          _isReady ? '取消准备' : '准备就绪',
+                          style: const TextStyle(fontSize: 16),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _isReady ? Colors.orange : null,
+                        ),
+                      ),
+                    ),
                     const SizedBox(height: 24),
                   ];
                 }(),
@@ -519,14 +603,58 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () => _startAdventure(context),
-                  icon: const Icon(Icons.rocket_launch_outlined),
-                  label: const Text('开始冒险', style: TextStyle(fontSize: 16)),
-                ),
+              const SizedBox(height: 12),
+              // ── 所有成员就绪后才可开始冒险 ──
+              Builder(
+                builder: (context) {
+                  final members = RoomSession.instance.membersNotifier.value;
+                  final readyMembers =
+                      RoomSession.instance.readyMembersNotifier.value;
+                  final allReady =
+                      members.isNotEmpty &&
+                      members.every((m) => readyMembers.contains(m));
+                  return Column(
+                    children: [
+                      if (!allReady && members.isNotEmpty)
+                        Card(
+                          color: Colors.orange.shade50,
+                          child: Padding(
+                            padding: const EdgeInsets.all(10),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.info_outline,
+                                  size: 18,
+                                  color: Colors.orange,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    '等待所有成员准备就绪 (${readyMembers.length}/${members.length})',
+                                    style: const TextStyle(fontSize: 13),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: allReady
+                              ? () => _startAdventure(context)
+                              : null,
+                          icon: const Icon(Icons.rocket_launch_outlined),
+                          label: const Text(
+                            '开始冒险',
+                            style: TextStyle(fontSize: 16),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
             ],
           ),

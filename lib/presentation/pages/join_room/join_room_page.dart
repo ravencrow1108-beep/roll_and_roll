@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 
 import '../../providers/room_state.dart';
+import '../../../data/models/models.dart';
 import '../../../data/services/socket_support.dart';
 import '../character_select/character_select_page.dart';
 
@@ -36,6 +37,9 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
   RoomClientHandle? _clientHandle;
   StreamSubscription<String>? _msgSub;
   String _hostSaveName = '';
+  List<CharacterData>? _receivedCharacters;
+  RuleData? _receivedRules;
+  bool _isReady = false;
 
   String get _playerName => widget.playerName;
 
@@ -44,6 +48,9 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
     super.initState();
     RoomSession.instance.membersNotifier.addListener(_handleMembersChanged);
     RoomSession.instance.memberRolesNotifier.addListener(_handleMembersChanged);
+    RoomSession.instance.readyMembersNotifier.addListener(
+      _handleMembersChanged,
+    );
     RoomSession.instance.startAdventureNotifier.addListener(
       _onAdventureStarted,
     );
@@ -54,6 +61,8 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
     if (!RoomSession.instance.startAdventureNotifier.value) return;
     if (!mounted || !_isConnected) return;
     final saveName = _hostSaveName;
+    final chars = _receivedCharacters;
+    final rules = _receivedRules;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       Navigator.of(context).push(
@@ -62,6 +71,8 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
             playerName: _playerName,
             role: _role,
             hostSaveName: saveName,
+            characters: chars,
+            rules: rules,
           ),
         ),
       );
@@ -131,9 +142,22 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
     RoomSession.instance.reset();
     setState(() {
       _isConnected = false;
+      _isReady = false;
       _connectedIp = '';
       _connectedPort = 0;
     });
+  }
+
+  void _markReady() {
+    setState(() => _isReady = true);
+    RoomSession.instance.setPlayerReady(_playerName);
+  }
+
+  void _cancelReady() {
+    setState(() => _isReady = false);
+    _clientHandle?.send(
+      socketEncode({'type': 'player_cancel_ready', 'name': _playerName}),
+    );
   }
 
   void _handleMessage(String message) {
@@ -149,6 +173,17 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
 
         case 'start_adventure':
           _hostSaveName = data['saveFileName'] as String? ?? '';
+          // 解析房主发送的角色数据
+          final charsJson = data['characters'] as List<dynamic>?;
+          if (charsJson != null) {
+            _receivedCharacters = charsJson
+                .map((c) => CharacterData.fromJson(c as Map<String, dynamic>))
+                .toList();
+          }
+          final rulesJson = data['rules'] as Map<String, dynamic>?;
+          if (rulesJson != null) {
+            _receivedRules = RuleData.fromJson(rulesJson);
+          }
           RoomSession.instance.startAdventureNotifier.value = true;
           break;
 
@@ -168,6 +203,13 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
             final saveName = m['hostSaveName'] as String?;
             if (saveName != null && saveName.isNotEmpty) {
               hostSave = saveName;
+            }
+            // Sync ready status from server
+            final isReady = m['isReady'] as bool? ?? false;
+            if (isReady) {
+              RoomSession.instance.setStateReady(name);
+            } else {
+              RoomSession.instance.setStateNotReady(name);
             }
           }
           if (hostSave.isNotEmpty) {
@@ -273,6 +315,9 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
     _msgSub?.cancel();
     RoomSession.instance.membersNotifier.removeListener(_handleMembersChanged);
     RoomSession.instance.memberRolesNotifier.removeListener(
+      _handleMembersChanged,
+    );
+    RoomSession.instance.readyMembersNotifier.removeListener(
       _handleMembersChanged,
     );
     RoomSession.instance.startAdventureNotifier.removeListener(
@@ -494,11 +539,76 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
                       : role == '玩家'
                       ? Icons.person
                       : Icons.account_circle;
+                  final isReady = RoomSession
+                      .instance
+                      .readyMembersNotifier
+                      .value
+                      .contains(name);
                   return Card(
                     child: ListTile(
                       leading: Icon(roleIcon),
                       title: Text(name),
                       subtitle: role.isNotEmpty ? Text(role) : null,
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (_isConnected &&
+                              _role == '主持' &&
+                              name != _playerName)
+                            IconButton(
+                              icon: const Icon(
+                                Icons.remove_circle_outline,
+                                color: Colors.red,
+                                size: 20,
+                              ),
+                              tooltip: '踢出 $name',
+                              onPressed: () {
+                                showDialog(
+                                  context: context,
+                                  builder: (ctx) => AlertDialog(
+                                    title: const Text('确认踢出'),
+                                    content: Text('确定要将 $name 踢出房间吗？'),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(ctx),
+                                        child: const Text('取消'),
+                                      ),
+                                      TextButton(
+                                        onPressed: () {
+                                          Navigator.pop(ctx);
+                                          RoomSession.instance.kickMember(name);
+                                          RoomSession.instance.removeMember(
+                                            name,
+                                          );
+                                          RoomSession.instance.broadcast({
+                                            'type': 'member_left',
+                                            'name': name,
+                                          });
+                                        },
+                                        child: const Text('踢出'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                          Icon(
+                            isReady
+                                ? Icons.check_circle
+                                : Icons.hourglass_empty,
+                            size: 20,
+                            color: isReady ? Colors.green : Colors.orange,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            isReady ? '已准备' : '未准备',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isReady ? Colors.green : Colors.orange,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   );
                 }).toList(),
@@ -509,6 +619,25 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
                 child: ElevatedButton(
                   onPressed: _leaveRoom,
                   child: const Text('离开房间', style: TextStyle(fontSize: 16)),
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _isReady ? _cancelReady : _markReady,
+                  icon: Icon(
+                    _isReady
+                        ? Icons.cancel_outlined
+                        : Icons.check_circle_outline,
+                  ),
+                  label: Text(
+                    _isReady ? '取消准备' : '准备就绪',
+                    style: const TextStyle(fontSize: 16),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _isReady ? Colors.orange : null,
+                  ),
                 ),
               ),
             ],

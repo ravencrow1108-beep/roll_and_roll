@@ -170,6 +170,9 @@ class _AdventurePageState extends State<AdventurePage> {
         if (type == 'player_ready') {
           RoomSession.instance.onPlayerReady(data['name'] as String? ?? '');
           _checkAllReady();
+        } else if (type == 'player_cancel_ready') {
+          RoomSession.instance.setStateNotReady(data['name'] as String? ?? '');
+          if (mounted) setState(() {});
         }
       } else {
         switch (type) {

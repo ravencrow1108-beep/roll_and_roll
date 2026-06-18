@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -37,11 +36,6 @@ class _MapEditPageState extends State<MapEditPage> {
   List<PlayerPosition> _loadedPositions = [];
   List<CharacterData> _loadedCharacters = [];
 
-  bool _isReady = false;
-  bool _hasStarted = false;
-
-  StreamSubscription<String>? _msgSub;
-
   @override
   void initState() {
     super.initState();
@@ -51,64 +45,6 @@ class _MapEditPageState extends State<MapEditPage> {
     if (_saveFilePath != null) {
       _saveFileName = _saveFilePath!.split('/').last.split('\\').last;
       _loadSaveData();
-    }
-
-    // Listen for player_ready messages
-    final server = RoomSession.instance.serverHandle;
-    if (server != null) {
-      _msgSub = server.messages.listen(_handleMessage);
-    }
-
-    RoomSession.instance.readyMembersNotifier.addListener(_onReadyChanged);
-    RoomSession.instance.startAdventureNotifier.addListener(_onAdventureEnded);
-  }
-
-  void _onReadyChanged() {
-    if (mounted) setState(() {});
-  }
-
-  void _onAdventureEnded() {
-    if (!RoomSession.instance.startAdventureNotifier.value && mounted) {
-      setState(() {
-        _hasStarted = false;
-        _isReady = false;
-      });
-    }
-  }
-
-  void _handleMessage(String message) {
-    try {
-      final data = jsonDecode(message.trim()) as Map<String, dynamic>;
-      final type = data['type'] as String? ?? '';
-
-      if (type == 'player_ready') {
-        final name = data['name'] as String? ?? '';
-        RoomSession.instance.onPlayerReady(name);
-        _checkAllReady();
-      }
-    } catch (_) {}
-  }
-
-  /// Check if all non-host members are ready, and if so, start adventure directly.
-  void _checkAllReady() {
-    final session = RoomSession.instance;
-    final allMembers = session.membersNotifier.value;
-    final readyMembers = session.readyMembersNotifier.value;
-
-    final nonHost = allMembers
-        .where((m) => m != session.hostNameNotifier.value)
-        .toList();
-    if (nonHost.isEmpty && _selectedMap != null && !_hasStarted) {
-      // 仅房主一人，直接开始冒险
-      _hasStarted = true;
-      _startAdventureDirectly();
-      return;
-    }
-
-    final allReady = nonHost.every((m) => readyMembers.contains(m));
-    if (allReady && _selectedMap != null && !_hasStarted) {
-      _hasStarted = true;
-      _startAdventureDirectly();
     }
   }
 
@@ -172,7 +108,6 @@ class _MapEditPageState extends State<MapEditPage> {
       _saveFilePath = result.files.single.path!;
       _saveFileName = result.files.single.name;
       _selectedMap = null;
-      _isReady = false;
     });
     _loadSaveData();
   }
@@ -233,24 +168,17 @@ class _MapEditPageState extends State<MapEditPage> {
         _saveFilePath = result;
         _saveFileName = result.split('/').last.split('\\').last;
         _selectedMap = null;
-        _isReady = false;
       });
       _loadSaveData();
     }
   }
 
   void _markReady() {
-    setState(() => _isReady = true);
-    _checkAllReady();
+    _startAdventureDirectly();
   }
 
   @override
   void dispose() {
-    _msgSub?.cancel();
-    RoomSession.instance.readyMembersNotifier.removeListener(_onReadyChanged);
-    RoomSession.instance.startAdventureNotifier.removeListener(
-      _onAdventureEnded,
-    );
     super.dispose();
   }
 
@@ -359,20 +287,14 @@ class _MapEditPageState extends State<MapEditPage> {
                   ),
                 ],
                 const SizedBox(height: 12),
-                _buildReadyStatus(),
-                const SizedBox(height: 8),
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    onPressed: _isReady ? null : _markReady,
-                    icon: Icon(
-                      _isReady
-                          ? Icons.check_circle
-                          : Icons.rocket_launch_outlined,
-                    ),
-                    label: Text(
-                      _isReady ? '已准备，等待所有玩家…' : '开始冒险',
-                      style: const TextStyle(fontSize: 16),
+                    onPressed: _markReady,
+                    icon: const Icon(Icons.rocket_launch_outlined),
+                    label: const Text(
+                      '开始冒险',
+                      style: TextStyle(fontSize: 16),
                     ),
                   ),
                 ),
@@ -602,70 +524,6 @@ class _MapEditPageState extends State<MapEditPage> {
     );
   }
 
-  /// 构建玩家准备状态指示面板
-  Widget _buildReadyStatus() {
-    final session = RoomSession.instance;
-    final allMembers = session.membersNotifier.value;
-    final readyMembers = session.readyMembersNotifier.value;
-    final hostName = session.hostNameNotifier.value;
-    final players = allMembers.where((m) => m != hostName).toList();
-
-    if (players.isEmpty) {
-      return Card(
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              const Icon(Icons.info_outline, size: 20),
-              const SizedBox(width: 8),
-              Text('暂无玩家加入', style: TextStyle(color: Colors.grey.shade600)),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '玩家准备状态',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-            ),
-            const SizedBox(height: 8),
-            ...players.map((name) {
-              final ready = readyMembers.contains(name);
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 2),
-                child: Row(
-                  children: [
-                    Icon(
-                      ready ? Icons.check_circle : Icons.hourglass_empty,
-                      size: 18,
-                      color: ready ? Colors.green : Colors.orange,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(name),
-                    const SizedBox(width: 8),
-                    Text(
-                      ready ? '已准备' : '未准备',
-                      style: TextStyle(
-                        color: ready ? Colors.green : Colors.orange,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 /// 大地图预览组件：可缩放平移 + 角色位置标记

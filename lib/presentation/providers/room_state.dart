@@ -161,6 +161,12 @@ class RoomSession {
     readyMembersNotifier.value = next;
   }
 
+  /// Remove a player from the ready set (used when a player cancels ready).
+  void setStateNotReady(String name) {
+    final next = {...readyMembersNotifier.value}..remove(name.trim());
+    readyMembersNotifier.value = next;
+  }
+
   /// Remove a member from the member list.
   void removeMember(String name) {
     final trimmed = name.trim();
