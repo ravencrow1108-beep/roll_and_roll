@@ -5,7 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../../providers/room_state.dart';
-import '../../../data/models/save_data.dart';
+import '../../../data/models/models.dart';
 import '../../../data/services/socket_support.dart';
 import '../character_select/character_select_page.dart';
 import '../create_save/create_save_page.dart';
@@ -28,12 +28,15 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
   RoomServerHandle? _server;
   StreamSubscription<String>? _serverSub;
   bool _isHosting = false;
-  bool _isReady = false;
   String _status = '尚未开放端口';
   String _roomAddress = '等待开放端口';
   String? _saveFilePath;
   String _saveFileName = '未选择';
   String _role = '玩家';
+
+  bool get _isReady => RoomSession.instance.readyMembersNotifier.value.contains(
+    widget.playerName,
+  );
 
   @override
   void initState() {
@@ -113,6 +116,24 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('打开存档失败: $e')));
+      }
+    }
+  }
+
+  Future<void> _navigateToCreateSave() async {
+    final result = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const CreateSavePage(allowMapEdit: true),
+      ),
+    );
+    if (result != null && mounted) {
+      setState(() {
+        _saveFilePath = result;
+        _saveFileName = result.split('/').last.split('\\').last;
+      });
+      if (_isHosting) {
+        RoomSession.instance.hostSetSave(_saveFileName);
       }
     }
   }
@@ -214,12 +235,58 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
           final role = data['role'] as String? ?? '玩家';
           RoomSession.instance.addMember(name, role: role);
           break;
+        case 'character_create':
+          // 远程玩家新建角色 → 保存到房主本地存档
+          _onRemoteCharacterCreate(data);
+          break;
+        case 'character_update':
+          // 远程玩家编辑角色 → 保存到房主本地存档
+          _onRemoteCharacterUpdate(data);
+          break;
       }
     } catch (_) {}
   }
 
+  Future<void> _onRemoteCharacterCreate(Map<String, dynamic> data) async {
+    if (_saveFilePath == null) return;
+    try {
+      final charJson = data['character'] as Map<String, dynamic>?;
+      if (charJson == null) return;
+      final character = CharacterData.fromJson(charJson);
+      final save = await SaveData.fromZip(_saveFilePath!);
+      final updated = SaveData(
+        createdAt: DateTime.now().toIso8601String(),
+        characters: [...save.characters, character],
+        maps: save.maps,
+        rules: save.rules,
+      );
+      await updated.packToZip(_saveFilePath!);
+    } catch (_) {}
+  }
+
+  Future<void> _onRemoteCharacterUpdate(Map<String, dynamic> data) async {
+    if (_saveFilePath == null) return;
+    try {
+      final charJson = data['character'] as Map<String, dynamic>?;
+      if (charJson == null) return;
+      final character = CharacterData.fromJson(charJson);
+      final save = await SaveData.fromZip(_saveFilePath!);
+      final chars = [...save.characters];
+      final idx = chars.indexWhere((c) => c.name == character.name);
+      if (idx >= 0) {
+        chars[idx] = character;
+      }
+      final updated = SaveData(
+        createdAt: DateTime.now().toIso8601String(),
+        characters: chars,
+        maps: save.maps,
+        rules: save.rules,
+      );
+      await updated.packToZip(_saveFilePath!);
+    } catch (_) {}
+  }
+
   void _markHostReady() {
-    setState(() => _isReady = true);
     RoomSession.instance.setPlayerReady(widget.playerName);
     // 房主自身没有 clientHandle，需通过广播通知玩家
     RoomSession.instance.broadcast({
@@ -229,7 +296,6 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
   }
 
   void _cancelHostReady() {
-    setState(() => _isReady = false);
     // 房主本地取消准备
     RoomSession.instance.setStateNotReady(widget.playerName);
     // 通知其他玩家
@@ -251,7 +317,6 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
     RoomSession.instance.reset();
     setState(() {
       _isHosting = false;
-      _isReady = false;
       _status = '已关闭端口';
       _roomAddress = '等待开放端口';
       _role = '玩家';
@@ -260,6 +325,9 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
 
   Future<void> _startAdventure(BuildContext context) async {
     if (!mounted || !context.mounted) return;
+
+    // 在异步操作前捕获 NavigatorState，避免跨异步间隔使用 BuildContext
+    final navigator = Navigator.of(context);
 
     // Mark adventure as started
     RoomSession.instance.startAdventureNotifier.value = true;
@@ -283,6 +351,8 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
       } catch (_) {}
     }
 
+    if (!mounted) return;
+
     RoomSession.instance.broadcast(msg);
 
     final page = _role == '主持'
@@ -298,12 +368,11 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
             hostSaveName: _saveFilePath != null ? _saveFileName : '',
           );
 
-    await Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+    await navigator.push(MaterialPageRoute(builder: (_) => page));
 
-    // User came back without starting the adventure — reset state so they can try again
+    // User came back without starting the adventure — reset only the adventure flag
     if (mounted) {
       RoomSession.instance.startAdventureNotifier.value = false;
-      RoomSession.instance.readyMembersNotifier.value = {};
       setState(() {});
     }
   }
@@ -348,7 +417,10 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
             IconButton(
               icon: const Icon(Icons.refresh),
               tooltip: '刷新成员列表',
-              onPressed: () => RoomSession.instance.sendFullMemberList(),
+              onPressed: () {
+                RoomSession.instance.sendFullMemberList();
+                if (mounted) setState(() {});
+              },
             ),
         ],
       ),
@@ -451,63 +523,86 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(
-                                isReady
-                                    ? Icons.check_circle
-                                    : Icons.hourglass_empty,
-                                size: 20,
-                                color: isReady ? Colors.green : Colors.orange,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                isReady ? '已准备' : '未准备',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: isReady ? Colors.green : Colors.orange,
-                                ),
-                              ),
-                              if (!isSelf) ...[
-                                const SizedBox(width: 8),
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.remove_circle_outline,
-                                    color: Colors.red,
-                                    size: 20,
-                                  ),
-                                  tooltip: '踢出 $name',
-                                  onPressed: () {
-                                    showDialog(
-                                      context: context,
-                                      builder: (ctx) => AlertDialog(
-                                        title: const Text('确认踢出'),
-                                        content: Text('确定要将 $name 踢出房间吗？'),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () => Navigator.pop(ctx),
-                                            child: const Text('取消'),
-                                          ),
-                                          TextButton(
-                                            onPressed: () {
-                                              Navigator.pop(ctx);
-                                              RoomSession.instance.kickMember(
-                                                name,
-                                              );
-                                              RoomSession.instance.removeMember(
-                                                name,
-                                              );
-                                              RoomSession.instance.broadcast({
-                                                'type': 'member_left',
-                                                'name': name,
-                                              });
-                                            },
-                                            child: const Text('踢出'),
-                                          ),
-                                        ],
+                              // 准备状态（固定宽度对齐）
+                              SizedBox(
+                                width: 72,
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      isReady
+                                          ? Icons.check_circle
+                                          : Icons.hourglass_empty,
+                                      size: 20,
+                                      color: isReady
+                                          ? Colors.green
+                                          : Colors.orange,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      isReady ? '已准备' : '未准备',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: isReady
+                                            ? Colors.green
+                                            : Colors.orange,
                                       ),
-                                    );
-                                  },
+                                    ),
+                                  ],
                                 ),
-                              ],
+                              ),
+                              // 踢出按钮（固定宽度占位）
+                              SizedBox(
+                                width: 40,
+                                child: !isSelf
+                                    ? IconButton(
+                                        icon: const Icon(
+                                          Icons.remove_circle_outline,
+                                          color: Colors.red,
+                                          size: 20,
+                                        ),
+                                        tooltip: '踢出 $name',
+                                        padding: EdgeInsets.zero,
+                                        constraints: const BoxConstraints(
+                                          minWidth: 40,
+                                          minHeight: 40,
+                                        ),
+                                        onPressed: () {
+                                          showDialog(
+                                            context: context,
+                                            builder: (ctx) => AlertDialog(
+                                              title: const Text('确认踢出'),
+                                              content: Text(
+                                                '确定要将 $name 踢出房间吗？',
+                                              ),
+                                              actions: [
+                                                TextButton(
+                                                  onPressed: () =>
+                                                      Navigator.pop(ctx),
+                                                  child: const Text('取消'),
+                                                ),
+                                                TextButton(
+                                                  onPressed: () {
+                                                    Navigator.pop(ctx);
+                                                    RoomSession.instance
+                                                        .kickMember(name);
+                                                    RoomSession.instance
+                                                        .removeMember(name);
+                                                    RoomSession.instance
+                                                        .broadcast({
+                                                          'type': 'member_left',
+                                                          'name': name,
+                                                        });
+                                                  },
+                                                  child: const Text('踢出'),
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                        },
+                                      )
+                                    : null,
+                              ),
                             ],
                           ),
                         ),
@@ -603,6 +698,15 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
                   ),
                 ],
               ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _navigateToCreateSave,
+                  icon: const Icon(Icons.add_circle_outline, size: 18),
+                  label: const Text('创建存档'),
+                ),
+              ),
               const SizedBox(height: 12),
               // ── 所有成员就绪后才可开始冒险 ──
               Builder(
@@ -610,12 +714,17 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
                   final members = RoomSession.instance.membersNotifier.value;
                   final readyMembers =
                       RoomSession.instance.readyMembersNotifier.value;
+                  // 单人主持无需等待，可直接开始
+                  final isSoloHost = members.length == 1 && _role == '主持';
+                  final hasSave = _saveFilePath != null;
                   final allReady =
-                      members.isNotEmpty &&
-                      members.every((m) => readyMembers.contains(m));
+                      isSoloHost ||
+                      (members.isNotEmpty &&
+                          members.every((m) => readyMembers.contains(m)));
+                  final canStart = allReady && hasSave;
                   return Column(
                     children: [
-                      if (!allReady && members.isNotEmpty)
+                      if (!allReady && !isSoloHost && members.isNotEmpty)
                         Card(
                           color: Colors.orange.shade50,
                           child: Padding(
@@ -638,11 +747,37 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
                             ),
                           ),
                         ),
+                      if (!hasSave && allReady)
+                        Card(
+                          color: Colors.red.shade50,
+                          child: const Padding(
+                            padding: EdgeInsets.all(10),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.warning_amber_rounded,
+                                  size: 18,
+                                  color: Colors.red,
+                                ),
+                                SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    '请先选择或创建存档文件',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.red,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       const SizedBox(height: 8),
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton.icon(
-                          onPressed: allReady
+                          onPressed: canStart
                               ? () => _startAdventure(context)
                               : null,
                           icon: const Icon(Icons.rocket_launch_outlined),

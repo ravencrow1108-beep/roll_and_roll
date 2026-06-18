@@ -185,8 +185,15 @@ class RoomSession {
   void sendFullMemberList() {
     if (_serverHandle == null) return;
     final roles = memberRolesNotifier.value;
+    final readyMembers = readyMembersNotifier.value;
     final allList = membersNotifier.value
-        .map((n) => {'name': n, 'role': roles[n] ?? '玩家'})
+        .map(
+          (n) => {
+            'name': n,
+            'role': roles[n] ?? '玩家',
+            'isReady': readyMembers.contains(n),
+          },
+        )
         .toList();
     broadcast({'type': 'members_list', 'members': allList});
   }

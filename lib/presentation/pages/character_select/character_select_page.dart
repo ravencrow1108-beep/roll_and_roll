@@ -7,6 +7,8 @@ import 'package:flutter/material.dart';
 
 import '../../providers/room_state.dart';
 import '../../../data/models/models.dart';
+import '../../../data/services/socket_support.dart';
+import '../../widgets/character_detail_panel.dart';
 import '../adventure/adventure_page.dart';
 import '../create_save/char_edit_models.dart';
 import '../create_save/character_tab.dart';
@@ -45,11 +47,19 @@ class _CharacterSelectPageState extends State<CharacterSelectPage> {
   List<CharacterData> _loadedCharacters = [];
   RuleData? _loadedRules;
 
-  bool _isReady = false;
+  /// 主持已进入冒险（收到 adventure_started）
+  bool _hostEnteredAdventure = false;
+
+  /// 暂存的 adventure_started 数据，等待玩家点击「开始冒险」
+  Map<String, dynamic>? _pendingAdventureData;
+
   bool _hostSettingUp = false;
   String _hostSaveName = '';
 
   StreamSubscription<String>? _msgSub;
+
+  /// 远程玩家（通过 socket 接收角色数据，无本地存档）
+  bool get _isRemote => widget.characters != null && _saveFilePath == null;
 
   @override
   void initState() {
@@ -83,28 +93,9 @@ class _CharacterSelectPageState extends State<CharacterSelectPage> {
 
       if (type == 'adventure_started') {
         if (!mounted) return;
-        if (data['map'] != null) {
-          RoomSession.instance.mapNotifier.value = MapData.fromJson(
-            data['map'] as Map<String, dynamic>,
-          );
-        }
-        final positions = data['positions'] as List<dynamic>?;
-        if (positions != null) {
-          RoomSession.instance.playerPositionsNotifier.value = positions
-              .map((p) => PlayerPosition.fromJson(p as Map<String, dynamic>))
-              .toList();
-        }
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => AdventurePage(
-              playerName: widget.playerName,
-              role: widget.role,
-              saveFilePath: _saveFilePath,
-              character: _character,
-            ),
-          ),
-        );
+        _hostEnteredAdventure = true;
+        _pendingAdventureData = data;
+        setState(() {});
       } else if (type == 'host_setting_up') {
         if (mounted) setState(() => _hostSettingUp = true);
       } else if (type == 'host_save_changed') {
@@ -114,6 +105,30 @@ class _CharacterSelectPageState extends State<CharacterSelectPage> {
         if (mounted) Navigator.of(context).pop();
       } else if (type == 'host_disconnected') {
         if (mounted) Navigator.of(context).pop();
+      } else if (type == 'character_create') {
+        final charJson = data['character'] as Map<String, dynamic>?;
+        if (charJson != null) {
+          final c = CharacterData.fromJson(charJson);
+          if (!_loadedCharacters.any((e) => e.name == c.name)) {
+            _loadedCharacters = [..._loadedCharacters, c];
+            if (mounted) setState(() {});
+          }
+        }
+      } else if (type == 'character_update') {
+        final charJson = data['character'] as Map<String, dynamic>?;
+        if (charJson != null) {
+          final c = CharacterData.fromJson(charJson);
+          final idx = _loadedCharacters.indexWhere((e) => e.name == c.name);
+          if (idx >= 0) {
+            final updated = [..._loadedCharacters];
+            updated[idx] = c;
+            _loadedCharacters = updated;
+            if (_character?.name == c.name) {
+              _character = c;
+            }
+            if (mounted) setState(() {});
+          }
+        }
       }
     } catch (_) {}
   }
@@ -141,9 +156,37 @@ class _CharacterSelectPageState extends State<CharacterSelectPage> {
       _saveFilePath = result.files.single.path!;
       _saveFileName = result.files.single.name;
       _character = null;
-      _isReady = false;
     });
     _loadSaveData();
+  }
+
+  void _enterAdventure() {
+    if (_character == null || _pendingAdventureData == null) return;
+    final data = _pendingAdventureData!;
+
+    if (data['map'] != null) {
+      RoomSession.instance.mapNotifier.value = MapData.fromJson(
+        data['map'] as Map<String, dynamic>,
+      );
+    }
+    final positions = data['positions'] as List<dynamic>?;
+    if (positions != null) {
+      RoomSession.instance.playerPositionsNotifier.value = positions
+          .map((p) => PlayerPosition.fromJson(p as Map<String, dynamic>))
+          .toList();
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AdventurePage(
+          playerName: widget.playerName,
+          role: widget.role,
+          saveFilePath: _saveFilePath,
+          character: _character,
+        ),
+      ),
+    );
   }
 
   void _selectCharacter(CharacterData c) {
@@ -158,7 +201,13 @@ class _CharacterSelectPageState extends State<CharacterSelectPage> {
       ),
     );
     if (result != null && mounted) {
-      await _appendCharacterToSave(result);
+      if (_isRemote) {
+        _sendCharacterToHost(result, 'character_create');
+        _loadedCharacters = [..._loadedCharacters, result];
+        setState(() {});
+      } else {
+        await _appendCharacterToSave(result);
+      }
     }
   }
 
@@ -172,11 +221,37 @@ class _CharacterSelectPageState extends State<CharacterSelectPage> {
       ),
     );
     if (result != null && mounted) {
-      await _updateCharacterInSave(index, result);
-      if (_character != null && _character!.name == existing.name) {
-        setState(() => _character = result);
+      if (_isRemote) {
+        _sendCharacterToHost(result, 'character_update');
+        final updated = [..._loadedCharacters];
+        if (index >= 0 && index < updated.length) {
+          updated[index] = result;
+        }
+        _loadedCharacters = updated;
+        if (_character != null && _character!.name == existing.name) {
+          _character = result;
+        }
+        setState(() {});
+      } else {
+        await _updateCharacterInSave(index, result);
+        if (_character != null && _character!.name == existing.name) {
+          setState(() => _character = result);
+        }
       }
     }
+  }
+
+  /// 通过 socket 向房主发送角色创建/更新消息
+  void _sendCharacterToHost(CharacterData character, String type) {
+    final client = RoomSession.instance.clientHandle;
+    if (client == null) return;
+    client.send(
+      socketEncode({
+        'type': type,
+        'character': character.toJson(),
+        'from': widget.playerName,
+      }),
+    );
   }
 
   Future<void> _appendCharacterToSave(CharacterData character) async {
@@ -241,228 +316,6 @@ class _CharacterSelectPageState extends State<CharacterSelectPage> {
     }
   }
 
-  void _editSkill(CharacterData c, SkillData oldSkill) {
-    final nameCtrl = TextEditingController(text: oldSkill.name);
-    final descCtrl = TextEditingController(text: oldSkill.description ?? '');
-    String imageBase64 = oldSkill.imageBase64 ?? '';
-    final dmgTypes =
-        _loadedRules?.damageTypes ??
-        const [
-          '火焰',
-          '寒冷',
-          '雷电',
-          '毒素',
-          '暗蚀',
-          '光耀',
-          '力场',
-          '精神',
-          '坏死',
-          '穿刺',
-          '挥砍',
-          '钝击',
-        ];
-    final damages = <_SkillDamageRow>[
-      for (final d in oldSkill.damages)
-        _SkillDamageRow(
-          exprCtrl: TextEditingController(text: d.expression ?? ''),
-          dmgType: d.damageType,
-        ),
-    ];
-    if (damages.isEmpty) {
-      damages.add(_SkillDamageRow(exprCtrl: TextEditingController()));
-    }
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          title: const Text('编辑技能'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: nameCtrl,
-                  decoration: const InputDecoration(
-                    labelText: '技能名称',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                OutlinedButton.icon(
-                  onPressed: () async {
-                    final result = await FilePicker.pickFiles(
-                      dialogTitle: '选择技能图标',
-                      type: FileType.image,
-                    );
-                    if (result != null && result.files.single.path != null) {
-                      final bytes = await File(
-                        result.files.single.path!,
-                      ).readAsBytes();
-                      setDialogState(() => imageBase64 = base64Encode(bytes));
-                    }
-                  },
-                  icon: const Icon(Icons.image, size: 18),
-                  label: Text(imageBase64.isEmpty ? '上传图标' : '已选择图标'),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    const Text(
-                      '技能伤害',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const Spacer(),
-                    TextButton.icon(
-                      onPressed: () => setDialogState(
-                        () => damages.add(
-                          _SkillDamageRow(exprCtrl: TextEditingController()),
-                        ),
-                      ),
-                      icon: const Icon(Icons.add, size: 16),
-                      label: const Text('添加', style: TextStyle(fontSize: 13)),
-                    ),
-                  ],
-                ),
-                ...List.generate(
-                  damages.length,
-                  (i) => Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          flex: 2,
-                          child: TextField(
-                            controller: damages[i].exprCtrl,
-                            decoration: const InputDecoration(
-                              labelText: '表达式',
-                              hintText: '1d6+3',
-                              border: OutlineInputBorder(),
-                              isDense: true,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          flex: 2,
-                          child: DropdownButtonFormField<String?>(
-                            initialValue: dmgTypes.contains(damages[i].dmgType)
-                                ? damages[i].dmgType
-                                : null,
-                            decoration: const InputDecoration(
-                              labelText: '伤害类型',
-                              border: OutlineInputBorder(),
-                              isDense: true,
-                            ),
-                            items: [
-                              const DropdownMenuItem(
-                                value: null,
-                                child: Text(
-                                  '无',
-                                  style: TextStyle(fontSize: 13),
-                                ),
-                              ),
-                              ...dmgTypes.map(
-                                (t) => DropdownMenuItem(
-                                  value: t,
-                                  child: Text(
-                                    t,
-                                    style: const TextStyle(fontSize: 13),
-                                  ),
-                                ),
-                              ),
-                            ],
-                            onChanged: (v) =>
-                                setDialogState(() => damages[i].dmgType = v),
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(
-                            Icons.remove_circle_outline,
-                            size: 18,
-                            color: Colors.red,
-                          ),
-                          onPressed: damages.length <= 1
-                              ? null
-                              : () => setDialogState(() => damages.removeAt(i)),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: descCtrl,
-                  decoration: const InputDecoration(
-                    labelText: '描述（可选）',
-                    border: OutlineInputBorder(),
-                  ),
-                  maxLines: 2,
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('取消'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final name = nameCtrl.text.trim();
-                if (name.isEmpty) return;
-                final idx = _loadedCharacters.indexOf(c);
-                final updatedSkills = c.skills.toList();
-                final oldIdx = updatedSkills.indexOf(oldSkill);
-                if (oldIdx >= 0) {
-                  updatedSkills[oldIdx] = SkillData(
-                    name: name,
-                    description: descCtrl.text.trim().isEmpty
-                        ? null
-                        : descCtrl.text.trim(),
-                    imageBase64: imageBase64.isEmpty ? null : imageBase64,
-                    damages: damages
-                        .where((r) => r.exprCtrl.text.trim().isNotEmpty)
-                        .map(
-                          (r) => SkillDamage(
-                            expression: r.exprCtrl.text.trim(),
-                            damageType: r.dmgType,
-                          ),
-                        )
-                        .toList(),
-                  );
-                }
-                final updated = c.copyWith(skills: updatedSkills);
-                Navigator.pop(ctx);
-                if (idx >= 0) {
-                  await _updateCharacterInSave(idx, updated);
-                }
-              },
-              child: const Text('保存'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _removeSkill(CharacterData c, SkillData skill) {
-    final idx = _loadedCharacters.indexOf(c);
-    final updatedSkills = c.skills.where((s) => s != skill).toList();
-    final updated = c.copyWith(skills: updatedSkills);
-    if (idx >= 0) {
-      _updateCharacterInSave(idx, updated);
-    }
-  }
-
-  void _markReady() {
-    if (_character == null) return;
-    setState(() => _isReady = true);
-    RoomSession.instance.setPlayerReady(widget.playerName);
-  }
-
   @override
   void dispose() {
     _msgSub?.cancel();
@@ -483,7 +336,7 @@ class _CharacterSelectPageState extends State<CharacterSelectPage> {
     return _buildCharacterSelection(theme);
   }
 
-  /// 构建角色详情视图，显示属性、技能与准备按钮
+  /// 构建角色详情视图：头像、HP条、装备/物品/技能 Tab + 开始冒险按钮
   Widget _buildCharacterView(ThemeData theme) {
     final c = _character!;
     final idx = _loadedCharacters.indexOf(c);
@@ -495,7 +348,7 @@ class _CharacterSelectPageState extends State<CharacterSelectPage> {
           onPressed: () => setState(() => _character = null),
         ),
         actions: [
-          if (_saveFilePath != null && idx >= 0)
+          if ((_saveFilePath != null || _isRemote) && idx >= 0)
             IconButton(
               icon: const Icon(Icons.edit),
               tooltip: '编辑角色',
@@ -503,218 +356,77 @@ class _CharacterSelectPageState extends State<CharacterSelectPage> {
             ),
         ],
       ),
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(vertical: 24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  '欢迎，${c.name}',
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
+      body: Column(
+        children: [
+          Expanded(child: CharacterDetailPanel(character: c, showClose: false)),
+          // ── 底部存档 / 房主备案信息 ──
+          if (_saveFilePath != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Text(
+                '已加载存档: $_saveFileName',
+                style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+              ),
+            ),
+          if (_hostSaveName.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Card(
+                color: Colors.blue.shade50,
+                child: Padding(
+                  padding: const EdgeInsets.all(10),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.save, size: 16, color: Colors.blue.shade700),
+                      const SizedBox(width: 6),
+                      Text(
+                        '房主备档: $_hostSaveName',
+                        style: TextStyle(
+                          color: Colors.blue.shade800,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 12),
-                if (c.portraitBase64.isNotEmpty)
-                  ClipOval(
-                    child: Image.memory(
-                      base64Decode(c.portraitBase64),
-                      width: 100,
-                      height: 100,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                const SizedBox(height: 12),
-                Text('职业: ${c.className}'),
-                Text('种族: ${c.race} · Lv${c.level}'),
-                if (c.skills.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  Text(
-                    '技能',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 320),
-                    child: Column(
-                      children: c.skills
-                          .map(
-                            (s) => Card(
-                              child: ListTile(
-                                title: Text(
-                                  s.name,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                subtitle: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    if (s.damages.isNotEmpty)
-                                      ...s.damages.map(
-                                        (d) => Padding(
-                                          padding: const EdgeInsets.only(
-                                            top: 2,
-                                          ),
-                                          child: Row(
-                                            children: [
-                                              Text(
-                                                '🎲 ${d.expression ?? ""}',
-                                                style: TextStyle(
-                                                  fontSize: 11,
-                                                  fontFamily: 'monospace',
-                                                  color: Colors.grey.shade600,
-                                                ),
-                                              ),
-                                              if (d.damageType != null) ...[
-                                                const SizedBox(width: 6),
-                                                Container(
-                                                  padding:
-                                                      const EdgeInsets.symmetric(
-                                                        horizontal: 4,
-                                                        vertical: 1,
-                                                      ),
-                                                  decoration: BoxDecoration(
-                                                    color: Colors.red
-                                                        .withValues(
-                                                          alpha: 0.12,
-                                                        ),
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          3,
-                                                        ),
-                                                  ),
-                                                  child: Text(
-                                                    d.damageType!,
-                                                    style: TextStyle(
-                                                      fontSize: 10,
-                                                      color:
-                                                          Colors.red.shade700,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                    if (s.description != null &&
-                                        s.description!.isNotEmpty)
-                                      Text(s.description!),
-                                  ],
-                                ),
-                                trailing: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    IconButton(
-                                      icon: const Icon(Icons.edit, size: 18),
-                                      tooltip: '编辑技能',
-                                      onPressed: () => _editSkill(c, s),
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(
-                                        Icons.delete_outline,
-                                        size: 18,
-                                        color: Colors.red,
-                                      ),
-                                      tooltip: '删除技能',
-                                      onPressed: () => _removeSkill(c, s),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          )
-                          .toList(),
-                    ),
-                  ),
-                ],
-                if (_saveFilePath != null) ...[
-                  const SizedBox(height: 16),
-                  Text(
-                    '已加载存档: $_saveFileName',
-                    style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
-                  ),
-                ],
-                if (_hostSaveName.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  Card(
-                    color: Colors.blue.shade50,
-                    child: Padding(
-                      padding: const EdgeInsets.all(10),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.save,
-                            size: 16,
-                            color: Colors.blue.shade700,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            '房主备档: $_hostSaveName',
-                            style: TextStyle(
-                              color: Colors.blue.shade800,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 32),
-                if (!_isReady)
-                  SizedBox(
-                    width: 200,
-                    child: ElevatedButton.icon(
-                      onPressed: _markReady,
-                      icon: const Icon(Icons.check_circle_outline),
-                      label: const Text('准备', style: TextStyle(fontSize: 18)),
-                    ),
-                  )
-                else if (_hostSettingUp)
-                  Card(
-                    color: Colors.blue.shade50,
-                    child: const Padding(
-                      padding: EdgeInsets.all(16),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(strokeWidth: 2.5),
-                          ),
-                          SizedBox(height: 12),
-                          Text('主持正在布置地图…'),
-                        ],
-                      ),
-                    ),
-                  )
-                else
-                  Card(
-                    color: Colors.green.shade50,
-                    child: const Padding(
-                      padding: EdgeInsets.all(12),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.check_circle, color: Colors.green),
-                          SizedBox(width: 8),
-                          Text('已准备，等待主持开始…'),
-                        ],
-                      ),
-                    ),
-                  ),
-              ],
+              ),
+            ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: 200,
+            child: ElevatedButton.icon(
+              onPressed: (_character != null && _hostEnteredAdventure)
+                  ? _enterAdventure
+                  : null,
+              icon: const Icon(Icons.rocket_launch_outlined),
+              label: const Text('开始冒险', style: TextStyle(fontSize: 18)),
             ),
           ),
-        ),
+          if (_character != null && !_hostEnteredAdventure)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Card(
+                color: Colors.blue.shade50,
+                child: const Padding(
+                  padding: EdgeInsets.all(8),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                      SizedBox(width: 8),
+                      Text('等待主持进入冒险', style: TextStyle(fontSize: 13)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          const SizedBox(height: 12),
+        ],
       ),
     );
   }
@@ -780,40 +492,42 @@ class _CharacterSelectPageState extends State<CharacterSelectPage> {
                   ),
                 ),
 
-              // ── 存档选择 ──
-              Text(
-                '从存档中选择角色',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
+              // ── 存档选择（仅本地玩家显示）──
+              if (!_isRemote) ...[
+                Text(
+                  '从存档中选择角色',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: Card(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 14,
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.save_outlined),
-                            const SizedBox(width: 12),
-                            Expanded(child: Text(_saveFileName)),
-                            IconButton(
-                              icon: const Icon(Icons.folder_open),
-                              tooltip: '选择存档文件',
-                              onPressed: _pickSaveFile,
-                            ),
-                          ],
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Card(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 14,
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.save_outlined),
+                              const SizedBox(width: 12),
+                              Expanded(child: Text(_saveFileName)),
+                              IconButton(
+                                icon: const Icon(Icons.folder_open),
+                                tooltip: '选择存档文件',
+                                onPressed: _pickSaveFile,
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
+              ],
 
               // ── 已加载的角色列表 ──
               if (_loadedCharacters.isNotEmpty) ...[
@@ -865,7 +579,7 @@ class _CharacterSelectPageState extends State<CharacterSelectPage> {
               const SizedBox(height: 24),
 
               // ── 创建新角色 ──
-              if (_saveFilePath != null) ...[
+              if (_saveFilePath != null || _isRemote) ...[
                 Text(
                   '或新建角色到当前存档',
                   style: theme.textTheme.titleMedium?.copyWith(

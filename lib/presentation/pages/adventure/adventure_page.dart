@@ -114,6 +114,32 @@ class _AdventurePageState extends State<AdventurePage> {
     _voice.isInChannel.addListener(_onVoiceStateChanged);
     _voice.isMuted.addListener(_onVoiceStateChanged);
     _voice.speakingMembers.addListener(_onVoiceStateChanged);
+
+    // 广播进入冒险的系统消息（下一帧发送，确保监听已就绪）
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _announceEnterAdventure();
+    });
+  }
+
+  /// 向聊天框播报「xxx 进入冒险」
+  void _announceEnterAdventure() {
+    final text = '${widget.playerName} 进入冒险';
+    final msg = <String, dynamic>{
+      'type': 'chat_message',
+      'from': '',
+      'text': text,
+      'isSystem': true,
+    };
+
+    // 本地立即显示
+    _addSystemChat(text);
+
+    if (_isGM) {
+      RoomSession.instance.broadcast(msg);
+    } else {
+      RoomSession.instance.clientHandle?.send(socketEncode(msg));
+    }
   }
 
   void _onVoiceStateChanged() {
@@ -143,7 +169,15 @@ class _AdventurePageState extends State<AdventurePage> {
       final type = data['type'] as String? ?? '';
 
       if (type == 'chat_message') {
-        _addChat(data['from'] as String? ?? '', data['text'] as String? ?? '');
+        final isSystem = data['isSystem'] as bool? ?? false;
+        if (isSystem) {
+          _addSystemChat(data['text'] as String? ?? '');
+        } else {
+          _addChat(
+            data['from'] as String? ?? '',
+            data['text'] as String? ?? '',
+          );
+        }
         if (_isGM) RoomSession.instance.broadcast(data);
         return;
       }
@@ -239,6 +273,14 @@ class _AdventurePageState extends State<AdventurePage> {
       () => _chatMessages.add(
         ChatMessage(from: from, text: text, portraitBase64: portrait),
       ),
+    );
+    _scrollChatToBottom();
+  }
+
+  void _addSystemChat(String text) {
+    setState(
+      () =>
+          _chatMessages.add(ChatMessage(from: '', text: text, isSystem: true)),
     );
     _scrollChatToBottom();
   }
@@ -996,14 +1038,7 @@ class _AdventurePageState extends State<AdventurePage> {
         title: Text('冒险中 · ${m.name}'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            RoomSession.instance.broadcast({'type': 'return_to_room'});
-            RoomSession.instance.startAdventureNotifier.value = false;
-            RoomSession.instance.mapNotifier.value = null;
-            RoomSession.instance.playerPositionsNotifier.value = [];
-            RoomSession.instance.readyMembersNotifier.value = {};
-            Navigator.of(context).pop();
-          },
+          onPressed: _onBackPressed,
         ),
         actions: [
           // ── 发言者指示器（仅在频道内） ──
@@ -1154,14 +1189,7 @@ class _AdventurePageState extends State<AdventurePage> {
             onPressed: _saveAsProgress,
           ),
           TextButton.icon(
-            onPressed: () {
-              RoomSession.instance.broadcast({'type': 'return_to_room'});
-              RoomSession.instance.startAdventureNotifier.value = false;
-              RoomSession.instance.mapNotifier.value = null;
-              RoomSession.instance.playerPositionsNotifier.value = [];
-              RoomSession.instance.readyMembersNotifier.value = {};
-              Navigator.of(context).pop();
-            },
+            onPressed: _onBackPressed,
             icon: const Icon(Icons.exit_to_app),
             label: const Text('返回房间'),
           ),
@@ -1231,6 +1259,61 @@ class _AdventurePageState extends State<AdventurePage> {
         ),
       ),
     );
+  }
+
+  /// 处理返回按钮 / 返回房间：主持弹出确认弹窗，玩家直接返回
+  Future<void> _onBackPressed() async {
+    if (_isGM) {
+      final result = await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('退出冒险'),
+          content: const Text('退出冒险将踢出所有玩家，确定要退出吗？'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, 'cancel'),
+              child: const Text('取消'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, 'exit'),
+              child: const Text('退出'),
+            ),
+            ElevatedButton.icon(
+              onPressed: () => Navigator.pop(ctx, 'save_exit'),
+              icon: const Icon(Icons.save, size: 16),
+              label: const Text('保存进度并退出'),
+            ),
+          ],
+        ),
+      );
+
+      if (result == 'cancel' || result == null) return;
+      if (!mounted) return;
+
+      if (result == 'save_exit') {
+        await _saveProgress();
+      }
+
+      _doExitAdventure();
+    } else {
+      // 玩家：直接回到角色选择页
+      if (mounted) Navigator.of(context).pop();
+    }
+  }
+
+  /// 执行退出冒险：广播 return_to_room + 重置 + pop 到首页
+  void _doExitAdventure() {
+    RoomSession.instance.broadcast({'type': 'return_to_room'});
+    RoomSession.instance.startAdventureNotifier.value = false;
+    RoomSession.instance.mapNotifier.value = null;
+    RoomSession.instance.playerPositionsNotifier.value = [];
+    RoomSession.instance.readyMembersNotifier.value = {};
+
+    if (mounted) {
+      // popUntil 到 HomePage，跳过所有房间/冒险页面
+      // CreateRoomPage.dispose() 会关闭服务器 → 玩家收到 host_disconnected
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    }
   }
 
   /// 构建玩家角色详情与准备冒险界面

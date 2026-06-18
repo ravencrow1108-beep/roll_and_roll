@@ -276,6 +276,21 @@ void _handleWebSocket(
               }
             }
 
+            // 转发角色操作到房主及所有客户端
+            if (msg['type'] == 'character_create' ||
+                msg['type'] == 'character_update') {
+              handle._onMessage('$trimmed\n');
+              // 广播给所有其他客户端
+              for (final c in [...handle._clients]) {
+                if (c.ws != ws) {
+                  try {
+                    c.ws.add('$trimmed\n');
+                  } catch (_) {}
+                }
+              }
+              continue;
+            }
+
             handle._onMessage('$trimmed\n');
             for (final c in [...handle._clients]) {
               if (c.ws != ws) {

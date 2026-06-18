@@ -39,7 +39,9 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
   String _hostSaveName = '';
   List<CharacterData>? _receivedCharacters;
   RuleData? _receivedRules;
-  bool _isReady = false;
+
+  bool get _isReady =>
+      RoomSession.instance.readyMembersNotifier.value.contains(_playerName);
 
   String get _playerName => widget.playerName;
 
@@ -142,19 +144,17 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
     RoomSession.instance.reset();
     setState(() {
       _isConnected = false;
-      _isReady = false;
       _connectedIp = '';
       _connectedPort = 0;
     });
   }
 
   void _markReady() {
-    setState(() => _isReady = true);
     RoomSession.instance.setPlayerReady(_playerName);
   }
 
   void _cancelReady() {
-    setState(() => _isReady = false);
+    RoomSession.instance.setStateNotReady(_playerName);
     _clientHandle?.send(
       socketEncode({'type': 'player_cancel_ready', 'name': _playerName}),
     );
@@ -254,9 +254,13 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
           break;
 
         case 'return_to_room':
-          // Host went back — pop all adventure pages
+          // Pop all adventure-level pages (CharacterSelectPage, AdventurePage)
+          // so only JoinRoomPage is visible.
           if (mounted) {
-            Navigator.of(context).popUntil((route) => route.isFirst);
+            final myRoute = ModalRoute.of(context);
+            if (myRoute != null) {
+              Navigator.of(context).popUntil((route) => route == myRoute);
+            }
           }
           break;
 
@@ -552,60 +556,84 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          if (_isConnected &&
-                              _role == '主持' &&
-                              name != _playerName)
-                            IconButton(
-                              icon: const Icon(
-                                Icons.remove_circle_outline,
-                                color: Colors.red,
-                                size: 20,
-                              ),
-                              tooltip: '踢出 $name',
-                              onPressed: () {
-                                showDialog(
-                                  context: context,
-                                  builder: (ctx) => AlertDialog(
-                                    title: const Text('确认踢出'),
-                                    content: Text('确定要将 $name 踢出房间吗？'),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () => Navigator.pop(ctx),
-                                        child: const Text('取消'),
-                                      ),
-                                      TextButton(
-                                        onPressed: () {
-                                          Navigator.pop(ctx);
-                                          RoomSession.instance.kickMember(name);
-                                          RoomSession.instance.removeMember(
-                                            name,
-                                          );
-                                          RoomSession.instance.broadcast({
-                                            'type': 'member_left',
-                                            'name': name,
-                                          });
-                                        },
-                                        child: const Text('踢出'),
-                                      ),
-                                    ],
+                          // 准备状态（固定宽度对齐）
+                          SizedBox(
+                            width: 72,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  isReady
+                                      ? Icons.check_circle
+                                      : Icons.hourglass_empty,
+                                  size: 20,
+                                  color: isReady ? Colors.green : Colors.orange,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  isReady ? '已准备' : '未准备',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: isReady
+                                        ? Colors.green
+                                        : Colors.orange,
                                   ),
-                                );
-                              },
+                                ),
+                              ],
                             ),
-                          Icon(
-                            isReady
-                                ? Icons.check_circle
-                                : Icons.hourglass_empty,
-                            size: 20,
-                            color: isReady ? Colors.green : Colors.orange,
                           ),
-                          const SizedBox(width: 4),
-                          Text(
-                            isReady ? '已准备' : '未准备',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: isReady ? Colors.green : Colors.orange,
-                            ),
+                          // 踢出按钮（固定宽度占位）
+                          SizedBox(
+                            width: 40,
+                            child:
+                                _isConnected &&
+                                    _role == '主持' &&
+                                    name != _playerName
+                                ? IconButton(
+                                    icon: const Icon(
+                                      Icons.remove_circle_outline,
+                                      color: Colors.red,
+                                      size: 20,
+                                    ),
+                                    tooltip: '踢出 $name',
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(
+                                      minWidth: 40,
+                                      minHeight: 40,
+                                    ),
+                                    onPressed: () {
+                                      showDialog(
+                                        context: context,
+                                        builder: (ctx) => AlertDialog(
+                                          title: const Text('确认踢出'),
+                                          content: Text('确定要将 $name 踢出房间吗？'),
+                                          actions: [
+                                            TextButton(
+                                              onPressed: () =>
+                                                  Navigator.pop(ctx),
+                                              child: const Text('取消'),
+                                            ),
+                                            TextButton(
+                                              onPressed: () {
+                                                Navigator.pop(ctx);
+                                                RoomSession.instance.kickMember(
+                                                  name,
+                                                );
+                                                RoomSession.instance
+                                                    .removeMember(name);
+                                                RoomSession.instance.broadcast({
+                                                  'type': 'member_left',
+                                                  'name': name,
+                                                });
+                                              },
+                                              child: const Text('踢出'),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    },
+                                  )
+                                : null,
                           ),
                         ],
                       ),
@@ -614,14 +642,6 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
                 }).toList(),
               ),
               const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _leaveRoom,
-                  child: const Text('离开房间', style: TextStyle(fontSize: 16)),
-                ),
-              ),
-              const SizedBox(height: 8),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
@@ -638,6 +658,14 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _isReady ? Colors.orange : null,
                   ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _leaveRoom,
+                  child: const Text('离开房间', style: TextStyle(fontSize: 16)),
                 ),
               ),
             ],

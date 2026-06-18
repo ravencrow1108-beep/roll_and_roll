@@ -433,6 +433,12 @@ class _ChatMessageItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+
+    // 系统消息用居中轻量样式
+    if (message.isSystem) {
+      return _buildSystemMessage(theme);
+    }
+
     final hasAvatar =
         message.portraitBase64 != null && message.portraitBase64!.isNotEmpty;
 
@@ -442,6 +448,31 @@ class _ChatMessageItem extends StatelessWidget {
     }
 
     return _buildNormalMessage(theme, hasAvatar);
+  }
+
+  Widget _buildSystemMessage(ThemeData theme) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerHighest.withValues(
+              alpha: 0.6,
+            ),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Text(
+            message.text,
+            style: TextStyle(
+              fontSize: 11,
+              color: Colors.grey.shade600,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildDiceMessage(ThemeData theme, bool hasAvatar) {
