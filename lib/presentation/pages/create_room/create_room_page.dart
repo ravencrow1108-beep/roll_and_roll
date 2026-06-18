@@ -28,8 +28,9 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
   RoomServerHandle? _server;
   StreamSubscription<String>? _serverSub;
   bool _isHosting = false;
-  String _status = '尚未开放端口';
-  String _roomAddress = '等待开放端口';
+  bool get _isDO => PlatformSocketSupport.useDO;
+  String _status = '尚未创建房间';
+  String _roomAddress = '等待创建房间';
   String? _saveFilePath;
   String _saveFileName = '未选择';
   String _role = '玩家';
@@ -141,12 +142,12 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
   Future<void> _startHosting() async {
     final portText = _portController.text.trim();
     if (portText.isEmpty) {
-      setState(() => _status = '请输入端口号');
+      if (!_isDO) setState(() => _status = '请输入端口号');
       return;
     }
 
     final port = int.tryParse(portText);
-    if (port == null || port < 1 || port > 65535) {
+    if (!_isDO && (port == null || port < 1 || port > 65535)) {
       setState(() => _status = '端口号必须是 1~65535 之间的整数');
       return;
     }
@@ -169,7 +170,7 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
       }
 
       final server = await PlatformSocketSupport.startServer(
-        port,
+        _isDO ? 0 : port!,
         onClient: (remoteAddress, name, role) {
           if (!mounted) {
             return;
@@ -216,7 +217,7 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
       if (!mounted) {
         return;
       }
-      setState(() => _status = '开放端口失败: $e');
+      setState(() => _status = _isDO ? '创建房间失败: $e' : '开放端口失败: $e');
     }
   }
 
@@ -324,8 +325,8 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
     RoomSession.instance.reset();
     setState(() {
       _isHosting = false;
-      _status = '已关闭端口';
-      _roomAddress = '等待开放端口';
+      _status = _isDO ? '房间已关闭' : '已关闭端口';
+      _roomAddress = _isDO ? '等待创建房间' : '等待开放端口';
       _role = '玩家';
     });
   }
@@ -437,20 +438,27 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
           child: ListView(
             children: [
               Text(
-                '开放本机端口',
+                _isDO ? '创建云端房间' : '开放本机端口',
                 style: Theme.of(
                   context,
                 ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
               ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _portController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: '端口号',
-                  border: OutlineInputBorder(),
+              if (_isDO)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8),
+                  child: Text('通过 Cloudflare 全球网络创建房间，无需开放端口'),
+                )
+              else ...[
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _portController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: '端口号',
+                    border: OutlineInputBorder(),
+                  ),
                 ),
-              ),
+              ],
               const SizedBox(height: 12),
               Row(
                 children: [
@@ -460,10 +468,12 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
                       icon: Icon(
                         _isHosting
                             ? Icons.stop_circle_outlined
-                            : Icons.wifi_tethering,
+                            : _isDO ? Icons.cloud : Icons.wifi_tethering,
                       ),
                       label: Text(
-                        _isHosting ? '关闭端口' : '开放端口',
+                        _isHosting
+                            ? (_isDO ? '关闭房间' : '关闭端口')
+                            : (_isDO ? '创建房间' : '开放端口'),
                         style: const TextStyle(fontSize: 16),
                       ),
                     ),
