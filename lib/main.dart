@@ -2,14 +2,47 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app.dart';
-// 【调试用】取消注释以启用单人快速入口
-// import 'presentation/pages/live_mode/live_mode_page.dart';
+import 'presentation/pages/live_mode/live_window_io.dart'
+    if (dart.library.html) 'presentation/pages/live_mode/live_window_stub.dart'
+    as live_window;
+import 'presentation/pages/live_mode/player_window.dart';
 
-void main() async {
+/// ── 主入口：区分 GM 主窗口与直播玩家窗口 ──
+void main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
   await SharedPreferences.getInstance();
-  runApp(const MyApp());
+
+  final windowArgs = await live_window.currentWindowArgs();
+
+  if (windowArgs.isNotEmpty) {
+    // 直播玩家窗口
+    runApp(_LivePlayerWindowApp(windowArgs: windowArgs));
+  } else {
+    // GM 主窗口
+    runApp(const MyApp());
+  }
 }
+
+/// 直播玩家窗口 App
+class _LivePlayerWindowApp extends StatelessWidget {
+  const _LivePlayerWindowApp({required this.windowArgs});
+  final String windowArgs;
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: '玩家视角 - 直播模式',
+      theme: ThemeData(
+        colorSchemeSeed: Colors.deepPurple,
+        useMaterial3: true,
+        brightness: Brightness.dark,
+      ),
+      home: LivePlayerWindow.fromRawJson(windowArgs),
+      debugShowCheckedModeBanner: false,
+    );
+  }
+}
+
 // 房间取消准备
 // 局内语音聊天功能
 // 内置基础规则书

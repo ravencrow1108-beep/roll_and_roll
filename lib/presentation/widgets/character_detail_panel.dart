@@ -10,11 +10,15 @@ class CharacterDetailPanel extends StatefulWidget {
   const CharacterDetailPanel({
     required this.character,
     this.showClose = true,
+    this.onAddEquipment,
+    this.onAddItem,
     super.key,
   });
 
   final CharacterData character;
   final bool showClose;
+  final void Function(String name)? onAddEquipment;
+  final void Function(String name)? onAddItem;
 
   @override
   State<CharacterDetailPanel> createState() => _CharacterDetailPanelState();
@@ -146,8 +150,8 @@ class _CharacterDetailPanelState extends State<CharacterDetailPanel> {
             child: IndexedStack(
               index: _tabIndex,
               children: [
-                _EquipmentTab(character: c),
-                _BackpackTab(character: c),
+                _EquipmentTab(character: c, onAdd: widget.onAddEquipment),
+                _BackpackTab(character: c, onAdd: widget.onAddItem),
                 _SkillsTab(character: c),
               ],
             ),
@@ -232,23 +236,42 @@ class _TabBarRow extends StatelessWidget {
 
 /// 装备 Tab
 class _EquipmentTab extends StatelessWidget {
-  const _EquipmentTab({required this.character});
+  const _EquipmentTab({required this.character, this.onAdd});
   final CharacterData character;
+  final void Function(String name)? onAdd;
 
   @override
   Widget build(BuildContext context) {
     final eq = character.equipment;
-    if (eq.isEmpty || eq.entries.every((e) => e.value == null)) {
-      return const Center(
-        child: Text('暂无装备', style: TextStyle(fontSize: 12, color: Colors.grey)),
-      );
-    }
-    return ListView(
-      padding: const EdgeInsets.all(8),
-      children: eq.entries
-          .where((e) => e.value != null)
-          .map((e) => _buildEqCard(e.key, e.value!, context))
-          .toList(),
+    final hasItems = eq.isNotEmpty && eq.entries.any((e) => e.value != null);
+    return Column(
+      children: [
+        if (onAdd != null)
+          Padding(
+            padding: const EdgeInsets.all(6),
+            child: SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => onAdd!(character.name),
+                icon: const Icon(Icons.add, size: 16),
+                label: const Text('添加装备', style: TextStyle(fontSize: 12)),
+              ),
+            ),
+          ),
+        Expanded(
+          child: hasItems
+              ? ListView(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  children: eq.entries
+                      .where((e) => e.value != null)
+                      .map((e) => _buildEqCard(e.key, e.value!, context))
+                      .toList(),
+                )
+              : const Center(
+                  child: Text('暂无装备', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                ),
+        ),
+      ],
     );
   }
 
@@ -326,20 +349,38 @@ class _EquipmentTab extends StatelessWidget {
 
 /// 物品（背包） Tab
 class _BackpackTab extends StatelessWidget {
-  const _BackpackTab({required this.character});
+  const _BackpackTab({required this.character, this.onAdd});
   final CharacterData character;
+  final void Function(String name)? onAdd;
 
   @override
   Widget build(BuildContext context) {
     final items = character.backpack;
-    if (items.isEmpty) {
-      return const Center(
-        child: Text('暂无物品', style: TextStyle(fontSize: 12, color: Colors.grey)),
-      );
-    }
-    return ListView(
-      padding: const EdgeInsets.all(8),
-      children: items.map((item) => _buildItemCard(item, context)).toList(),
+    return Column(
+      children: [
+        if (onAdd != null)
+          Padding(
+            padding: const EdgeInsets.all(6),
+            child: SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => onAdd!(character.name),
+                icon: const Icon(Icons.add, size: 16),
+                label: const Text('添加物品', style: TextStyle(fontSize: 12)),
+              ),
+            ),
+          ),
+        Expanded(
+          child: items.isEmpty
+              ? const Center(
+                  child: Text('暂无物品', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                )
+              : ListView(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  children: items.map((item) => _buildItemCard(item, context)).toList(),
+                ),
+        ),
+      ],
     );
   }
 
