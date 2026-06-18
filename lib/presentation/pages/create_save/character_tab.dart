@@ -774,41 +774,86 @@ class CharacterTab extends StatelessWidget {
   }
 
   void _showTemplatePicker(BuildContext context) {
+    final searchCtrl = TextEditingController();
     showModalBottomSheet(
       context: context,
-      builder: (ctx) => ListView(
-        children: [
-          const Padding(
-            padding: EdgeInsets.all(16),
-            child: Text(
-              '选择物品',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-          ),
-          for (int i = 0; i < itemTemplates.length; i++)
-            ListTile(
-              leading: const Icon(Icons.backpack_outlined),
-              title: Text(itemTemplates[i].name),
-              subtitle: Text(itemTemplates[i].type),
-              trailing: TextButton(
-                onPressed: () {
-                  onAddBackpackItem(itemTemplates[i]);
-                  Navigator.pop(ctx);
-                },
-                child: const Text('添加'),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) {
+          final query = searchCtrl.text.toLowerCase();
+          final filtered = itemTemplates
+              .where(
+                (t) =>
+                    t.name.toLowerCase().contains(query) ||
+                    t.type.toLowerCase().contains(query) ||
+                    t.effect.toLowerCase().contains(query),
+              )
+              .toList();
+          return Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                child: Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        '选择物品',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      icon: const Icon(Icons.close),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          if (itemTemplates.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(24),
-              child: Text(
-                '暂无物品模板，请先在规则页面添加',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: TextField(
+                  controller: searchCtrl,
+                  autofocus: true,
+                  decoration: const InputDecoration(
+                    hintText: '搜索物品名称/类型/效果…',
+                    prefixIcon: Icon(Icons.search, size: 20),
+                    isDense: true,
+                  ),
+                  onChanged: (_) => setSheetState(() {}),
+                ),
               ),
-            ),
-          const SizedBox(height: 80),
-        ],
+              const SizedBox(height: 8),
+              Expanded(
+                child: filtered.isEmpty
+                    ? const Center(
+                        child: Text(
+                          '无匹配物品模板',
+                          style: TextStyle(fontSize: 14, color: Colors.grey),
+                        ),
+                      )
+                    : ListView.builder(
+                        itemCount: filtered.length,
+                        itemBuilder: (_, i) {
+                          final t = filtered[i];
+                          return ListTile(
+                            leading: const Icon(Icons.backpack_outlined),
+                            title: Text(t.name),
+                            subtitle: Text(t.type),
+                            trailing: TextButton(
+                              onPressed: () {
+                                onAddBackpackItem(t);
+                                Navigator.pop(ctx);
+                              },
+                              child: const Text('添加'),
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -1061,46 +1106,100 @@ class _EquipmentGridTile extends StatelessWidget {
   }
 
   void _showPicker(BuildContext context) {
+    final searchCtrl = TextEditingController();
     showModalBottomSheet(
       context: context,
-      builder: (ctx) => ListView(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Text(
-              '选择 $slotName',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-          ),
-          for (final eq in _matching)
-            ListTile(
-              leading: eq.imageBase64.isNotEmpty
-                  ? ClipOval(
-                      child: Image.memory(
-                        base64Decode(eq.imageBase64),
-                        width: 32,
-                        height: 32,
-                        fit: BoxFit.cover,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) {
+          final query = searchCtrl.text.toLowerCase();
+          final filtered = _matching
+              .where(
+                (eq) =>
+                    eq.name.toLowerCase().contains(query) ||
+                    eq.type.toLowerCase().contains(query) ||
+                    eq.effect.toLowerCase().contains(query),
+              )
+              .toList();
+          return Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '选择 $slotName',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    )
-                  : const Icon(Icons.shield_outlined),
-              title: Text(eq.name),
-              subtitle: Text(
-                '${eq.type}  '
-                '${eq.ac > 0 ? '🛡AC${eq.ac}  ' : ''}'
-                '${eq.value > 0 ? '💰${eq.value}  ' : ''}'
-                '${eq.weight > 0 ? '⚖${eq.weight}' : ''}',
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      icon: const Icon(Icons.close),
+                    ),
+                  ],
+                ),
               ),
-              trailing: TextButton(
-                onPressed: () {
-                  onEquip(eq);
-                  Navigator.pop(ctx);
-                },
-                child: const Text('装备'),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: TextField(
+                  controller: searchCtrl,
+                  autofocus: true,
+                  decoration: const InputDecoration(
+                    hintText: '搜索装备名称/类型/效果…',
+                    prefixIcon: Icon(Icons.search, size: 20),
+                    isDense: true,
+                  ),
+                  onChanged: (_) => setSheetState(() {}),
+                ),
               ),
-            ),
-          const SizedBox(height: 80),
-        ],
+              const SizedBox(height: 8),
+              Expanded(
+                child: filtered.isEmpty
+                    ? const Center(
+                        child: Text(
+                          '无匹配装备模板',
+                          style: TextStyle(fontSize: 14, color: Colors.grey),
+                        ),
+                      )
+                    : ListView.builder(
+                        itemCount: filtered.length,
+                        itemBuilder: (_, i) {
+                          final eq = filtered[i];
+                          return ListTile(
+                            leading: eq.imageBase64.isNotEmpty
+                                ? ClipOval(
+                                    child: Image.memory(
+                                      base64Decode(eq.imageBase64),
+                                      width: 32,
+                                      height: 32,
+                                      fit: BoxFit.cover,
+                                    ),
+                                  )
+                                : const Icon(Icons.shield_outlined),
+                            title: Text(eq.name),
+                            subtitle: Text(
+                              '${eq.type}  '
+                              '${eq.ac > 0 ? '🛡AC${eq.ac}  ' : ''}'
+                              '${eq.value > 0 ? '💰${eq.value}  ' : ''}'
+                              '${eq.weight > 0 ? '⚖${eq.weight}' : ''}',
+                            ),
+                            trailing: TextButton(
+                              onPressed: () {
+                                onEquip(eq);
+                                Navigator.pop(ctx);
+                              },
+                              child: const Text('装备'),
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

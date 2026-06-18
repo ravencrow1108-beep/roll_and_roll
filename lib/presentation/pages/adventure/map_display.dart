@@ -3,16 +3,14 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
-import '../../../core/expressions/expression_engine.dart';
 import '../../../data/models/models.dart';
-import 'backpack_panel.dart';
 import 'coordinate_grid.dart';
 import 'token_widget.dart';
 
 /// 地图中心展示区域，含坐标系网格覆盖层。
 /// 坐标原点为地图图片的实际渲染区域左上角。
 class MapDisplay extends StatefulWidget {
-  const MapDisplay({
+  MapDisplay({
     required this.mapData,
     required this.positions,
     required this.enemies,
@@ -28,6 +26,7 @@ class MapDisplay extends StatefulWidget {
     this.onAddNote,
     this.onDeleteNote,
     this.onPlayerTap,
+    this.onRemovePlayer,
     super.key,
   });
 
@@ -57,6 +56,12 @@ class MapDisplay extends StatefulWidget {
   /// 单击玩家 token 时回调
   final void Function(String characterName)? onPlayerTap;
 
+  /// GM 右键将角色移出地图
+  final void Function(String characterName)? onRemovePlayer;
+
+  /// 地图图像区域 Key，供上场定位用
+  final GlobalKey imageAreaKey = GlobalKey();
+
   @override
   State<MapDisplay> createState() => _MapDisplayState();
 }
@@ -64,7 +69,6 @@ class MapDisplay extends StatefulWidget {
 class _MapDisplayState extends State<MapDisplay> {
   bool _showGrid = true;
   bool _showCoords = true;
-  bool _showBackpack = false;
   final bool _showMinorGrid = false;
 
   /// 地图图片的原始宽高（像素），异步解码后缓存。
@@ -156,35 +160,6 @@ class _MapDisplayState extends State<MapDisplay> {
     return (mag / 5).ceil() * 50;
   }
 
-  /// 根据规则中的负重表达式计算出负重上限
-  int _computeMaxWeight() {
-    final c = widget.character;
-    if (c == null) return 0;
-
-    final expr = widget.maxWeightExpression;
-    if (expr.isEmpty) {
-      // 默认：力量 × 15
-      return c.strength * 15;
-    }
-
-    final engine = const ExpressionEngine();
-    final stats = <String, int>{
-      '力量': c.strength,
-      '敏捷': c.dexterity,
-      '体质': c.constitution,
-      '智力': c.intelligence,
-      '感知': c.wisdom,
-      '魅力': c.charisma,
-      ...c.customStats,
-    };
-    try {
-      return engine.eval(expr, EvalContext(stats: stats));
-    } catch (_) {
-      // 表达式求值失败，回退到默认
-      return c.strength * 15;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -240,30 +215,8 @@ class _MapDisplayState extends State<MapDisplay> {
                     active: _showCoords,
                     onTap: () => setState(() => _showCoords = !_showCoords),
                   ),
-                  const SizedBox(width: 2),
-                  _GridToggle(
-                    icon: Icons.backpack_outlined,
-                    tooltip: _showBackpack ? '关闭背包' : '显示背包',
-                    active: _showBackpack,
-                    onTap: () => setState(() => _showBackpack = !_showBackpack),
-                  ),
                 ],
               ),
-              // ── 背包物品栏（限制最大高度，避免挤压地图） ──
-              if (_showBackpack && widget.backpackItems.isNotEmpty)
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxHeight: 80),
-                  child: SingleChildScrollView(
-                    child: Padding(
-                      padding: const EdgeInsets.only(bottom: 6),
-                      child: BackpackPanel(
-                        backpack: widget.backpackItems,
-                        slotMax: widget.backpackSlotMax,
-                        maxWeight: _computeMaxWeight(),
-                      ),
-                    ),
-                  ),
-                ),
               const SizedBox(height: 6),
               Expanded(
                 child: m.imageBase64.isNotEmpty && _imageNaturalSize != null
@@ -292,6 +245,7 @@ class _MapDisplayState extends State<MapDisplay> {
                                     fit: BoxFit.contain,
                                     alignment: Alignment.center,
                                     child: SizedBox(
+                                      key: widget.imageAreaKey,
                                       width: imgW,
                                       height: imgH,
                                       child: Stack(
@@ -601,12 +555,22 @@ class _MapDisplayState extends State<MapDisplay> {
             contentPadding: EdgeInsets.zero,
           ),
         ),
+        const PopupMenuItem(
+          value: 'remove',
+          child: ListTile(
+            leading: Icon(Icons.logout, color: Colors.red),
+            title: Text('下场', style: TextStyle(color: Colors.red)),
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
       ],
     ).then((value) {
       if (value == 'hp') {
         widget.onEditHp?.call(characterName);
       } else if (value == 'note') {
         widget.onAddNote?.call(characterName);
+      } else if (value == 'remove') {
+        widget.onRemovePlayer?.call(characterName);
       }
     });
   }

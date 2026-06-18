@@ -62,6 +62,9 @@ class _AdventurePageState extends State<AdventurePage> {
   // --- Left panel: selected player detail ---
   String? _selectedPlayerName;
 
+  // --- Deploy mode: right-click character → click map to place ---
+  CharacterData? _deployCharacter;
+
   // --- Voice ---
   final VoiceService _voice = VoiceService.instance;
 
@@ -501,6 +504,241 @@ class _AdventurePageState extends State<AdventurePage> {
     setState(() => _selectedPlayerName = name);
   }
 
+  void _onRemovePlayer(String name) {
+    final session = RoomSession.instance;
+    final list = List<PlayerPosition>.from(
+      session.playerPositionsNotifier.value,
+    );
+    list.removeWhere((p) => p.name == name);
+    session.playerPositionsNotifier.value = list;
+    session.broadcast({
+      'type': 'position_update',
+      'positions': list.map((p) => p.toJson()).toList(),
+    });
+    if (_selectedPlayerName == name) {
+      setState(() => _selectedPlayerName = null);
+    }
+    _addChat('系统', '$name 已下场');
+  }
+
+  void _onPlaceDeploy(CharacterData c, double x, double y) {
+    setState(() => _deployCharacter = null);
+    final session = RoomSession.instance;
+    final list = List<PlayerPosition>.from(
+      session.playerPositionsNotifier.value,
+    );
+
+    // 已在地图上则更新位置，否则添加
+    final idx = list.indexWhere((p) => p.name == c.name);
+    if (idx >= 0) {
+      list[idx] = PlayerPosition(name: c.name, x: x, y: y);
+    } else {
+      list.add(PlayerPosition(name: c.name, x: x, y: y));
+    }
+
+    session.playerPositionsNotifier.value = list;
+    session.broadcast({
+      'type': 'position_update',
+      'positions': list.map((p) => p.toJson()).toList(),
+    });
+    _addChat('系统', '${c.name} 已上场');
+  }
+
+  void _onAddEquipment(String characterName) {
+    final idx = _loadedCharacters.indexWhere((c) => c.name == characterName);
+    if (idx == -1) return;
+    final c = _loadedCharacters[idx];
+    final templates = _loadedRules.equipmentTemplates;
+    final searchCtrl = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          final query = searchCtrl.text.toLowerCase();
+          final filtered = templates
+              .where(
+                (t) =>
+                    t.name.toLowerCase().contains(query) ||
+                    t.slot.toLowerCase().contains(query) ||
+                    t.effect.toLowerCase().contains(query),
+              )
+              .toList();
+          return AlertDialog(
+            title: Text('添加装备 · $characterName'),
+            content: SizedBox(
+              width: 280,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: searchCtrl,
+                    autofocus: true,
+                    decoration: const InputDecoration(
+                      hintText: '搜索装备名称/位置/效果…',
+                      prefixIcon: Icon(Icons.search, size: 20),
+                      isDense: true,
+                    ),
+                    onChanged: (_) => setDialogState(() {}),
+                  ),
+                  const SizedBox(height: 8),
+                  Flexible(
+                    child: filtered.isEmpty
+                        ? const Text(
+                            '无匹配装备模板',
+                            style: TextStyle(fontSize: 13, color: Colors.grey),
+                          )
+                        : ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: filtered.length,
+                            itemBuilder: (_, i) {
+                              final t = filtered[i];
+                              return ListTile(
+                                dense: true,
+                                title: Text(
+                                  t.name,
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  '${t.slot}${t.ac > 0 ? ' · AC${t.ac}' : ''}${t.effect.isNotEmpty ? ' · ${t.effect}' : ''}',
+                                  style: const TextStyle(fontSize: 11),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                onTap: () {
+                                  final newEq =
+                                      Map<String, EquipmentData?>.from(
+                                        c.equipment,
+                                      );
+                                  newEq[t.slot] = t;
+                                  _loadedCharacters[idx] = c.copyWith(
+                                    equipment: newEq,
+                                  );
+                                  setState(() {});
+                                  _saveCharacterChanges();
+                                  Navigator.pop(ctx);
+                                  _addChat(
+                                    '系统',
+                                    '$characterName 装备了 ${t.name}',
+                                  );
+                                },
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('关闭'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  void _onAddItem(String characterName) {
+    final idx = _loadedCharacters.indexWhere((c) => c.name == characterName);
+    if (idx == -1) return;
+    final c = _loadedCharacters[idx];
+    final templates = _loadedRules.itemTemplates;
+    final searchCtrl = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          final query = searchCtrl.text.toLowerCase();
+          final filtered = templates
+              .where(
+                (t) =>
+                    t.name.toLowerCase().contains(query) ||
+                    t.type.toLowerCase().contains(query) ||
+                    t.effect.toLowerCase().contains(query),
+              )
+              .toList();
+          return AlertDialog(
+            title: Text('添加物品 · $characterName'),
+            content: SizedBox(
+              width: 280,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: searchCtrl,
+                    autofocus: true,
+                    decoration: const InputDecoration(
+                      hintText: '搜索物品名称/类型/效果…',
+                      prefixIcon: Icon(Icons.search, size: 20),
+                      isDense: true,
+                    ),
+                    onChanged: (_) => setDialogState(() {}),
+                  ),
+                  const SizedBox(height: 8),
+                  Flexible(
+                    child: filtered.isEmpty
+                        ? const Text(
+                            '无匹配物品模板',
+                            style: TextStyle(fontSize: 13, color: Colors.grey),
+                          )
+                        : ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: filtered.length,
+                            itemBuilder: (_, i) {
+                              final t = filtered[i];
+                              return ListTile(
+                                dense: true,
+                                title: Text(
+                                  t.name,
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  '${t.type}${t.effect.isNotEmpty ? ' · ${t.effect}' : ''}${t.value > 0 ? ' · 💎${t.value}' : ''}',
+                                  style: const TextStyle(fontSize: 11),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                onTap: () {
+                                  _loadedCharacters[idx] = c.copyWith(
+                                    backpack: [...c.backpack, t],
+                                  );
+                                  setState(() {});
+                                  _saveCharacterChanges();
+                                  Navigator.pop(ctx);
+                                  _addChat(
+                                    '系统',
+                                    '$characterName 获得了 ${t.name}',
+                                  );
+                                },
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('关闭'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
   Future<void> _saveProgress() async {
     if (_saveFilePath == null) return;
     final ok = await _confirmOverwrite();
@@ -724,33 +962,31 @@ class _AdventurePageState extends State<AdventurePage> {
     final positions = RoomSession.instance.playerPositionsNotifier.value;
     final theme = Theme.of(context);
 
-    // 默认选中自己的角色，主持无角色时选第一个
+    // 仅当地图 token 被点击选中时才显示详情面板
     final selectedChar = _loadedCharacters.cast<CharacterData?>().firstWhere(
       (c) => c?.name == _selectedPlayerName,
-      orElse: () =>
-          _character ??
-          (_loadedCharacters.isNotEmpty ? _loadedCharacters.first : null),
+      orElse: () => null,
     );
 
-    final mainContent = SafeArea(
-      child: MapDisplay(
-        mapData: m,
-        positions: positions,
-        enemies: m.enemies,
-        isGM: _isGM,
-        playerName: widget.playerName,
-        character: _character,
-        characters: _loadedCharacters,
-        backpackItems: _character?.backpack ?? const [],
-        backpackSlotMax: _loadedRules.backpackSlotMax,
-        maxWeightExpression: _loadedRules.maxWeightExpression,
-        onPositionChanged: _isGM ? _onPlayerPositionChanged : null,
-        onEditHp: _isGM ? _onEditCharacterHp : null,
-        onAddNote: _isGM ? _onAddCharacterNote : null,
-        onDeleteNote: _isGM ? _onDeleteCharacterNote : null,
-        onPlayerTap: _isGM ? _onPlayerTapped : null,
-      ),
+    final mapDisplay = MapDisplay(
+      mapData: m,
+      positions: positions,
+      enemies: m.enemies,
+      isGM: _isGM,
+      playerName: widget.playerName,
+      character: _character,
+      characters: _loadedCharacters,
+      backpackItems: _character?.backpack ?? const [],
+      backpackSlotMax: _loadedRules.backpackSlotMax,
+      maxWeightExpression: _loadedRules.maxWeightExpression,
+      onPositionChanged: _isGM ? _onPlayerPositionChanged : null,
+      onEditHp: _isGM ? _onEditCharacterHp : null,
+      onAddNote: _isGM ? _onAddCharacterNote : null,
+      onDeleteNote: _isGM ? _onDeleteCharacterNote : null,
+      onPlayerTap: _isGM ? _onPlayerTapped : null,
+      onRemovePlayer: _isGM ? _onRemovePlayer : null,
     );
+    final mainContent = SafeArea(child: mapDisplay);
 
     return Scaffold(
       appBar: AppBar(
@@ -933,16 +1169,32 @@ class _AdventurePageState extends State<AdventurePage> {
           Positioned.fill(
             child: Row(
               children: [
-                // ── 左侧角色详情面板 ──
-                _PlayerDetailPanel(
-                  character: selectedChar,
-                  onClose: () => setState(() => _selectedPlayerName = null),
+                // ── 左侧面板 ──
+                _AdventureLeftPanel(
+                  selectedCharacter: selectedChar,
+                  loadedCharacters: _loadedCharacters,
                   playerNames: _loadedCharacters.map((c) => c.name).toList(),
+                  isGM: _isGM,
                   onSelectPlayer: (name) =>
                       setState(() => _selectedPlayerName = name),
+                  onCloseDetail: () =>
+                      setState(() => _selectedPlayerName = null),
+                  onDeployCharacter: _isGM
+                      ? (c) => setState(() => _deployCharacter = c)
+                      : null,
+                  onAddEquipment: _isGM ? _onAddEquipment : null,
+                  onAddItem: _isGM ? _onAddItem : null,
                 ),
                 // ── 地图 ──
-                Expanded(child: mainContent),
+                Expanded(
+                  child: _DeployOverlay(
+                    deployCharacter: _deployCharacter,
+                    imageAreaKey: mapDisplay.imageAreaKey,
+                    onPlace: _onPlaceDeploy,
+                    onCancel: () => setState(() => _deployCharacter = null),
+                    child: mainContent,
+                  ),
+                ),
               ],
             ),
           ),
@@ -1169,6 +1421,316 @@ class _MicVolumeIcon extends StatelessWidget {
   }
 }
 
+/// 冒险中左侧面板：角色网格 / 角色背包 / 角色详情
+class _AdventureLeftPanel extends StatelessWidget {
+  const _AdventureLeftPanel({
+    required this.selectedCharacter,
+    required this.loadedCharacters,
+    required this.playerNames,
+    required this.isGM,
+    required this.onSelectPlayer,
+    required this.onCloseDetail,
+    this.onDeployCharacter,
+    this.onAddEquipment,
+    this.onAddItem,
+  });
+
+  final CharacterData? selectedCharacter;
+  final List<CharacterData> loadedCharacters;
+  final List<String> playerNames;
+  final bool isGM;
+  final ValueChanged<String> onSelectPlayer;
+  final VoidCallback onCloseDetail;
+  final void Function(CharacterData c)? onDeployCharacter;
+  final void Function(String name)? onAddEquipment;
+  final void Function(String name)? onAddItem;
+
+  @override
+  Widget build(BuildContext context) {
+    // 选中角色 → 显示详情面板
+    if (selectedCharacter != null) {
+      return _PlayerDetailPanel(
+        character: selectedCharacter,
+        onClose: onCloseDetail,
+        playerNames: playerNames,
+        onSelectPlayer: onSelectPlayer,
+        isGM: isGM,
+        onAddEquipment: onAddEquipment,
+        onAddItem: onAddItem,
+      );
+    }
+
+    // 默认显示角色网格
+    return _CharacterGridPanel(
+      characters: loadedCharacters,
+      isGM: isGM,
+      onTapCharacter: (c) => onSelectPlayer(c.name),
+      onDeployCharacter: onDeployCharacter,
+    );
+  }
+}
+
+/// 角色网格面板
+class _CharacterGridPanel extends StatelessWidget {
+  const _CharacterGridPanel({
+    required this.characters,
+    required this.isGM,
+    required this.onTapCharacter,
+    this.onDeployCharacter,
+  });
+
+  final List<CharacterData> characters;
+  final bool isGM;
+  final void Function(CharacterData c) onTapCharacter;
+  final void Function(CharacterData c)? onDeployCharacter;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      width: 220,
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        border: Border(
+          right: BorderSide(
+            color: theme.dividerColor.withValues(alpha: 0.3),
+            width: 1,
+          ),
+        ),
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.fromLTRB(10, 10, 10, 6),
+            child: Row(
+              children: [
+                const Icon(Icons.people_outline, size: 18),
+                const SizedBox(width: 6),
+                Text(
+                  '角色列表',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const Spacer(),
+                if (isGM)
+                  Text(
+                    '右键头像上场',
+                    style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
+                  ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: characters.isEmpty
+                ? const Center(
+                    child: Text(
+                      '暂无角色',
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                  )
+                : GridView.builder(
+                    padding: const EdgeInsets.all(8),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          mainAxisSpacing: 6,
+                          crossAxisSpacing: 6,
+                          childAspectRatio: 0.85,
+                        ),
+                    itemCount: characters.length,
+                    itemBuilder: (_, i) {
+                      final c = characters[i];
+                      final card = Card(
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(10),
+                          onTap: () => onTapCharacter(c),
+                          onSecondaryTapDown: isGM && onDeployCharacter != null
+                              ? (details) => _showDeployMenu(
+                                  context,
+                                  c,
+                                  onDeployCharacter!,
+                                  details.globalPosition,
+                                )
+                              : null,
+                          child: Padding(
+                            padding: const EdgeInsets.all(6),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                CircleAvatar(
+                                  radius: 22,
+                                  backgroundImage: c.portraitBase64.isNotEmpty
+                                      ? MemoryImage(
+                                          base64Decode(c.portraitBase64),
+                                        )
+                                      : null,
+                                  backgroundColor: theme.colorScheme.primary
+                                      .withValues(alpha: 0.1),
+                                  child: c.portraitBase64.isEmpty
+                                      ? Text(
+                                          c.name.isNotEmpty
+                                              ? c.name[0].toUpperCase()
+                                              : '?',
+                                          style: TextStyle(
+                                            color: theme.colorScheme.primary,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16,
+                                          ),
+                                        )
+                                      : null,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  c.name,
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+
+                      return card;
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static void _showDeployMenu(
+    BuildContext context,
+    CharacterData c,
+    void Function(CharacterData) onDeploy,
+    Offset globalPosition,
+  ) {
+    final overlay =
+        Overlay.of(context, rootOverlay: true).context.findRenderObject()
+            as RenderBox?;
+    if (overlay == null) return;
+
+    showMenu<String>(
+      context: context,
+      position: RelativeRect.fromRect(
+        Rect.fromLTWH(globalPosition.dx, globalPosition.dy, 1, 1),
+        Offset.zero & overlay.size,
+      ),
+      items: [
+        const PopupMenuItem(
+          value: 'deploy',
+          child: ListTile(
+            leading: Icon(Icons.add_location, color: Colors.green),
+            title: Text('上场'),
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
+      ],
+    ).then((value) {
+      if (value == 'deploy') onDeploy(c);
+    });
+  }
+}
+
+/// 部署模式覆盖层：当右键角色选择"上场"后，点击地图放置角色
+class _DeployOverlay extends StatelessWidget {
+  const _DeployOverlay({
+    required this.deployCharacter,
+    required this.imageAreaKey,
+    required this.onPlace,
+    required this.onCancel,
+    required this.child,
+  });
+
+  final CharacterData? deployCharacter;
+  final GlobalKey imageAreaKey;
+  final void Function(CharacterData c, double x, double y) onPlace;
+  final VoidCallback onCancel;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (deployCharacter == null) return child;
+
+    return Stack(
+      children: [
+        child,
+        Positioned.fill(
+          child: GestureDetector(
+            onTapUp: (details) {
+              // 将全局坐标转为图像区域本地坐标
+              final imgBox =
+                  imageAreaKey.currentContext?.findRenderObject() as RenderBox?;
+              if (imgBox == null || !imgBox.hasSize) return;
+
+              final localPos = imgBox.globalToLocal(details.globalPosition);
+              final dx = (localPos.dx / imgBox.size.width).clamp(0.0, 1.0);
+              final dy = (localPos.dy / imgBox.size.height).clamp(0.0, 1.0);
+              onPlace(deployCharacter!, dx, dy);
+            },
+            child: Container(
+              color: Colors.blue.withValues(alpha: 0.1),
+              child: Column(
+                children: [
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade700,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.touch_app,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '点击地图放置 ${deployCharacter!.name}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        GestureDetector(
+                          onTap: onCancel,
+                          child: const Icon(
+                            Icons.close,
+                            color: Colors.white70,
+                            size: 20,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 /// 左侧角色详情面板 — 装备、物品、技能（法术表）
 class _PlayerDetailPanel extends StatefulWidget {
   const _PlayerDetailPanel({
@@ -1176,12 +1738,18 @@ class _PlayerDetailPanel extends StatefulWidget {
     required this.onClose,
     required this.playerNames,
     required this.onSelectPlayer,
+    this.isGM = false,
+    this.onAddEquipment,
+    this.onAddItem,
   });
 
   final CharacterData? character;
   final VoidCallback onClose;
   final List<String> playerNames;
   final ValueChanged<String> onSelectPlayer;
+  final bool isGM;
+  final void Function(String name)? onAddEquipment;
+  final void Function(String name)? onAddItem;
 
   @override
   State<_PlayerDetailPanel> createState() => _PlayerDetailPanelState();
@@ -1234,8 +1802,16 @@ class _PlayerDetailPanelState extends State<_PlayerDetailPanel> {
                   child: IndexedStack(
                     index: _tabIndex,
                     children: [
-                      _EquipmentTab(character: c),
-                      _BackpackTab(character: c),
+                      _EquipmentTab(
+                        character: c,
+                        isGM: widget.isGM,
+                        onAdd: widget.onAddEquipment,
+                      ),
+                      _BackpackTab(
+                        character: c,
+                        isGM: widget.isGM,
+                        onAdd: widget.onAddItem,
+                      ),
                       _SkillsTab(character: c),
                     ],
                   ),
@@ -1460,23 +2036,42 @@ class _TabBarRow extends StatelessWidget {
 
 /// 装备 Tab
 class _EquipmentTab extends StatelessWidget {
-  const _EquipmentTab({required this.character});
+  const _EquipmentTab({required this.character, this.isGM = false, this.onAdd});
   final CharacterData character;
+  final bool isGM;
+  final void Function(String name)? onAdd;
 
   @override
   Widget build(BuildContext context) {
     final eq = character.equipment;
-    if (eq.isEmpty) {
-      return const Center(
-        child: Text('暂无装备', style: TextStyle(fontSize: 12, color: Colors.grey)),
-      );
-    }
-    return ListView(
-      padding: const EdgeInsets.all(8),
-      children: eq.entries
-          .where((e) => e.value != null)
-          .map((e) => _buildEqCard(e.key, e.value!, context))
-          .toList(),
+    return Stack(
+      children: [
+        if (eq.isEmpty)
+          const Center(
+            child: Text(
+              '暂无装备',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          )
+        else
+          ListView(
+            padding: const EdgeInsets.all(8),
+            children: eq.entries
+                .where((e) => e.value != null)
+                .map((e) => _buildEqCard(e.key, e.value!, context))
+                .toList(),
+          ),
+        if (isGM && onAdd != null)
+          Positioned(
+            right: 8,
+            bottom: 8,
+            child: FloatingActionButton.small(
+              heroTag: 'add_eq_${character.name}',
+              onPressed: () => onAdd!(character.name),
+              child: const Icon(Icons.add),
+            ),
+          ),
+      ],
     );
   }
 
@@ -1554,24 +2149,45 @@ class _EquipmentTab extends StatelessWidget {
 
 /// 物品（背包） Tab
 class _BackpackTab extends StatelessWidget {
-  const _BackpackTab({required this.character});
+  const _BackpackTab({required this.character, this.isGM = false, this.onAdd});
   final CharacterData character;
+  final bool isGM;
+  final void Function(String name)? onAdd;
 
   @override
   Widget build(BuildContext context) {
     final items = character.backpack;
-    if (items.isEmpty) {
-      return const Center(
-        child: Text('暂无物品', style: TextStyle(fontSize: 12, color: Colors.grey)),
-      );
-    }
-    return ListView(
-      padding: const EdgeInsets.all(8),
-      children: items.map((item) => _buildItemCard(item)).toList(),
+    return Stack(
+      children: [
+        if (items.isEmpty)
+          const Center(
+            child: Text(
+              '暂无物品',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          )
+        else
+          ListView(
+            padding: const EdgeInsets.all(8),
+            children: items
+                .map((item) => buildItemCard(item, context))
+                .toList(),
+          ),
+        if (isGM && onAdd != null)
+          Positioned(
+            right: 8,
+            bottom: 8,
+            child: FloatingActionButton.small(
+              heroTag: 'add_bp_${character.name}',
+              onPressed: () => onAdd!(character.name),
+              child: const Icon(Icons.add),
+            ),
+          ),
+      ],
     );
   }
 
-  Widget _buildItemCard(ItemData item) {
+  static Widget buildItemCard(ItemData item, BuildContext context) {
     return Card(
       margin: const EdgeInsets.only(bottom: 4),
       child: Padding(
