@@ -10,7 +10,7 @@ void main() async {
   await SharedPreferences.getInstance();
   runApp(const MyApp());
 }
-
+// 房间取消准备
 // 局内语音聊天功能
 // 内置基础规则书
 // TODO:局内添加角色

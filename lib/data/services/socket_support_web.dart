@@ -13,7 +13,7 @@ bool get isWebPlatform => true;
 // ──────────────────────────────────────────────
 
 class WebRoomServerHandle implements RoomServerHandle {
-  final StreamController<String> _sc = StreamController<String>();
+  final StreamController<String> _sc = StreamController<String>.broadcast();
 
   @override
   bool get isActive => false;

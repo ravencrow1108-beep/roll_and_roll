@@ -270,7 +270,7 @@ void _handleWebSocket(
 // ──────────────────────────────────────────────
 
 class IoRoomClientHandle implements RoomClientHandle {
-  IoRoomClientHandle(this._ws) : _sc = StreamController<String>();
+  IoRoomClientHandle(this._ws) : _sc = StreamController<String>.broadcast();
 
   final WebSocket _ws;
   final StreamController<String> _sc;
