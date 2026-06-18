@@ -6,6 +6,7 @@ import 'socket_support_io.dart'
 
 import 'transport/websocket/websocket_game.dart';
 import 'transport/legacy/socket_support_adapter.dart';
+import 'room_connection.dart';
 
 // ═══════════════════════════════════════════════════════════════
 // 旧接口：保留以兼容所有现有 UI 代码。
@@ -46,6 +47,20 @@ class PlatformSocketSupport {
   /// Alias for [canHost].
   static bool get isSupported => canHost;
 
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // Phase 2 模式切换
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  /// Phase 2: 使用 Cloudflare DO + WebRTC DataChannel。
+  /// 设为 false 回退到旧 WebSocket 实现。
+  static bool useDO = true;
+
+  /// Cloudflare Worker 地址。
+  static String workerUrl = 'https://signal.roll-and-roll.com';
+
+  /// 最近一次 [startServer] 创建的房间 ID（测试/调试用）。
+  static String? lastRoomId;
+
   static Future<RoomServerHandle> startServer(
     int port, {
     required void Function(String remoteAddress, String name, String role)
@@ -53,7 +68,19 @@ class PlatformSocketSupport {
     String hostName = '',
     String hostRole = '玩家',
   }) async {
-    // Phase 0: 使用 platform socket 实现建立原始句柄
+    // ── Phase 2: DO + WebRTC ──
+    if (useDO) {
+      final handle = await RoomConnection.createRoom(
+        workerUrl: workerUrl,
+        hostName: hostName,
+        hostRole: hostRole,
+        onClient: (playerId, name) => onClient(playerId, name, '玩家'),
+      );
+      lastRoomId = RoomConnection.lastRoomId;
+      return handle;
+    }
+
+    // ── Phase 0: WebSocket (fallback) ──
     final rawServer = await socket_impl.startServer(
       port,
       onClient: onClient,
@@ -61,11 +88,8 @@ class PlatformSocketSupport {
       hostRole: hostRole,
     );
 
-    // 包装到 transport/ 层
     final transport = WebSocketHostGameTransport(rawServer);
     await transport.connect();
-
-    // 适配为旧接口返回
     return ServerHandleAdapter(transport);
   }
 
@@ -75,7 +99,18 @@ class PlatformSocketSupport {
     required String playerName,
     String role = '玩家',
   }) async {
-    // Phase 0: 使用 platform socket 实现建立原始句柄
+    // ── Phase 2: DO + WebRTC ──
+    // host 字段复用为 roomId（6位大写字母）
+    if (useDO) {
+      return RoomConnection.joinRoom(
+        workerUrl: workerUrl,
+        roomId: host, // IP 字段填入房间号
+        playerName: playerName,
+        role: role,
+      );
+    }
+
+    // ── Phase 0: WebSocket (fallback) ──
     final rawClient = await socket_impl.connectToRoom(
       host,
       port,
@@ -83,11 +118,8 @@ class PlatformSocketSupport {
       role: role,
     );
 
-    // 包装到 transport/ 层
     final transport = WebSocketClientGameTransport(rawClient);
     await transport.connect();
-
-    // 适配为旧接口返回
     return ClientHandleAdapter(transport);
   }
 
