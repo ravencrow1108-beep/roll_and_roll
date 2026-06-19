@@ -249,6 +249,17 @@ class _AdventurePageState extends State<AdventurePage> {
               if (mounted) setState(() {});
             }
             break;
+          case 'return_to_selection':
+            // 主持点击"返回房间"：玩家回到角色选择页
+            if (mounted) {
+              setState(() {
+                _adventureStarted = false;
+                _displayedMap = null;
+                _isReady = false;
+                _character = null;
+              });
+            }
+            break;
           case 'return_to_room':
           case 'host_disconnected':
             if (mounted) Navigator.of(context).pop();
@@ -1203,8 +1214,8 @@ class _AdventurePageState extends State<AdventurePage> {
             onPressed: _saveAsProgress,
           ),
           TextButton.icon(
-            onPressed: _onBackPressed,
-            icon: const Icon(Icons.exit_to_app),
+            onPressed: _returnToRoom,
+            icon: const Icon(Icons.arrow_back),
             label: const Text('返回房间'),
           ),
         ],
@@ -1273,6 +1284,23 @@ class _AdventurePageState extends State<AdventurePage> {
         ),
       ),
     );
+  }
+
+  /// "返回房间"按钮：回到选图/选角页面，不退出冒险
+  void _returnToRoom() {
+    // 通知所有玩家返回选角页
+    RoomSession.instance.broadcast({'type': 'return_to_selection'});
+    RoomSession.instance.startAdventureNotifier.value = false;
+    RoomSession.instance.mapNotifier.value = null;
+    RoomSession.instance.playerPositionsNotifier.value = [];
+    RoomSession.instance.readyMembersNotifier.value = {};
+    setState(() {
+      _adventureStarted = false;
+      _displayedMap = null;
+      _selectedMap = null;
+      _selectedPlayerName = null;
+      _isReady = false;
+    });
   }
 
   /// 处理返回按钮 / 返回房间：主持弹出确认弹窗，玩家直接返回
