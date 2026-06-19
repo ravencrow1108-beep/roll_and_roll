@@ -411,7 +411,7 @@ class _AdventurePageState extends State<AdventurePage> {
           characters: _loadedCharacters,
           saveFileName: _saveFilePath != null ? _saveFileName : null,
           onBack: () => Navigator.of(context).pop(),
-          onStart: _forceStartAdventure,
+          onStart: () => _forceStartAdventure(m),
         ),
       ),
     );
@@ -439,7 +439,7 @@ class _AdventurePageState extends State<AdventurePage> {
     if (_isGM) {
       if (_selectedMap == null) return;
       // GM 点击开始冒险 → 立即开始，不等待玩家准备
-      _forceStartAdventure();
+      _forceStartAdventure(_selectedMap!);
     } else {
       if (_character == null) return;
       setState(() => _isReady = true);
@@ -448,20 +448,19 @@ class _AdventurePageState extends State<AdventurePage> {
   }
 
   /// GM 强制开始冒险（无视玩家准备状态），保留现有角色位置
-  void _forceStartAdventure() {
-    if (_selectedMap == null) return;
+  void _forceStartAdventure(MapData map) {
     final s = RoomSession.instance;
     final positions = s.playerPositionsNotifier.value;
-    s.mapNotifier.value = _selectedMap;
+    s.mapNotifier.value = map;
     s.broadcast({
       'type': 'adventure_started',
-      'map': _selectedMap!.toJson(),
+      'map': map.toJson(),
       'positions': positions.map((p) => p.toJson()).toList(),
     });
     if (mounted) {
       setState(() {
         _adventureStarted = true;
-        _displayedMap = _selectedMap;
+        _displayedMap = map;
       });
     }
   }
