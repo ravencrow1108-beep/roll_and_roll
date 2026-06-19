@@ -67,6 +67,9 @@ class RoomConnection {
       iceConfig: IceConfig.defaultConfig,
     );
 
+    // Phase 2: name → playerId 映射（用于踢人/定向发送）
+    final nameToPlayerId = <String, String>{};
+
     // 4. 信令 ↔ WebRTC 桥接
     gameTransport.onLocalSignal = (playerId, signal) {
       // Host → DO → Player
@@ -96,6 +99,7 @@ class RoomConnection {
         case 'player_joined':
           final playerId = sig.payload['playerId'] as String? ?? '';
           final name = sig.payload['name'] as String? ?? playerId;
+          nameToPlayerId[name] = playerId;
           debugPrint('[RoomConnection] Player joined: $name ($playerId)');
           onClient(playerId, name);
 
@@ -126,6 +130,8 @@ class RoomConnection {
 
         case 'player_left':
           final pid = sig.payload['playerId'] as String? ?? '';
+          final pname = sig.payload['name'] as String? ?? '';
+          nameToPlayerId.remove(pname);
           gameTransport.kickPlayer(pid);
           break;
       }
@@ -133,8 +139,9 @@ class RoomConnection {
 
     await gameTransport.connect();
 
-    // 5. 适配为旧接口
-    final adapter = ServerHandleAdapter(gameTransport);
+    // 5. 适配为旧接口（带 name→playerId 映射）
+    final adapter = ServerHandleAdapter(gameTransport,
+        nameToPlayerId: nameToPlayerId);
     return adapter;
   }
 

@@ -17,7 +17,7 @@ import '../protocol/room_message.dart';
 /// UI（CreateRoomPage, AdventurePage 等）通过 [RoomSession] 使用
 /// [RoomServerHandle] 接口，不感知底层是 WebSocket 还是 WebRTC。
 class ServerHandleAdapter implements RoomServerHandle {
-  ServerHandleAdapter(this._transport) {
+  ServerHandleAdapter(this._transport, {this.nameToPlayerId}) {
     _sub = _transport.messages.listen((msg) {
       _messageController.add(msg.toLegacyString());
     });
@@ -25,6 +25,9 @@ class ServerHandleAdapter implements RoomServerHandle {
 
   final HostGameTransport _transport;
   late final StreamSubscription<RoomMessage> _sub;
+
+  /// Phase 2: name → playerId 映射（DO 模式下玩家 ID 与显示名不同）
+  final Map<String, String>? nameToPlayerId;
 
   final StreamController<String> _messageController =
       StreamController<String>.broadcast();
@@ -44,18 +47,18 @@ class ServerHandleAdapter implements RoomServerHandle {
   @override
   void updateHostRole(String role) {
     // Phase 0: Host role 由上层 RoomSession 管理
-    // Phase 1+: 可通过信令通道同步到 DO
   }
 
   @override
   void updateHostSaveName(String name) {
     // Phase 0: 存档名通过 broadcast host_save_changed 同步
-    // Phase 1+: 可通过信令通道同步到 DO
   }
 
   @override
   void kickClient(String name) {
-    _transport.kickPlayer(name);
+    // Phase 2: name 映射到 playerId，否则直接用 name（WebSocket 模式）
+    final targetId = nameToPlayerId?[name] ?? name;
+    _transport.kickPlayer(targetId);
   }
 
   @override

@@ -84,16 +84,17 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
     final ip = _ipController.text.trim();
     final portText = _portController.text.trim();
 
-    if (ip.isEmpty || portText.isEmpty) {
-      setState(() => _status = '请输入 IP 和端口');
+    if (ip.isEmpty) {
+      setState(() => _status = _isDO ? '请输入房间号' : '请输入 IP');
       return;
     }
 
-    final port = int.tryParse(portText);
-    if (port == null || port < 1 || port > 65535) {
-      setState(() => _status = '端口号必须是 1~65535 之间的整数');
+    if (!_isDO && (portText.isEmpty || int.tryParse(portText) == null)) {
+      setState(() => _status = '请输入有效端口号');
       return;
     }
+
+    final port = _isDO ? 0 : int.parse(portText);
 
     setState(() {
       _isJoining = true;
@@ -352,11 +353,16 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
           child: ListView(
             children: [
               Text(
-                _isDO ? '输入房间号加入' : '通过 IP 和端口加入房间',
+                _isDO ? '输入房间号' : '通过 IP 和端口加入房间',
                 style: Theme.of(
                   context,
                 ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
               ),
+              if (_isDO)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 4),
+                  child: Text('让房主把房间号发给你'),
+                ),
               const SizedBox(height: 12),
               TextField(
                 controller: _ipController,
@@ -366,15 +372,17 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
                   border: const OutlineInputBorder(),
                 ),
               ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _portController,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: _isDO ? '端口（任意）' : '房间端口',
-                  border: const OutlineInputBorder(),
+              if (!_isDO) ...[
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _portController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: '房间端口',
+                    border: OutlineInputBorder(),
+                  ),
                 ),
-              ),
+              ],
               const SizedBox(height: 24),
               Text(
                 '选择身份',
