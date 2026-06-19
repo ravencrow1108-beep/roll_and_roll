@@ -31,8 +31,11 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
 
   // ── 已连接状态 ──
   bool _isConnected = false;
+  bool _isReconnecting = false;
+  Timer? _reconnectTimer;
   String _connectedIp = '';
   int _connectedPort = 0;
+  String _lastRoomId = '';
   RoomClientHandle? _clientHandle;
   StreamSubscription<String>? _msgSub;
   String _hostSaveName = '';
@@ -111,9 +114,12 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
 
       if (!mounted) return;
 
+      // Phase 2.5: 保存房间号用于断线重连
+      _lastRoomId = ip;
+
       RoomSession.instance.joinRoom(
         _playerName,
-        roomAddress: '$ip:$port',
+        roomAddress: ip,
         role: _role,
       );
       RoomSession.instance.setClientHandle(clientHandle);
@@ -149,6 +155,9 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
   }
 
   void _leaveRoom() {
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+    _isReconnecting = false;
     _msgSub?.cancel();
     _msgSub = null;
     _clientHandle = null;
@@ -158,6 +167,54 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
       _connectedIp = '';
       _connectedPort = 0;
     });
+  }
+
+  /// Phase 2.5: 启动断线检测，自动重连
+  void _startReconnectMonitor() {
+    _reconnectTimer?.cancel();
+    _reconnectTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+      if (!mounted) return;
+      final handle = _clientHandle;
+      if (handle != null && !handle.isConnected && !_isReconnecting) {
+        _tryReconnect();
+      }
+    });
+  }
+
+  Future<void> _tryReconnect() async {
+    if (_isReconnecting || _lastRoomId.isEmpty) return;
+    setState(() { _isReconnecting = true; _status = '重连中...'; });
+
+    try {
+      // 关闭旧连接
+      _msgSub?.cancel();
+      _clientHandle?.close();
+      _clientHandle = null;
+
+      // 重新加入（DO 现在允许同名重连）
+      final newHandle = await PlatformSocketSupport.connectToRoom(
+        _lastRoomId, 0,
+        playerName: _playerName,
+        role: _role,
+      );
+
+      if (!mounted) return;
+
+      _msgSub = newHandle.messages.listen(_handleMessage);
+      _clientHandle = newHandle;
+      RoomSession.instance.setClientHandle(newHandle);
+
+      // 请求最新成员列表
+      Future.delayed(const Duration(milliseconds: 500), () {
+        _clientHandle?.send(socketEncode({'type': 'request_members'}));
+      });
+
+      setState(() { _isReconnecting = false; _status = '已重连'; });
+    } catch (e) {
+      if (mounted) {
+        setState(() { _isReconnecting = false; _status = '重连失败: $e'; });
+      }
+    }
   }
 
   void _markReady() {
@@ -234,6 +291,8 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
               _connectedPort = int.tryParse(_portController.text.trim()) ?? 0;
               _status = '已成功加入房间';
             });
+            // Phase 2.5: 启动断线自动重连
+            _startReconnectMonitor();
           }
           if (mounted) setState(() {});
           break;
@@ -327,6 +386,7 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
 
   @override
   void dispose() {
+    _reconnectTimer?.cancel();
     _msgSub?.cancel();
     RoomSession.instance.membersNotifier.removeListener(_handleMembersChanged);
     RoomSession.instance.memberRolesNotifier.removeListener(
@@ -474,7 +534,15 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
             children: [
               const Icon(Icons.check_circle_outline, size: 64),
               const SizedBox(height: 12),
-              Text('已连接到房间', style: Theme.of(context).textTheme.titleLarge),
+              Text(
+                _isReconnecting ? '重连中...' : '已连接到房间',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              if (_isReconnecting)
+                const Padding(
+                  padding: EdgeInsets.only(top: 4),
+                  child: LinearProgressIndicator(),
+                ),
               const SizedBox(height: 8),
               if (_isDO)
                 Text('房间号: $_connectedIp')

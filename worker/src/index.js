@@ -155,12 +155,17 @@ export class RoomDO {
         this._removeSession(ws);
         return;
       }
-      for (const [, s] of this.sessions) {
+      // 检查重名：同名的旧连接视为重连，踢掉旧 session
+      for (const [oldWs, s] of this.sessions) {
         if (s.role === 'player' && s.name === name) {
-          this._send(ws, { type: 'error', message: 'Name taken', code: 'name_taken' });
-          this._removeSession(ws);
-          return;
-          return;
+          console.log(`[Room ${this.roomId}] Reconnect: ${name} (kicking old session ${s.playerId})`);
+          this._sendToHost({
+            type: 'player_left',
+            playerId: s.playerId,
+            name: s.name,
+          });
+          this._removeSession(oldWs);
+          break;
         }
       }
       session.role = 'player';
