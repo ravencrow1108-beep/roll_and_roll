@@ -46,9 +46,9 @@ class _MapEditPageState extends State<MapEditPage> {
   }
 
   /// 直接从存档读取角色位置并开始冒险
-  Future<void> _startAdventureDirectly() async {
+  Future<void> _startAdventureDirectly(MapData map) async {
     final session = RoomSession.instance;
-    session.mapNotifier.value = _selectedMap;
+    session.mapNotifier.value = map;
     session.startAdventureNotifier.value = true;
 
     // 从存档加载玩家位置
@@ -63,7 +63,7 @@ class _MapEditPageState extends State<MapEditPage> {
 
     session.broadcast({
       'type': 'adventure_started',
-      'map': _selectedMap!.toJson(),
+      'map': map.toJson(),
       'positions': positions.map((p) => p.toJson()).toList(),
     });
 
@@ -138,7 +138,7 @@ class _MapEditPageState extends State<MapEditPage> {
           characters: _loadedCharacters,
           saveFileName: _saveFilePath != null ? _saveFileName : null,
           onBack: () => Navigator.of(context).pop(),
-          onStart: _markReady,
+          onStart: () => _markReady(m),
         ),
       ),
     );
@@ -203,9 +203,7 @@ class _MapEditPageState extends State<MapEditPage> {
     }
   }
 
-  void _markReady() {
-    _startAdventureDirectly();
-  }
+  void _markReady(MapData map) => _startAdventureDirectly(map);
 
   @override
   void dispose() {
