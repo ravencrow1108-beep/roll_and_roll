@@ -177,12 +177,8 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
             return;
           }
           RoomSession.instance.addMember(name, role: role);
-          // Tell all other clients about the new member
-          RoomSession.instance.broadcast({
-            'type': 'member_joined',
-            'name': name,
-            'role': role,
-          });
+          // 通知所有人（含新玩家）
+          RoomSession.instance.sendFullMemberList();
         },
         hostName: widget.playerName,
         hostRole: _role,

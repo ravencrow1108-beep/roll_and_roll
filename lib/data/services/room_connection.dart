@@ -8,6 +8,7 @@ import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'socket_support.dart';
 import 'transport/webrtc/webrtc_game.dart';
 import 'transport/webrtc/ice_config.dart';
+import 'transport/protocol/room_message.dart';
 import 'transport/protocol/signal_message.dart';
 import 'transport/signaling/websocket_signaling.dart';
 import 'transport/legacy/socket_support_adapter.dart';
@@ -133,6 +134,12 @@ class RoomConnection {
           final pname = sig.payload['name'] as String? ?? '';
           nameToPlayerId.remove(pname);
           gameTransport.kickPlayer(pid);
+          // 通知 UI：此玩家离开了
+          gameTransport.broadcast(RoomMessage.create(
+            type: RoomMessage.memberLeft,
+            senderId: 'host',
+            payload: {'name': pname},
+          ));
           break;
       }
     });
