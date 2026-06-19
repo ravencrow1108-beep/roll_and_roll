@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../providers/room_state.dart';
 import '../../../data/models/models.dart';
@@ -489,7 +490,25 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
                     children: [
                       Text('状态: $_status'),
                       const SizedBox(height: 6),
-                      Text('房间地址: $_roomAddress'),
+                      Row(
+                        children: [
+                          Expanded(child: Text('房间地址: $_roomAddress')),
+                          if (_isDO && _isHosting && PlatformSocketSupport.lastRoomId != null)
+                            IconButton(
+                              icon: const Icon(Icons.copy, size: 20),
+                              tooltip: '复制房间号',
+                              onPressed: () {
+                                Clipboard.setData(ClipboardData(
+                                    text: PlatformSocketSupport.lastRoomId!));
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                      content: Text('房间号已复制！'),
+                                      duration: Duration(seconds: 1)),
+                                );
+                              },
+                            ),
+                        ],
+                      ),
                     ],
                   ),
                 ),

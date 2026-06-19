@@ -139,7 +139,7 @@ export class RoomDO {
     if (role === 'host') {
       if (this.hostWs && this.hostWs !== ws) {
         this._send(ws, { type: 'error', message: 'Room already has a host' });
-        ws.close(4001, 'Host already connected');
+        this._removeSession(ws);
         return;
       }
       session.role = 'host';
@@ -151,14 +151,15 @@ export class RoomDO {
 
     } else if (role === 'player') {
       if (!this.hostWs) {
-        this._send(ws, { type: 'error', message: 'No host in room' });
-        ws.close(4002, 'No host');
+        this._send(ws, { type: 'error', message: 'No host in room — host must join first' });
+        this._removeSession(ws);
         return;
       }
       for (const [, s] of this.sessions) {
         if (s.role === 'player' && s.name === name) {
           this._send(ws, { type: 'error', message: 'Name taken', code: 'name_taken' });
-          ws.close(4003, 'Name taken');
+          this._removeSession(ws);
+          return;
           return;
         }
       }
@@ -180,7 +181,8 @@ export class RoomDO {
 
     } else {
       this._send(ws, { type: 'error', message: `Invalid role: ${role}` });
-      ws.close(4004, 'Invalid role');
+      this._removeSession(ws);
+      return;
     }
   }
 
