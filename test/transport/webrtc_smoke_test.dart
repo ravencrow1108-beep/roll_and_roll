@@ -2,9 +2,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 
-import '../../lib/data/services/transport/webrtc/peer_connection_manager.dart';
-import '../../lib/data/services/transport/webrtc/ice_config.dart';
-import '../../lib/data/services/transport/protocol/room_message.dart';
+import 'package:roll_and_roll/data/services/transport/webrtc/peer_connection_manager.dart';
+import 'package:roll_and_roll/data/services/transport/webrtc/ice_config.dart';
+import 'package:roll_and_roll/data/services/transport/protocol/room_message.dart';
 
 // ═══════════════════════════════════════════════════════════════
 // Phase 1A — Windows Desktop WebRTC loopback smoke test.

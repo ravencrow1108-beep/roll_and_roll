@@ -3,7 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
-import '../../lib/data/services/socket_support.dart';
+import 'package:roll_and_roll/data/services/socket_support.dart';
 
 // ═══════════════════════════════════════════════════════════════
 // Phase 2 — PlatformSocketSupport DO+WebRTC 集成测试

@@ -2,9 +2,9 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 
-import '../../lib/data/services/transport/protocol/room_message.dart';
-import '../../lib/data/services/transport/webrtc/ice_config.dart';
-import '../../lib/data/services/transport/webrtc/webrtc_game.dart';
+import 'package:roll_and_roll/data/services/transport/protocol/room_message.dart';
+import 'package:roll_and_roll/data/services/transport/webrtc/ice_config.dart';
+import 'package:roll_and_roll/data/services/transport/webrtc/webrtc_game.dart';
 
 void main() {
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
