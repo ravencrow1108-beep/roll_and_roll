@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:http/http.dart' as http;
 
 import 'socket_support.dart';
 import 'transport/webrtc/webrtc_game.dart';
@@ -267,20 +267,13 @@ class RoomConnection {
 
   static Future<String> _httpCreateRoom(String workerUrl) async {
     final uri = Uri.parse('$workerUrl/createRoom');
-    final client = HttpClient();
-    try {
-      final request = await client.postUrl(uri);
-      final response = await request.close().timeout(
-            const Duration(seconds: 10),
-          );
-      final body = await response.transform(utf8.decoder).join();
-      final data = jsonDecode(body) as Map<String, dynamic>;
-      if (data['success'] != true) {
-        throw Exception('createRoom failed: $body');
-      }
-      return data['roomId'] as String;
-    } finally {
-      client.close();
+    final response = await http.post(uri).timeout(
+          const Duration(seconds: 10),
+        );
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    if (data['success'] != true) {
+      throw Exception('createRoom failed: ${response.body}');
     }
+    return data['roomId'] as String;
   }
 }

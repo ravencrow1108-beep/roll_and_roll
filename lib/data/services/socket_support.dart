@@ -38,8 +38,9 @@ abstract class RoomClientHandle {
 // ═══════════════════════════════════════════════════════════════
 
 class PlatformSocketSupport {
-  /// Whether this platform can host a room (desktop only in Phase 0).
-  static bool get canHost => !socket_impl.isWebPlatform;
+  /// Whether this platform can host a room.
+  /// Phase 3: DO 模式下任意平台均可创建房间。
+  static bool get canHost => useDO || !socket_impl.isWebPlatform;
 
   /// Whether this platform can connect to a room (desktop + web via WebSocket).
   static bool get canConnect => true;
@@ -124,7 +125,7 @@ class PlatformSocketSupport {
   }
 
   static String get unsupportedHostMessage =>
-      '当前 Web 端暂不支持创建房间，请在桌面端运行。';
+      useDO ? '连接云端信令失败' : '当前 Web 端暂不支持创建房间，请在桌面端运行。';
 }
 
 /// Encode a JSON map as a newline-terminated socket message.
