@@ -240,12 +240,13 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
           final role = data['role'] as String? ?? '玩家';
           RoomSession.instance.addMember(name, role: role);
           break;
+        case 'request_members':
+          RoomSession.instance.sendFullMemberList();
+          break;
         case 'character_create':
-          // 远程玩家新建角色 → 保存到房主本地存档
           _onRemoteCharacterCreate(data);
           break;
         case 'character_update':
-          // 远程玩家编辑角色 → 保存到房主本地存档
           _onRemoteCharacterUpdate(data);
           break;
       }

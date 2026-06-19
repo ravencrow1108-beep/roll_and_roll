@@ -128,6 +128,17 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
         _isJoining = false;
         _status = '等待房主确认...';
       });
+
+      // DO 模式：DataChannel 可能延迟，主动请求成员列表（重试直到收到）
+      if (_isDO) {
+        Timer.periodic(const Duration(seconds: 2), (timer) {
+          if (!mounted || _isConnected) {
+            timer.cancel();
+            return;
+          }
+          _clientHandle?.send(socketEncode({'type': 'request_members'}));
+        });
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
