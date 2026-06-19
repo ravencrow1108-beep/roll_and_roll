@@ -49,6 +49,13 @@ class _HomePageState extends State<HomePage> {
     Navigator.push(context, MaterialPageRoute(builder: (_) => page));
   }
 
+  void _openSettings(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const _SettingsPage()),
+    );
+  }
+
   Future<void> _modifySaveFile() async {
     final result = await FilePicker.pickFiles(
       dialogTitle: '选择要修改的存档文件 (.zip)',
@@ -116,6 +123,16 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('Roll and Roll'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings_outlined),
+            tooltip: '软件设置',
+            onPressed: () => _openSettings(context),
+          ),
+        ],
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           child: Container(
@@ -256,6 +273,26 @@ class _ActionButton extends StatelessWidget {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 软件设置页面（内容待补充）
+class _SettingsPage extends StatelessWidget {
+  const _SettingsPage();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('软件设置'),
+      ),
+      body: const Center(
+        child: Text(
+          '设置项后续补充',
+          style: TextStyle(fontSize: 16, color: Colors.grey),
         ),
       ),
     );
