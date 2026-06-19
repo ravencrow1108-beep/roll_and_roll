@@ -6,7 +6,7 @@ import '../../../data/models/models.dart';
 import '../create_save/create_save_page.dart';
 import '../adventure/adventure_page.dart';
 import '../map_editor/map_editor_page.dart';
-import '../../widgets/map_preview_page.dart';
+import '../map_preview/map_preview_page.dart';
 
 /// 主持地图编辑页面：选择地图、查看详情并等待所有玩家准备后开始布置
 class MapEditPage extends StatefulWidget {
@@ -109,8 +109,41 @@ class _MapEditPageState extends State<MapEditPage> {
     _loadSaveData();
   }
 
-  void _selectMap(MapData m) {
-    setState(() => _selectedMap = m);
+  Future<void> _selectMap(MapData m) async {
+    // 有位置记录就用位置，否则给每个角色分配默认位置（均匀排列）
+    List<PlayerPosition> positionsForMap;
+    if (_loadedPositions.isNotEmpty) {
+      positionsForMap = _loadedPositions.toList();
+    } else if (_loadedCharacters.isNotEmpty) {
+      final count = _loadedCharacters.length;
+      final spacing = 0.8 / (count + 1);
+      positionsForMap = List.generate(count, (i) {
+        return PlayerPosition(
+          name: _loadedCharacters[i].name,
+          x: spacing * (i + 1) + 0.1,
+          y: 0.5,
+        );
+      });
+    } else {
+      positionsForMap = [];
+    }
+
+    if (!mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MapPreviewPage(
+          mapData: m,
+          positions: positionsForMap,
+          characters: _loadedCharacters,
+          saveFileName: _saveFilePath != null ? _saveFileName : null,
+          onBack: () => Navigator.of(context).pop(),
+          onStart: _markReady,
+        ),
+      ),
+    );
+    // 返回后清空选中状态
+    if (mounted) setState(() => _selectedMap = null);
   }
 
   Future<void> _editMap(MapData m, int index) async {
@@ -179,48 +212,10 @@ class _MapEditPageState extends State<MapEditPage> {
     super.dispose();
   }
 
-  /// 根据已选地图切换显示地图详情或选择列表
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
-    // ── 已选定地图 → 地图详情 + 准备状态 ──
-    if (_selectedMap != null) {
-      return _buildMapView(theme);
-    }
-
-    // ── 地图选择页 ──
     return _buildMapSelection(theme);
-  }
-
-  /// 构建地图详情视图 — 大图预览 + 角色位置标记 + 开始冒险按钮
-  Widget _buildMapView(ThemeData theme) {
-    final m = _selectedMap!;
-    // 有位置记录就用位置，否则给每个角色分配默认位置（均匀排列）
-    List<PlayerPosition> positionsForMap;
-    if (_loadedPositions.isNotEmpty) {
-      positionsForMap = _loadedPositions.toList();
-    } else if (_loadedCharacters.isNotEmpty) {
-      final count = _loadedCharacters.length;
-      final spacing = 0.8 / (count + 1);
-      positionsForMap = List.generate(count, (i) {
-        return PlayerPosition(
-          name: _loadedCharacters[i].name,
-          x: spacing * (i + 1) + 0.1,
-          y: 0.5,
-        );
-      });
-    } else {
-      positionsForMap = [];
-    }
-    return MapPreviewPage(
-      mapData: m,
-      positions: positionsForMap,
-      characters: _loadedCharacters,
-      saveFileName: _saveFilePath != null ? _saveFileName : null,
-      onBack: () => setState(() => _selectedMap = null),
-      onStart: _markReady,
-    );
   }
 
   /// 构建地图选择列表与存档加载界面

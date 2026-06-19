@@ -10,7 +10,7 @@ import '../../../data/models/models.dart';
 import '../../../data/services/socket_support.dart';
 import '../../../data/services/voice_service.dart';
 import '../create_save/create_save_page.dart';
-import '../../widgets/map_preview_page.dart';
+import '../map_preview/map_preview_page.dart';
 import 'character_views.dart';
 import 'map_display.dart';
 import 'map_views.dart';
@@ -398,7 +398,26 @@ class _AdventurePageState extends State<AdventurePage> {
   }
 
   void _selectCharacter(CharacterData c) => setState(() => _character = c);
-  void _selectMap(MapData m) => setState(() => _selectedMap = m);
+
+  Future<void> _selectMap(MapData m) async {
+    final positions = RoomSession.instance.playerPositionsNotifier.value;
+    if (!mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MapPreviewPage(
+          mapData: m,
+          positions: positions,
+          characters: _loadedCharacters,
+          saveFileName: _saveFilePath != null ? _saveFileName : null,
+          onBack: () => Navigator.of(context).pop(),
+          onStart: _forceStartAdventure,
+        ),
+      ),
+    );
+    // 返回后清空选中状态（若冒险已开始则 build 自动进入冒险视图）
+    if (mounted) setState(() => _selectedMap = null);
+  }
 
   Future<void> _navigateToCreateSave() async {
     final result = await Navigator.push<String>(
@@ -1028,7 +1047,6 @@ class _AdventurePageState extends State<AdventurePage> {
       return _buildAdventureView();
     }
     if (!_isGM && _character != null) return _buildCharacterView();
-    if (_isGM && _selectedMap != null) return _buildMapPreviewView();
     return _isGM ? _buildMapSelection() : _buildCharacterSelection();
   }
 
@@ -1373,19 +1391,6 @@ class _AdventurePageState extends State<AdventurePage> {
       onBack: () => setState(() => _character = null),
       onStart: _startAdventure,
       saveFileName: _saveFilePath != null ? _saveFileName : null,
-    );
-  }
-
-  /// 构建主持地图预览与开始冒险界面（统一使用 MapPreviewPage）
-  Widget _buildMapPreviewView() {
-    final positions = RoomSession.instance.playerPositionsNotifier.value;
-    return MapPreviewPage(
-      mapData: _selectedMap!,
-      positions: positions,
-      characters: _loadedCharacters,
-      saveFileName: _saveFilePath != null ? _saveFileName : null,
-      onBack: () => setState(() => _selectedMap = null),
-      onStart: _forceStartAdventure,
     );
   }
 

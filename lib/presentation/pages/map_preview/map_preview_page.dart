@@ -3,10 +3,10 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
-import '../../data/models/models.dart';
+import '../../../data/models/models.dart';
 
 /// 统一的地图预览页面：大图预览 + 角色位置标记 + 底部信息栏 + 开始冒险按钮
-/// 用于 MapEditPage 和 AdventurePage，保证两处地图预览完全一致
+/// 用于 MapEditPage 和 AdventurePage，通过 Navigator.push 调用，保证两处地图预览完全一致
 class MapPreviewPage extends StatelessWidget {
   const MapPreviewPage({
     required this.mapData,
@@ -114,7 +114,10 @@ class MapPreviewPage extends StatelessWidget {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    onPressed: onStart,
+                    onPressed: () {
+                      onStart();
+                      Navigator.of(context).pop();
+                    },
                     icon: const Icon(Icons.rocket_launch_outlined),
                     label: const Text(
                       '开始冒险',
