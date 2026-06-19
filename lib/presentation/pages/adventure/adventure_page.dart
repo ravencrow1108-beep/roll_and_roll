@@ -10,6 +10,7 @@ import '../../../data/models/models.dart';
 import '../../../data/services/socket_support.dart';
 import '../../../data/services/voice_service.dart';
 import '../create_save/create_save_page.dart';
+import '../../widgets/map_preview_page.dart';
 import 'character_views.dart';
 import 'map_display.dart';
 import 'map_views.dart';
@@ -1369,14 +1370,15 @@ class _AdventurePageState extends State<AdventurePage> {
     );
   }
 
-  /// 构建主持地图预览与开始冒险界面
+  /// 构建主持地图预览与开始冒险界面（统一使用 MapPreviewPage）
   Widget _buildMapPreviewView() {
-    return MapPreviewView(
+    return MapPreviewPage(
       mapData: _selectedMap!,
-      isReady: _isReady,
-      onBack: () => setState(() => _selectedMap = null),
-      onStart: _startAdventure,
+      positions: const [],
+      characters: _loadedCharacters,
       saveFileName: _saveFilePath != null ? _saveFileName : null,
+      onBack: () => setState(() => _selectedMap = null),
+      onStart: _forceStartAdventure,
     );
   }
 
