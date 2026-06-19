@@ -428,12 +428,17 @@ class _AdventurePageState extends State<AdventurePage> {
     }
   }
 
-  /// GM 强制开始冒险（无视玩家准备状态）
+  /// GM 强制开始冒险（无视玩家准备状态），保留现有角色位置
   void _forceStartAdventure() {
     if (_selectedMap == null) return;
     final s = RoomSession.instance;
+    final positions = s.playerPositionsNotifier.value;
     s.mapNotifier.value = _selectedMap;
-    s.broadcast({'type': 'adventure_started', 'map': _selectedMap!.toJson()});
+    s.broadcast({
+      'type': 'adventure_started',
+      'map': _selectedMap!.toJson(),
+      'positions': positions.map((p) => p.toJson()).toList(),
+    });
     if (mounted) {
       setState(() {
         _adventureStarted = true;
@@ -1288,13 +1293,14 @@ class _AdventurePageState extends State<AdventurePage> {
   }
 
   /// "返回房间"按钮：回到选图/选角页面，不退出冒险
+  /// 保留角色位置以便重新开始后恢复场上角色
   void _returnToRoom() {
     // 通知所有玩家返回选角页
     RoomSession.instance.broadcast({'type': 'return_to_selection'});
     RoomSession.instance.startAdventureNotifier.value = false;
     RoomSession.instance.mapNotifier.value = null;
-    RoomSession.instance.playerPositionsNotifier.value = [];
-    RoomSession.instance.readyMembersNotifier.value = {};
+    // 不重置 readyMembersNotifier 和 playerPositionsNotifier，
+    // 以便重新选择地图后角色位置保持不变
     setState(() {
       _adventureStarted = false;
       _displayedMap = null;
