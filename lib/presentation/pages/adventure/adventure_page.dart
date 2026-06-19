@@ -1378,9 +1378,10 @@ class _AdventurePageState extends State<AdventurePage> {
 
   /// 构建主持地图预览与开始冒险界面（统一使用 MapPreviewPage）
   Widget _buildMapPreviewView() {
+    final positions = RoomSession.instance.playerPositionsNotifier.value;
     return MapPreviewPage(
       mapData: _selectedMap!,
-      positions: const [],
+      positions: positions,
       characters: _loadedCharacters,
       saveFileName: _saveFilePath != null ? _saveFileName : null,
       onBack: () => setState(() => _selectedMap = null),
