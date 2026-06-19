@@ -1229,8 +1229,6 @@ class _AdventurePageState extends State<AdventurePage> {
                       : null,
                   onAddEquipment: _isGM ? _onAddEquipment : null,
                   onAddItem: _isGM ? _onAddItem : null,
-                  onBackToMapSelection:
-                      _isGM ? () => _backToMapSelection() : null,
                 ),
                 // ── 地图 ──
                 Expanded(
@@ -1275,19 +1273,6 @@ class _AdventurePageState extends State<AdventurePage> {
         ),
       ),
     );
-  }
-
-  /// 返回选图界面（GM 专用，不退出冒险房间）
-  void _backToMapSelection() {
-    // 同时通知所有玩家返回选图
-    RoomSession.instance.broadcast({'type': 'return_to_map_selection'});
-    setState(() {
-      _adventureStarted = false;
-      _displayedMap = null;
-      _selectedMap = null;
-      _selectedPlayerName = null;
-      _isReady = false;
-    });
   }
 
   /// 处理返回按钮 / 返回房间：主持弹出确认弹窗，玩家直接返回
@@ -1548,7 +1533,6 @@ class _AdventureLeftPanel extends StatelessWidget {
     this.onDeployCharacter,
     this.onAddEquipment,
     this.onAddItem,
-    this.onBackToMapSelection,
   });
 
   final CharacterData? selectedCharacter;
@@ -1560,14 +1544,12 @@ class _AdventureLeftPanel extends StatelessWidget {
   final void Function(CharacterData c)? onDeployCharacter;
   final void Function(String name)? onAddEquipment;
   final void Function(String name)? onAddItem;
-  final VoidCallback? onBackToMapSelection;
 
   @override
   Widget build(BuildContext context) {
     // 选中角色 → 显示详情面板
-    Widget content;
     if (selectedCharacter != null) {
-      content = _PlayerDetailPanel(
+      return _PlayerDetailPanel(
         character: selectedCharacter,
         onClose: onCloseDetail,
         playerNames: playerNames,
@@ -1576,71 +1558,14 @@ class _AdventureLeftPanel extends StatelessWidget {
         onAddEquipment: onAddEquipment,
         onAddItem: onAddItem,
       );
-    } else {
-      // 默认显示角色网格
-      content = _CharacterGridPanel(
-        characters: loadedCharacters,
-        isGM: isGM,
-        onTapCharacter: (c) => onSelectPlayer(c.name),
-        onDeployCharacter: onDeployCharacter,
-      );
     }
 
-    // GM 可见：顶部"返回选图"按钮条
-    if (isGM && onBackToMapSelection != null) {
-      final width = selectedCharacter != null ? 260.0 : 220.0;
-      return SizedBox(
-        width: width,
-        child: Column(
-          children: [
-            _BackToMapBar(onTap: onBackToMapSelection!),
-            Expanded(child: content),
-          ],
-        ),
-      );
-    }
-    return content;
-  }
-}
-
-/// "返回选图"按钮条，GM 可见
-class _BackToMapBar extends StatelessWidget {
-  const _BackToMapBar({required this.onTap});
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.orange.shade50,
-        border: Border(
-          bottom: BorderSide(color: Colors.orange.shade200, width: 1),
-        ),
-      ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(4),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.map_outlined, size: 14, color: Colors.orange.shade700),
-              const SizedBox(width: 4),
-              Text(
-                '返回选图',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.orange.shade800,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+    // 默认显示角色网格
+    return _CharacterGridPanel(
+      characters: loadedCharacters,
+      isGM: isGM,
+      onTapCharacter: (c) => onSelectPlayer(c.name),
+      onDeployCharacter: onDeployCharacter,
     );
   }
 }
