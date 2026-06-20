@@ -77,6 +77,7 @@ class WebSocketSignaling implements SignalingTransport {
       token: roomId,
       role: role,
       playerId: playerId,
+      name: name,
     ));
 
     // 监听消息

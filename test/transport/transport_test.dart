@@ -2,8 +2,8 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 
-import '../../lib/data/services/transport/protocol/room_message.dart';
-import '../../lib/data/services/transport/protocol/signal_message.dart';
+import 'package:roll_and_roll/data/services/transport/protocol/room_message.dart';
+import 'package:roll_and_roll/data/services/transport/protocol/signal_message.dart';
 
 /// Comprehensive transport protocol serialization tests.
 ///

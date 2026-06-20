@@ -49,6 +49,13 @@ class _HomePageState extends State<HomePage> {
     Navigator.push(context, MaterialPageRoute(builder: (_) => page));
   }
 
+  void _openSettings(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const _SettingsPage()),
+    );
+  }
+
   Future<void> _modifySaveFile() async {
     final result = await FilePicker.pickFiles(
       dialogTitle: '选择要修改的存档文件 (.zip)',
@@ -116,6 +123,16 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('Roll and Roll'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings_outlined),
+            tooltip: '软件设置',
+            onPressed: () => _openSettings(context),
+          ),
+        ],
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           child: Container(
@@ -250,13 +267,81 @@ class _ActionButton extends StatelessWidget {
       child: ElevatedButton.icon(
         onPressed: enabled ? onPressed : null,
         icon: Icon(icon, size: 22),
-        label: Text(label, style: const TextStyle(fontSize: 16)),
+        label: Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         style: ElevatedButton.styleFrom(
           padding: const EdgeInsets.symmetric(vertical: 16),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// 软件设置页面
+class _SettingsPage extends StatefulWidget {
+  const _SettingsPage();
+
+  @override
+  State<_SettingsPage> createState() => _SettingsPageState();
+}
+
+class _SettingsPageState extends State<_SettingsPage> {
+  static const _keyLang = 'app_language';
+  String _lang = 'zh';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLang();
+  }
+
+  Future<void> _loadLang() async {
+    final prefs = await SharedPreferences.getInstance();
+    final v = prefs.getString(_keyLang) ?? 'zh';
+    if (mounted) setState(() => _lang = v);
+  }
+
+  Future<void> _setLang(String v) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyLang, v);
+    if (mounted) setState(() => _lang = v);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('软件设置'),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          Text(
+            '语言 Language',
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 12),
+          SegmentedButton<String>(
+            segments: const [
+              ButtonSegment(value: 'zh', label: Text('中文')),
+              ButtonSegment(value: 'en', label: Text('English')),
+            ],
+            selected: {_lang},
+            onSelectionChanged: (v) => _setLang(v.first),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            _lang == 'zh'
+                ? '切换语言后重启应用生效'
+                : 'Restart the app after switching language',
+            style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
+          ),
+        ],
       ),
     );
   }

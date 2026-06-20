@@ -239,6 +239,7 @@ class _MapDisplayState extends State<MapDisplay> {
                               children: [
                                 InteractiveViewer(
                                   transformationController: _transformCtrl,
+                                  panEnabled: _draggedIndex == null,
                                   minScale: 0.1,
                                   maxScale: 8.0,
                                   child: FittedBox(

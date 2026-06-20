@@ -74,12 +74,14 @@ class SignalMessage {
     required String token,
     required String role, // "host" | "player"
     String? playerId,
+    String? name,
   }) {
     final payload = <String, dynamic>{
       'token': token,
       'role': role,
     };
     if (playerId != null) payload['playerId'] = playerId;
+    if (name != null) payload['name'] = name;
     return SignalMessage(type: auth, payload: payload);
   }
 

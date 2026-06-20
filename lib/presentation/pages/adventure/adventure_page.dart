@@ -10,6 +10,7 @@ import '../../../data/models/models.dart';
 import '../../../data/services/socket_support.dart';
 import '../../../data/services/voice_service.dart';
 import '../create_save/create_save_page.dart';
+import '../map_preview/map_preview_page.dart';
 import 'character_views.dart';
 import 'map_display.dart';
 import 'map_views.dart';
@@ -249,6 +250,17 @@ class _AdventurePageState extends State<AdventurePage> {
               if (mounted) setState(() {});
             }
             break;
+          case 'return_to_selection':
+            // 主持点击"返回房间"：玩家回到角色选择页
+            if (mounted) {
+              setState(() {
+                _adventureStarted = false;
+                _displayedMap = null;
+                _isReady = false;
+                _character = null;
+              });
+            }
+            break;
           case 'return_to_room':
           case 'host_disconnected':
             if (mounted) Navigator.of(context).pop();
@@ -386,7 +398,26 @@ class _AdventurePageState extends State<AdventurePage> {
   }
 
   void _selectCharacter(CharacterData c) => setState(() => _character = c);
-  void _selectMap(MapData m) => setState(() => _selectedMap = m);
+
+  Future<void> _selectMap(MapData m) async {
+    final positions = RoomSession.instance.playerPositionsNotifier.value;
+    if (!mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MapPreviewPage(
+          mapData: m,
+          positions: positions,
+          characters: _loadedCharacters,
+          saveFileName: _saveFilePath != null ? _saveFileName : null,
+          onBack: () => Navigator.of(context).pop(),
+          onStart: () => _forceStartAdventure(m),
+        ),
+      ),
+    );
+    // 返回后清空选中状态（若冒险已开始则 build 自动进入冒险视图）
+    if (mounted) setState(() => _selectedMap = null);
+  }
 
   Future<void> _navigateToCreateSave() async {
     final result = await Navigator.push<String>(
@@ -407,12 +438,30 @@ class _AdventurePageState extends State<AdventurePage> {
   void _startAdventure() {
     if (_isGM) {
       if (_selectedMap == null) return;
-      setState(() => _isReady = true);
-      _checkAllReady();
+      // GM 点击开始冒险 → 立即开始，不等待玩家准备
+      _forceStartAdventure(_selectedMap!);
     } else {
       if (_character == null) return;
       setState(() => _isReady = true);
       RoomSession.instance.setPlayerReady(widget.playerName);
+    }
+  }
+
+  /// GM 强制开始冒险（无视玩家准备状态），保留现有角色位置
+  void _forceStartAdventure(MapData map) {
+    final s = RoomSession.instance;
+    final positions = s.playerPositionsNotifier.value;
+    s.mapNotifier.value = map;
+    s.broadcast({
+      'type': 'adventure_started',
+      'map': map.toJson(),
+      'positions': positions.map((p) => p.toJson()).toList(),
+    });
+    if (mounted) {
+      setState(() {
+        _adventureStarted = true;
+        _displayedMap = map;
+      });
     }
   }
 
@@ -997,7 +1046,6 @@ class _AdventurePageState extends State<AdventurePage> {
       return _buildAdventureView();
     }
     if (!_isGM && _character != null) return _buildCharacterView();
-    if (_isGM && _selectedMap != null) return _buildMapPreviewView();
     return _isGM ? _buildMapSelection() : _buildCharacterSelection();
   }
 
@@ -1189,8 +1237,8 @@ class _AdventurePageState extends State<AdventurePage> {
             onPressed: _saveAsProgress,
           ),
           TextButton.icon(
-            onPressed: _onBackPressed,
-            icon: const Icon(Icons.exit_to_app),
+            onPressed: _returnToRoom,
+            icon: const Icon(Icons.arrow_back),
             label: const Text('返回房间'),
           ),
         ],
@@ -1261,6 +1309,24 @@ class _AdventurePageState extends State<AdventurePage> {
     );
   }
 
+  /// "返回房间"按钮：回到选图/选角页面，不退出冒险
+  /// 保留角色位置以便重新开始后恢复场上角色
+  void _returnToRoom() {
+    // 通知所有玩家返回选角页
+    RoomSession.instance.broadcast({'type': 'return_to_selection'});
+    RoomSession.instance.startAdventureNotifier.value = false;
+    RoomSession.instance.mapNotifier.value = null;
+    // 不重置 readyMembersNotifier 和 playerPositionsNotifier，
+    // 以便重新选择地图后角色位置保持不变
+    setState(() {
+      _adventureStarted = false;
+      _displayedMap = null;
+      _selectedMap = null;
+      _selectedPlayerName = null;
+      _isReady = false;
+    });
+  }
+
   /// 处理返回按钮 / 返回房间：主持弹出确认弹窗，玩家直接返回
   Future<void> _onBackPressed() async {
     if (_isGM) {
@@ -1322,17 +1388,6 @@ class _AdventurePageState extends State<AdventurePage> {
       character: _character!,
       isReady: _isReady,
       onBack: () => setState(() => _character = null),
-      onStart: _startAdventure,
-      saveFileName: _saveFilePath != null ? _saveFileName : null,
-    );
-  }
-
-  /// 构建主持地图预览与开始冒险界面
-  Widget _buildMapPreviewView() {
-    return MapPreviewView(
-      mapData: _selectedMap!,
-      isReady: _isReady,
-      onBack: () => setState(() => _selectedMap = null),
       onStart: _startAdventure,
       saveFileName: _saveFilePath != null ? _saveFileName : null,
     );
@@ -2060,8 +2115,77 @@ class _PanelHeader extends StatelessWidget {
               ),
             ),
           ),
+          // ── 金币 & 装备总价值 ──
+          const SizedBox(height: 6),
+          _GoldValueRow(character: character),
         ],
       ),
+    );
+  }
+}
+
+/// 金币 & 装备价值汇总行
+class _GoldValueRow extends StatelessWidget {
+  const _GoldValueRow({required this.character});
+  final CharacterData character;
+
+  int get _backpackGold {
+    int total = 0;
+    for (final item in character.backpack) {
+      total += item.value;
+    }
+    return total;
+  }
+
+  int get _equipmentValue {
+    int total = 0;
+    for (final entry in character.equipment.entries) {
+      if (entry.value != null) {
+        total += entry.value!.value;
+      }
+    }
+    return total;
+  }
+
+  int get _totalValue => _backpackGold + _equipmentValue;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        // 携带金币
+        Icon(Icons.monetization_on_outlined, size: 14, color: Colors.amber.shade700),
+        const SizedBox(width: 2),
+        Text(
+          '$_backpackGold',
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: Colors.amber.shade800,
+          ),
+        ),
+        const SizedBox(width: 10),
+        // 装备总价值
+        Icon(Icons.shield_outlined, size: 12, color: Colors.blueGrey.shade500),
+        const SizedBox(width: 2),
+        Text(
+          '$_equipmentValue',
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w500,
+            color: Colors.blueGrey.shade600,
+          ),
+        ),
+        const Spacer(),
+        // 总价值
+        Text(
+          '总价值 $_totalValue',
+          style: TextStyle(
+            fontSize: 10,
+            color: Colors.grey.shade500,
+          ),
+        ),
+      ],
     );
   }
 }

@@ -8,15 +8,12 @@ Flutter App
     │ WebSocket (wss://)
     │
     ▼
-Cloudflare Worker (fetch)
-    │
+Worker (fetch)
     │ 路由到 Durable Object
-    │
     ▼
-RoomDO (per-room instance)
-    │
-    ├── Host WebSocket   (role="host")
-    └── Player WebSocket (role="player")
+RoomDO (per-room 内存实例)
+    ├── Host   (role="host")
+    └── Player (role="player")
 ```
 
 ## 文件结构
@@ -24,47 +21,31 @@ RoomDO (per-room instance)
 ```
 worker/
   src/
-    index.js       — Worker 入口（HTTP 路由 + WebSocket 升级）
-    room-do.js     — Durable Object（房间信令中继）
+    index.js       — 单文件 Worker + RoomDO（可直接粘贴 Dashboard 或 wrangler deploy）
   wrangler.toml.example  — 配置模板
   README.md
 ```
 
 ## 部署
 
-### 1. 安装 Wrangler
-
-```bash
-npm install -g wrangler
-```
-
-### 2. 创建 wrangler.toml
-
-```bash
-cp wrangler.toml.example wrangler.toml
-```
-
-编辑 `wrangler.toml`，填入你的 `account_id`：
-
-```toml
-account_id = "你的Cloudflare账号ID"
-```
-
-### 3. 部署
+### 方式 A：Wrangler CLI（推荐）
 
 ```bash
 cd worker
+cp wrangler.toml.example wrangler.toml
+# 编辑 wrangler.toml，填你的 account_id
 npx wrangler deploy
 ```
 
-### 4. 验证
+### 方式 B：Cloudflare Dashboard
 
-```bash
-# 创建房间
-curl -X POST https://你的域名.workers.dev/createRoom
+1. 复制 `src/index.js` 全部内容
+2. 粘贴到 Worker 编辑器
+3. Settings → Variables → Durable Objects → 添加绑定：
 
-# 返回: {"success":true,"roomId":"ABC123"}
-```
+| Binding name | Class name |
+|-------------|------------|
+| ROOM | RoomDO |
 
 ## API
 
@@ -81,32 +62,9 @@ curl -X POST https://你的域名.workers.dev/createRoom
 |------|------|
 | `wss://域名/room/{roomId}` | 连接房间 |
 
-### 信令消息
+连接后先发 `auth`：
 
-连接后先发送 `auth` 鉴权：
+**Host:** `{"type":"auth","role":"host","name":"GM"}`
+**Player:** `{"type":"auth","role":"player","name":"玩家名"}`
 
-**Host:**
-```json
-{"type":"auth","role":"host","name":"GM"}
-```
-
-**Player:**
-```json
-{"type":"auth","role":"player","name":"玩家名"}
-```
-
-收到确认后即可交换 WebRTC 信令：
-
-```json
-{"type":"offer","sdp":"...","targetPlayerId":"p_xxx"}
-{"type":"answer","sdp":"..."}
-{"type":"iceCandidate","candidate":"...","sdpMid":"0","sdpMLineIndex":0}
-```
-
-## 安全注意
-
-以下文件不应提交到 git（已在 .gitignore 中）：
-
-- `worker/wrangler.toml`（含 account_id）
-- `worker/.dev.vars`
-- `worker/.env`
+收到 `auth_ok` 后开始 WebRTC 信令交换。
