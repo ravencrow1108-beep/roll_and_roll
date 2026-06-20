@@ -267,7 +267,7 @@ class _ActionButton extends StatelessWidget {
       child: ElevatedButton.icon(
         onPressed: enabled ? onPressed : null,
         icon: Icon(icon, size: 22),
-        label: Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+        label: Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         style: ElevatedButton.styleFrom(
           padding: const EdgeInsets.symmetric(vertical: 16),
           shape: RoundedRectangleBorder(
