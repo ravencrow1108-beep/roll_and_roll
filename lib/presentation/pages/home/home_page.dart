@@ -279,21 +279,69 @@ class _ActionButton extends StatelessWidget {
   }
 }
 
-/// 软件设置页面（内容待补充）
-class _SettingsPage extends StatelessWidget {
+/// 软件设置页面
+class _SettingsPage extends StatefulWidget {
   const _SettingsPage();
 
   @override
+  State<_SettingsPage> createState() => _SettingsPageState();
+}
+
+class _SettingsPageState extends State<_SettingsPage> {
+  static const _keyLang = 'app_language';
+  String _lang = 'zh';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLang();
+  }
+
+  Future<void> _loadLang() async {
+    final prefs = await SharedPreferences.getInstance();
+    final v = prefs.getString(_keyLang) ?? 'zh';
+    if (mounted) setState(() => _lang = v);
+  }
+
+  Future<void> _setLang(String v) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyLang, v);
+    if (mounted) setState(() => _lang = v);
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
         title: const Text('软件设置'),
       ),
-      body: const Center(
-        child: Text(
-          '设置项后续补充',
-          style: TextStyle(fontSize: 16, color: Colors.grey),
-        ),
+      body: ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          Text(
+            '语言 Language',
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 12),
+          SegmentedButton<String>(
+            segments: const [
+              ButtonSegment(value: 'zh', label: Text('中文')),
+              ButtonSegment(value: 'en', label: Text('English')),
+            ],
+            selected: {_lang},
+            onSelectionChanged: (v) => _setLang(v.first),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            _lang == 'zh'
+                ? '切换语言后重启应用生效'
+                : 'Restart the app after switching language',
+            style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
+          ),
+        ],
       ),
     );
   }
