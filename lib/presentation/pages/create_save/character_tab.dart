@@ -443,13 +443,10 @@ class CharacterTab extends StatelessWidget {
               ),
               const Spacer(),
               if (skillTemplates.isNotEmpty)
-                PopupMenuButton<SkillData>(
+                IconButton(
                   tooltip: '从模板添加技能',
                   icon: const Icon(Icons.add_circle_outline, size: 20),
-                  onSelected: onAddSkillFromTemplate,
-                  itemBuilder: (_) => skillTemplates
-                      .map((s) => PopupMenuItem(value: s, child: Text(s.name)))
-                      .toList(),
+                  onPressed: () => _showSkillPicker(context),
                 ),
             ],
           ),
@@ -852,6 +849,113 @@ class CharacterTab extends StatelessWidget {
                       ),
               ),
             ],
+          );
+        },
+      ),
+    );
+  }
+
+  void _showSkillPicker(BuildContext context) {
+    final searchCtrl = TextEditingController();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) {
+          final query = searchCtrl.text.toLowerCase();
+          final filtered = skillTemplates
+              .where((s) {
+                if (query.isEmpty) return true;
+                if (s.name.toLowerCase().contains(query)) return true;
+                if (s.description?.toLowerCase().contains(query) ?? false) {
+                  return true;
+                }
+                for (final d in s.damages) {
+                  if (d.damageType?.toLowerCase().contains(query) ?? false) {
+                    return true;
+                  }
+                  if (d.expression?.toLowerCase().contains(query) ?? false) {
+                    return true;
+                  }
+                }
+                return false;
+              })
+              .toList();
+          return SizedBox(
+            height: MediaQuery.of(ctx).size.height * 0.7,
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                  child: Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          '选择技能',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        icon: const Icon(Icons.close),
+                      ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: TextField(
+                    controller: searchCtrl,
+                    autofocus: true,
+                    decoration: const InputDecoration(
+                      hintText: '搜索技能名称/描述/伤害类型…',
+                      prefixIcon: Icon(Icons.search, size: 20),
+                      isDense: true,
+                    ),
+                    onChanged: (_) => setSheetState(() {}),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: filtered.isEmpty
+                      ? const Center(
+                          child: Text(
+                            '无匹配技能模板',
+                            style:
+                                TextStyle(fontSize: 14, color: Colors.grey),
+                          ),
+                        )
+                      : ListView.builder(
+                          itemCount: filtered.length,
+                          itemBuilder: (_, i) {
+                            final s = filtered[i];
+                            return ListTile(
+                              leading: const Icon(
+                                Icons.casino,
+                                color: Colors.deepPurple,
+                              ),
+                              title: Text(s.name),
+                              subtitle: Text(
+                                s.description ?? '',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              trailing: TextButton(
+                                onPressed: () {
+                                  onAddSkillFromTemplate(s);
+                                  Navigator.pop(ctx);
+                                },
+                                child: const Text('添加'),
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
           );
         },
       ),
